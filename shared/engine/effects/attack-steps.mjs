@@ -110,7 +110,9 @@ function attackingView(ctx, root) {
 function attackerRef(ctx) {
   const id = ctx.sourceCard?.instanceId;
   if (id == null) return null;
-  const ref = findCard(ctx.draft, id);
+  let ref = findCard(ctx.draft, id);
+  // An Ability's source can be the evolution card on top; the Pokémon in play is its root.
+  if (ref?.card.attachedTo != null && isPokemon(ref.card)) ref = findCard(ctx.draft, ref.card.attachedTo);
   if (!ref || (ref.zoneId !== 'active' && ref.zoneId !== 'bench') || ref.card.attachedTo) return null;
   return ref;
 }
@@ -1457,6 +1459,8 @@ function benchDiscardCandidates(player, step) {
       return false;
     }
     if (step.pokemonType && !pokemonHasType(c, step.pokemonType)) return false;
+    // Ninjask Molting: "a Shedinja".
+    if (step.name && String(c.name || '').trim().toLowerCase() !== step.name) return false;
     if (step.maxHp && (Number(c.hp) || 0) > step.maxHp) return false;
     if (
       step.ruleBoxes &&
@@ -1521,7 +1525,8 @@ function atkBenchFromDiscard(ctx) {
 // Bench; Marshadow Shadowy Echoes (`each`): one from each player's. The attacker chooses.
 function atkBenchFromAnyDiscard(ctx) {
   const { player, opponent, step } = ctx;
-  const sides = [player, opponent].filter(Boolean);
+  // Banette Red Eyes (`side: 'opponent'`): the opponent's discard pile only.
+  const sides = (step.side === 'opponent' ? [opponent] : [player, opponent]).filter(Boolean);
   const basicsOf = (side) =>
     benchSpace(side, ctx.draft) > 0 ? (side.zones.discard || []).filter((c) => isPokemon(c) && stageOf(c) === 'Basic') : [];
   const place = (picked) => {
@@ -3733,6 +3738,36 @@ function atkSourceFromDiscardToBench(ctx) {
   return null;
 }
 
+// Trumbeak Mountain Pass: the attacker sees the opponent's top card; this card goes to the Lost
+// Zone, and so may that card when it is a Supporter.
+function atkLostZoneSourceAndOppTopSupporter(ctx) {
+  const { player, opponent } = ctx;
+  const top = opponent?.zones?.deck?.[0] || null;
+  if (ctx.memo?.offered) {
+    if (ctx.selection?.[0] === ATTACK_YES && top && opponent.zones.deck[0] === top) {
+      moveToZone(opponent, top, 'lostZone', 'deck', ctx.events);
+    }
+    return null;
+  }
+  const self = (player.zones.hand || []).find((c) => c.instanceId === ctx.sourceCard?.instanceId);
+  if (self) moveToZone(player, self, 'lostZone', 'hand', ctx.events);
+  if (!top) return skip(ctx, 'empty_deck');
+  ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: 1 });
+  const supporter = matchesSearch(top, 'Supporter');
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Put the top card of your opponent's deck in the Lost Zone?`,
+    options: supporter
+      ? [
+          { instanceId: ATTACK_YES, name: `Yes (${top.name})`, type: 'option' },
+          { instanceId: ATTACK_NO, name: `No (${top.name})`, type: 'option' },
+        ]
+      : [{ instanceId: ATTACK_NO, name: `${top.name} (not a Supporter)`, type: 'option' }],
+    min: 1,
+    max: 1,
+    memo: { offered: true },
+  });
+}
+
 // Wishiwashi Cowardice: discard everything attached to this Pokémon and return it to the hand.
 function atkReturnSelfToHand(ctx) {
   const { player } = ctx;
@@ -5116,6 +5151,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkDrawPerBench,
   atkReturnSelfToHand,
   atkSourceFromDiscardToBench,
+  atkLostZoneSourceAndOppTopSupporter,
   atkCountersOnChosen,
   evolveSelfFromHand,
   abilityStage2OntoBasic,

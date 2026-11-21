@@ -560,6 +560,21 @@ const TEMPLATES = [
         ? { type: 'atkCountersOnChosen', targets: Number(m[1]), count: Number(m[3]), scope: m[2] ? 'bench' : 'all' }
         : null,
   ],
+  // Marshadow Let Loose (sm3.5-45).
+  [
+    /^have each player shuffle their hand into their deck and draw (\d+) cards$/,
+    (m) => ({ type: 'ionoShuffle', drawCount: Number(m[1]) }),
+  ],
+  // Banette Red Eyes (sm7-65).
+  [
+    /^put a basic pokémon from your opponent's discard pile onto their bench$/,
+    () => ({ type: 'atkBenchFromAnyDiscard', side: 'opponent' }),
+  ],
+  // Ninjask Molting (sm8-30): a named Pokémon.
+  [
+    /^put an? ([a-z][a-z'’ -]*?) from your discard pile onto your bench$/,
+    (m) => (/pokémon|card/.test(m[1]) ? null : { type: 'atkBenchFromDiscard', count: 1, name: m[1].trim() }),
+  ],
   // Darkrai-GX Restoration / Giratina Distortion Door: the Ability's own card, from the discard.
   [/^put it onto your bench$/, () => ({ type: 'atkSourceFromDiscardToBench' })],
   // Wishiwashi Cowardice (sm1-44): an Ability's effect.
@@ -1757,6 +1772,12 @@ const BLOCKS = [
     /choose 1 of your basic pokémon in play\. if you have a stage 2 card in your hand that evolves from that pokémon, put that card onto the basic pokémon to evolve it\./g,
     () => ({ type: 'abilityStage2OntoBasic' }),
   ],
+  // Trumbeak Mountain Pass (sm8-165), from the hand: this card to the Lost Zone, and the opponent's
+  // top card too when it is a Supporter.
+  [
+    /reveal it\. if you do, look at the top card of your opponent's deck and put this pokémon in the lost zone\. if that card is a supporter card, you may put it in the lost zone\./g,
+    () => ({ type: 'atkLostZoneSourceAndOppTopSupporter' }),
+  ],
   // Nuzleaf Clear the Room (sm7-13).
   [
     /your opponent reveals their hand\. choose a supporter card you find there\. your opponent shuffles that card into their deck\./g,
@@ -2134,7 +2155,13 @@ export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
   let holderZone = null;
   const position = HOLDER_POSITION.exec(effect);
   if (position) {
-    holderZone = /bench/.test(position[1]) ? 'bench' : /discard/.test(position[1]) ? 'discard' : 'active';
+    holderZone = /bench/.test(position[1])
+      ? 'bench'
+      : /discard/.test(position[1])
+        ? 'discard'
+        : /hand/.test(position[1])
+          ? 'hand'
+          : 'active';
     effect = effect.slice(position[0].length);
   }
   // Milk Drink's "if this Pokémon was healed during this turn" is its activation gate
@@ -2157,7 +2184,7 @@ function abilityRevealVoice(effect) {
 }
 
 const HOLDER_POSITION =
-  /^if this pokémon is (in the active spot|your active pokémon|on your bench|in your discard pile), (?:you may )?/;
+  /^if this pokémon is (in the active spot|your active pokémon|on your bench|in your discard pile|in your hand), (?:you may )?/;
 
 /**
  * Applies a coin result to gated steps: "If heads/tails" steps are dropped on the other face
@@ -2198,7 +2225,8 @@ function isAttachStep(step) {
 // Sentences that only make sense after an attach: "it" / "that Pokémon" is the Pokémon the
 // Energy went to.
 // Steps whose "If you do, …" runs only when they happened (a switch, Distortion Door's return).
-const SWITCH_STEP_TYPES = new Set(['atkGust', 'atkSwitchSelf', 'atkSourceFromDiscardToBench']);
+// Rayquaza-GX Stormy Winds (sm7-109): "discard the top 3 cards of your deck. If you do, attach …".
+const SWITCH_STEP_TYPES = new Set(['atkGust', 'atkSwitchSelf', 'atkSourceFromDiscardToBench', 'atkMill']);
 
 const CHAIN_TEMPLATES = [
   [/^switch it with 1 of your benched pokémon$/, () => ({ type: 'atkSwitchSelf' })],

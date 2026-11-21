@@ -367,3 +367,142 @@ test('Sudowoodo Roadblock (sm2-66): 4 Benched Pokémon at most, and a 5th is dis
   assert.equal(res.state.players.p1.zones.bench.length, 4);
   assert.deepEqual(names(res.state, 'p1', 'discard'), ['Bench 0']);
 });
+
+/** A Stage 1 `name` evolved this turn (turn 5) from a Basic in `zone`. */
+function evolvedThisTurn(state, zone, name, text, evolvedTurn = 5) {
+  const root = mon(`${name} root`);
+  const top = mon(name, { stage: 'Stage 1', subtypes: ['Stage 1'], attachedTo: root.instanceId, ...ability(text) });
+  top.enteredPlayTurn = evolvedTurn;
+  state.players.p1.zones[zone].push(root, top);
+  if (evolvedTurn === 5) state.players.p1.flags.evolved = { [root.instanceId]: true, [top.instanceId]: true };
+  return { root, top };
+}
+
+/** A Basic `name` benched from the hand on `turn`. */
+function benchedOn(state, name, text, turn = 5) {
+  const card = mon(name, ability(text));
+  card.playedToBenchTurn = turn;
+  card.enteredPlayTurn = turn;
+  state.players.p1.zones.bench.push(card);
+  return card;
+}
+
+test('Lucario Stance (smp-SM54) protects the evolved Pokémon, only on the turn it evolved', () => {
+  const text =
+    'When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may prevent all effects of your opponent’s attacks, including damage, done to this Pokémon until the end of your opponent’s next turn.';
+  const state = board();
+  const { root, top } = evolvedThisTurn(state, 'active', 'Lucario', text);
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const res = useAbility(state, top);
+  assert.equal(res.error ?? null, null, res.reason);
+  const kinds = res.state.players.p1.zones.active.find((c) => c.instanceId === root.instanceId).attackMarkers.map((m) => m.kind);
+  assert.deepEqual(kinds.sort(), ['effectPrevent', 'incomingPrevent']);
+
+  const stale = board();
+  const old = evolvedThisTurn(stale, 'active', 'Lucario', text, 3);
+  stale.players.p2.zones.active.push(mon('Opponent'));
+  assert.ok(useAbility(stale, old.top).error);
+});
+
+test('Marshadow Let Loose (sm35-45): each player shuffles their hand away and draws 4', () => {
+  const text =
+    'When you play this Pokémon from your hand onto your Bench during your turn, you may have each player shuffle their hand into their deck and draw 4 cards.';
+  const state = board();
+  state.players.p1.zones.active.push(mon('Active'));
+  const marshadow = benchedOn(state, 'Marshadow', text);
+  state.players.p1.zones.hand.push(trainer('Mine'));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  state.players.p2.zones.hand.push(trainer('A'), trainer('B'));
+  const res = useAbility(state, marshadow);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.hand.length, 4);
+  assert.equal(res.state.players.p2.zones.hand.length, 4);
+});
+
+test('Banette Red Eyes (sm7-65) benches a Basic from the opponent’s discard pile', () => {
+  const state = board();
+  state.players.p1.zones.active.push(mon('Active'));
+  const { top } = evolvedThisTurn(
+    state,
+    'bench',
+    'Banette',
+    'When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may put a Basic Pokémon from your opponent’s discard pile onto their Bench.'
+  );
+  state.players.p2.zones.active.push(mon('Opponent'));
+  state.players.p2.zones.discard.push(mon('Victim'));
+  const res = useAbility(state, top);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(res.state.players.p2.zones.bench.map((c) => c.name), ['Victim']);
+});
+
+test('Rayquaza-GX Stormy Winds (sm7-109) mills 3 then attaches a basic Energy from the discard', () => {
+  const state = board();
+  state.players.p1.zones.active.push(mon('Active'));
+  const rayquaza = benchedOn(
+    state,
+    'Rayquaza-GX',
+    'When you play this Pokémon from your hand onto your Bench during your turn, you may discard the top 3 cards of your deck. If you do, attach a basic Energy card from your discard pile to this Pokémon.'
+  );
+  state.players.p1.zones.deck.unshift(energy('Grass', null), mon('x'), mon('y'));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const res = useAbility(state, rayquaza, (pc) => [(pc.options.find((o) => o.name === 'Yes') || pc.options[0]).instanceId]);
+  assert.equal(res.error ?? null, null, res.reason);
+  const attached = res.state.players.p1.zones.bench.filter((c) => c.attachedTo === rayquaza.instanceId);
+  assert.deepEqual(attached.map((c) => c.name), ['Basic Grass Energy']);
+});
+
+test('Ninjask Molting (sm8-30) benches a Shedinja from the discard pile', () => {
+  const state = board();
+  state.players.p1.zones.active.push(mon('Active'));
+  const { top } = evolvedThisTurn(
+    state,
+    'bench',
+    'Ninjask',
+    'When you play this Pokémon from your hand to evolve 1 of your Pokémon during your turn, you may put a Shedinja from your discard pile onto your Bench.'
+  );
+  state.players.p1.zones.discard.push(mon('Shedinja', { stage: 'Stage 1', subtypes: ['Stage 1'] }), mon('Other'));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const res = useAbility(state, top);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.ok(res.state.players.p1.zones.bench.some((c) => c.name === 'Shedinja'));
+  assert.ok(res.state.players.p1.zones.discard.some((c) => c.name === 'Other'));
+});
+
+test('Minior Falling Star (sm7-83) needs room on the Bench', () => {
+  const text =
+    'Once during your turn (before your attack), if this Pokémon is in your hand and your Bench isn’t full, you may move your Active Pokémon to your Bench and play this Pokémon as your new Active Pokémon.';
+  const setup = (benched) => {
+    const state = board();
+    state.players.p1.zones.active.push(mon('Old Active'));
+    for (let i = 0; i < benched; i++) state.players.p1.zones.bench.push(mon(`Bench ${i}`));
+    const minior = mon('Minior', ability(text));
+    state.players.p1.zones.hand.push(minior);
+    state.players.p2.zones.active.push(mon('Opponent'));
+    return useAbility(state, minior);
+  };
+  const ok = setup(0);
+  assert.equal(ok.error ?? null, null, ok.reason);
+  assert.equal(ok.state.players.p1.zones.active[0].name, 'Minior');
+  assert.ok(ok.state.players.p1.zones.bench.some((c) => c.name === 'Old Active'));
+  assert.match(setup(5).error || '', /bench is full/i);
+});
+
+test('Trumbeak Mountain Pass (sm8-165) Lost Zones itself and a Supporter on top of the opponent’s deck', () => {
+  const text =
+    'Once during your turn (before your attack), if this Pokémon is in your hand, you may reveal it. If you do, look at the top card of your opponent’s deck and put this Pokémon in the Lost Zone. If that card is a Supporter card, you may put it in the Lost Zone. If your opponent has no cards in their deck, you can’t use this Ability.';
+  const setup = (emptyDeck) => {
+    const state = board();
+    state.players.p1.zones.active.push(mon('Active'));
+    const trumbeak = mon('Trumbeak', ability(text));
+    state.players.p1.zones.hand.push(trumbeak);
+    state.players.p2.zones.active.push(mon('Opponent'));
+    if (emptyDeck) state.players.p2.zones.deck.length = 0;
+    else state.players.p2.zones.deck.unshift(trainer('Cynthia', 'Supporter'));
+    return useAbility(state, trumbeak);
+  };
+  const res = setup(false);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(res.state.players.p1.zones.lostZone.map((c) => c.name), ['Trumbeak']);
+  assert.deepEqual(res.state.players.p2.zones.lostZone.map((c) => c.name), ['Cynthia']);
+  assert.match(setup(true).error || '', /no cards in their deck/);
+});

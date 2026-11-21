@@ -231,6 +231,8 @@ const WINDOW_PHRASES = [
     'yourNextTurn',
     (body) => `if your opponent's active pokémon is knocked out, ${body}`,
   ],
+  // Lucario Stance / Pupitar Hard Shell Evolution: "… until the end of your opponent's next turn".
+  [/^(.+) until the end of your opponent's next turn$/, 'opponentNextTurn'],
   [/^(.+) until the end of your next turn$/, 'throughYourNextTurn'],
   [/^until the end of your next turn, (.+)$/, 'throughYourNextTurn'],
   // Older wording: "Your opponent can't attach Energy … during his or her next turn."
@@ -293,6 +295,18 @@ const MARKER_BODIES = [
       { kind: 'effectPrevent', filter: null },
     ],
   ],
+  // Lucario Stance (sm3-71): damage and every other effect.
+  [
+    /^prevent all effects of (?:your opponent's attacks|attacks), including damage, done to this pokémon$/,
+    'self',
+    null,
+    () => [
+      { kind: 'incomingPrevent', filter: null },
+      { kind: 'effectPrevent', filter: null },
+    ],
+  ],
+  // Pupitar Hard Shell Evolution (sm8-116).
+  [/^prevent all damage done to this pokémon by your opponent's attacks$/, 'self', null, () => ({ kind: 'incomingPrevent', filter: null })],
   // Latios-EX / Slurpuff Light Pulse ("except damage"), Light Dragonite ("other than damage"),
   // Venomoth ("excluding damage"), Altaria ex Light Pulse ("attacks used by your opponent's
   // Pokémon done to this Pokémon", reminder "Damage is not an effect").
@@ -652,7 +666,7 @@ export const MARKER_TEMPLATES = [
     () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'cardEffectImmunity' } }),
   ],
   [
-    /^(?:during your|as long as this pokémon remains in the active spot, |at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
+    /^(?:during your|as long as this pokémon remains in the active spot, |at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your|until the end of your opponent's) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
   ],
   // Locks with no turn window. Ariados Spider Web / Piloswine Freeze print "(Benching or evolving

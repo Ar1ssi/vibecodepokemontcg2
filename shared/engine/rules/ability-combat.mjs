@@ -826,6 +826,7 @@ export function sideContextFor(state, playerId) {
     sideBench: own.bench || [],
     opponentActive: other.active || [],
     opponentBench: other.bench || [],
+    opponentDeckCount: Array.isArray(other.deck) ? other.deck.length : null,
     // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
     turnNumber: state.turn?.number,
     powersOff: powersOffActive(state),
@@ -1825,6 +1826,24 @@ export function abilityActivationBlockReason(card, ctx = {}) {
     return zone === 'hand'
       ? 'This ability can only be used while the Pokémon is in play.'
       : 'This ability can only be used from your hand.';
+  }
+  // Minior Falling Star (sm7-83): "if this Pokémon is in your hand and your Bench isn't full".
+  const handText = zone === 'hand' ? lower(cardAbilityText(card)) : '';
+  if (
+    rulesEnabled &&
+    /your bench isn't full/.test(handText) &&
+    Array.isArray(ctx.sideBench) &&
+    sideTops(ctx.sideBench).length >= 5
+  ) {
+    return 'Your Bench is full.';
+  }
+  // Trumbeak Mountain Pass (sm8-165): "If your opponent has no cards in their deck, you can't use this Ability."
+  if (
+    rulesEnabled &&
+    /if your opponent has no cards in their deck, you can't use this ability/.test(lower(cardAbilityText(card))) &&
+    ctx.opponentDeckCount === 0
+  ) {
+    return 'Your opponent has no cards in their deck.';
   }
   if (rulesEnabled && zone !== 'bench' && requiresBenchSpot(card)) {
     return 'This ability can only be used from the Bench.';
