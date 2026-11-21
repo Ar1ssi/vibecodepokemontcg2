@@ -671,6 +671,8 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
   _effectOwner = ownerUser || card?.user || 'self';
   // The Pokémon whose Energy paid a discardOwnAttachedEnergy cost (WotC Super Potion's heal target).
   let costHost = null;
+  // Cards the latest draw step moved: "If you drew any cards in this way" (Gardenia's Vigor).
+  let lastDrawCount = 0;
   const runAt = async (idx) => {
     if (idx >= steps.length) {
       onComplete?.();
@@ -856,12 +858,18 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           }
           break;
         }
-        case 'draw':
+        case 'draw': {
+          // Awaited like the other draws (I37): a following step reads the hand and must see these cards.
+          lastDrawCount = 0;
           for (let i = 0; i < step.count; i++) {
-            if (zone(_effectOwner, 'deck').getCount() > 0) moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+            if (zone(_effectOwner, 'deck').getCount() > 0) {
+              await moveCardBundle(_effectOwner, _effectOwner, 'deck', 'hand', 0, false, 'move');
+              lastDrawCount++;
+            }
           }
-          msg(`  auto: drew ${step.count}`);
+          msg(`  auto: drew ${lastDrawCount}`);
           break;
+        }
         case 'drawUntil': {
           const target = Number(step.target);
           let drew = 0;
@@ -1830,15 +1838,27 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
           break;
         }
         case 'attachFromHand': {
+          if (step.requiresDraw && lastDrawCount === 0) {
+            msg('  no cards drawn — nothing is attached');
+            break;
+          }
+          const energyTypes = step.handEnergy?.types || [];
           const handEnergy = zone(_effectOwner, 'hand').array.filter((c) => {
             if (!isEnergyCard(c)) return false;
-            return step.energy === 'Basic Energy' ? isBasicEnergyCard(c) : true;
+            if (step.energy === 'Basic Energy' && !isBasicEnergyCard(c)) return false;
+            const kind = String(c.energyType || c.name || '').toLowerCase();
+            return energyTypes.length === 0 || energyTypes.some((type) => kind.includes(type));
           });
           if (!handEnergy.length) {
             msg('  no matching Energy in hand');
             break;
           }
-          const targets = getInPlayPokemon(_effectOwner);
+          const benchedOnly = /benched/.test(String(step.handTarget || ''));
+          const attachTargets = () =>
+            benchedOnly
+              ? getZoneSafe(_effectOwner, 'bench').array.filter((c) => c && !c.image?.attached)
+              : getInPlayPokemon(_effectOwner);
+          const targets = attachTargets();
           if (!targets.length) {
             msg('  no Pokémon to attach to');
             break;
@@ -1854,7 +1874,7 @@ export function runTrainerSteps(card, steps, startIndex = 0, onComplete, ownerUs
               if (!picked.length) return;
               openPickOnly({
                 title: `${card.name} — choose a Pokémon to attach ${picked.map((e) => e.name).join(', ')} to`,
-                candidates: getInPlayPokemon(_effectOwner),
+                candidates: attachTargets(),
                 user: _effectOwner,
                 onPick: (target) => {
                   for (const e of picked) attachEnergyCard(_effectOwner, e, target);
