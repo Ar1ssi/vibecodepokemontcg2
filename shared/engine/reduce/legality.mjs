@@ -21,7 +21,7 @@ import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
   abilitySupporterLimit, abilitySetupActive, abilityPlayLocks, abilityEvolvePermission,
   abilityEvolveLock, abilityEvolutionCardLock, abilityRetreatLock, abilitySummonRestricted,
-  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityOpponentAttackCostIncrease,
+  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityAttackLockReason, abilityOpponentAttackCostIncrease,
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from '../effects/attack-steps.mjs';
@@ -1221,6 +1221,8 @@ export function validateLegality(state, command) {
       if (attackLockReason) return { allowed: false, reason: attackLockReason };
       // Mega Golurk ex Restricted Activation (customhb): "This Pokémon can't use attacks unless you
       // have 10 or more cards in your hand."
+      const abilityLock = abilityAttackLockReason(inPlayView(state, active), sideContextFor(state, playerId));
+      if (abilityLock) return { allowed: false, reason: abilityLock };
       const handGate = abilityAttackHandMinimum(inPlayView(state, active), sideContextFor(state, playerId));
       if (handGate && (player.zones?.hand || []).length < handGate) {
         return { allowed: false, reason: `This Pokémon can't attack unless you have ${handGate} or more cards in your hand.` };

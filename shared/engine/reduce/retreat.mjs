@@ -66,6 +66,7 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
     benchCards: player?.zones?.bench || [],
     sideCards,
     opponentSideCards,
+    turnNumber: state.turn?.number ?? null,
   });
 
   // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat

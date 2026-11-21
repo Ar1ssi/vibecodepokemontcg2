@@ -511,7 +511,7 @@ export function combinedToolRetreatCost(
   baseRetreat,
   pokemon,
   zoneCards,
-  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null } = {}
+  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null, turnNumber = null } = {}
 ) {
   let cost = baseRetreat || 0;
   const holder = holderView(pokemon, zoneCards);
@@ -521,6 +521,8 @@ export function combinedToolRetreatCost(
     benchCards,
     sideCards,
     opponentSideCards,
+    // Wimpod Wimp Out (sm3-16): "During your first turn, this Pokémon has no Retreat Cost."
+    turnNumber,
   });
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;

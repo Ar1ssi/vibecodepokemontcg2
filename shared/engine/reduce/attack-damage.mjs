@@ -19,7 +19,7 @@ import {
   abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers,
   abilityPreventsAttackEffects, sideContextFor, powersOffActive, abilityWeaknessOverride,
   abilityIgnoresDefenderEffects, abilityExtraTypes, isAbilitySuppressed,
-  abilityIgnoresResistance, abilityIgnoresDefenderAbilities, abilityIgnoresAttackerBoosts, abilityFlipPreventsAttackDamage,
+  abilityIgnoresResistance, abilityIgnoresWeakness, abilityIgnoresDefenderAbilities, abilityIgnoresAttackerBoosts, abilityFlipPreventsAttackDamage,
   abilityEnergyAttackerShield, healBlockedByAbility,
 } from '../rules/ability-combat.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
@@ -740,7 +740,11 @@ export function attackAbilityReads(
           ...abilityDamagePrevention(defender, attackerView, defenderCtx),
           legacyModifiers: abilityLegacyDamageModifiers(defender, attackerView, defenderCtx),
         },
-    weaknessOverride: ignoresDefenderAbilities ? null : abilityWeaknessOverride(defender, defenderCtx),
+    weaknessOverride: abilityIgnoresWeakness(attackerView, attackerCtx)
+      ? { none: true }
+      : ignoresDefenderAbilities
+        ? null
+        : abilityWeaknessOverride(defender, defenderCtx),
     ignoreDefenderEffects: abilityIgnoresDefenderEffects(attackerView),
     ignoreResistance: ignoresDefenderAbilities || abilityIgnoresResistance(attackerView, attackerCtx),
     ignoresDefenderAbilities,

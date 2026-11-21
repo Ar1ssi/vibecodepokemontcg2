@@ -64,6 +64,8 @@ import {
   isMegaCard,
   isVCard,
   isVmaxCard,
+  isUltraBeastCard,
+  isBasicEnergy,
 } from './card-classify.mjs';
 import { isAttachedAsEnergy, isAttachedAsTool, isBasicPokemon, isPokemon } from '../cards.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
@@ -223,6 +225,11 @@ function inPlayConditionMet(text, target, ctx) {
     if (attachedEnergy(target, ctx.sideCards || ctx.inPlayCards).length === 0)
       return false;
   }
+  // Shelgon Energy Guard (sm7.5-43): "If this Pokémon has any basic Energy attached to it".
+  const anyBasic = /if (?:this pok[eé]mon|it) has any basic energy attached/.test(text);
+  if (anyBasic && !attachedEnergy(target, ctx.sideCards || ctx.inPlayCards).some((e) => isBasicEnergy(e))) {
+    return false;
+  }
   const energyCount = text.match(
     /if (?:this pok[eé]mon|it) has (\d+) or more \{([a-z])\} energy attached/
   );
@@ -240,6 +247,7 @@ function inPlayConditionMet(text, target, ctx) {
     anyEnergy ||
     teamEnergy ||
     energyCount ||
+    anyBasic ||
     /if (?:this pok[eé]mon|it) has any (?:special )?energy attached/.test(text);
   const namedTool = energyCondition
     ? null
@@ -337,7 +345,15 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
 function namedReductionTargets(text) {
   const plain = "(?:(?!pok[eé]mon)[a-z0-9 .'’-])+?";
   const m = text.match(new RegExp(`\\byour (${plain}(?: and ${plain})*) take \\d+ less damage`));
+  // Stakataka-GX Ultra Wall (sm7-102): "your Ultra Beasts" is a kind, not a printed name.
+  if (m && /^ultra beasts?$/.test(m[1].trim())) return null;
   return m ? m[1].split(' and ').map((n) => n.trim()) : null;
+}
+
+/** "your Ultra Beasts take … less damage": the reduction covers Ultra Beasts only. */
+function reductionKindMet(text, target) {
+  if (/\byour ultra beasts? take \d+ less damage/.test(text)) return isUltraBeastCard(target);
+  return true;
 }
 
 /** True when the holder itself is the only legal target ("this Pokémon"). */
@@ -360,7 +376,8 @@ export function selfNamedText(holder) {
   for (const printed of new Set([name, short])) {
     if (printed.length < 3) continue;
     const escaped = printed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(`(?<![\\w'])${escaped}(?![\\w-])`, 'g'), 'this pokémon');
+    // "your Passimian's attacks" (Passimian Power Huddle, sm5-70) names every copy, not the holder.
+    out = out.replace(new RegExp(`(?<![\\w'])(?<!\\byour )${escaped}(?![\\w-])`, 'g'), 'this pokémon');
   }
   return out;
 }
@@ -543,7 +560,9 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
     const perNamed = /for each ([a-z][a-z' -]*?) in play \(both yours and your opponent's\)/.exec(
       lower(cardAbilityText(holder))
     )?.[1];
-    if (/for each/.test(t) && !perOpponentPrize && !perOwnPrize && !perUniqueEnergy && !perNamed) continue;
+    // Charizard Resolute Flame (sm7.5-3): "for each of their Pokémon-GX and Pokémon-EX in play".
+    const perOpponentGxEx = /for each of (?:their|your opponent's) pok[eé]mon-gx and pok[eé]mon-ex in play/.test(t);
+    if (/for each/.test(t) && !perOpponentPrize && !perOwnPrize && !perUniqueEnergy && !perNamed && !perOpponentGxEx) continue;
     // An activated power's "during your next turn … more damage" is its effect, not a passive.
     if (/^(?:once during your turn|as often as you like)/.test(t)) continue;
     if (!attackerQualifies(t, attacker, holder, ctx)) continue;
@@ -565,6 +584,10 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
         (top) => lower(top.name) === perNamed
       );
       total += bonus * named.length;
+      continue;
+    }
+    if (perOpponentGxEx) {
+      total += bonus * sideTops(ctx.opponentSideCards || []).filter((top) => isGxCard(top) || isExCard(top)).length;
       continue;
     }
     if (perOwnPrize) {
@@ -650,6 +673,7 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     // The printed text, not `t`: `t` reads the holder's own name as "this pokémon".
     const named = namedReductionTargets(lower(cardAbilityText(holder)));
     if (named && !named.some((n) => lower(defender?.name).includes(n))) continue;
+    if (!reductionKindMet(t, defender)) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     if (!attackerTypeRequirementMet(t, attacker)) continue;
     const red = reductionForCard(holder, defender, attacker, {
@@ -1076,6 +1100,18 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
       ) {
         return { none: true };
       }
+      // Cherrim Weather Guard (sm5-11): "Your {G} Pokémon have no Weakness."
+      const typedTeam = holderSide === 'defender' && t.match(/your \{([a-z])\} pok[eé]mon have no weakness/);
+      if (typedTeam && attackerTypes(defender).includes(lower(TYPE_LETTER[typedTeam[1]]))) return { none: true };
+      // Solgaleo Full Metal Body (sm7-99): "If this Pokémon has any {M} Energy attached to it, it has no Weakness."
+      if (
+        holderSide === 'defender' &&
+        sameCard(holder, defender) &&
+        /(?:\bit|this pok[eé]mon) has no weakness/.test(t) &&
+        inPlayConditionMet(t, holder, holderCtx)
+      ) {
+        return { none: true };
+      }
 
       const both = t.match(
         /apply weakness for both active pok[eé]mon as [x×](\d)/
@@ -1364,10 +1400,33 @@ export function abilityIgnoresDefenderAbilities(attacker, ctx = {}) {
   );
 }
 
-/** Dragapult Infiltrator (customhb): "This Pokémon's attacks ignore Resistance." */
+/**
+ * Dragapult Infiltrator (customhb): "This Pokémon's attacks ignore Resistance."; Zygarde Earthen
+ * Aura (sm6-71) also ignores Weakness. Mesprit Silent Waves (sm6-42), on any of the attacker's
+ * Pokémon: "If you have Azelf in play, your opponent's Pokémon in play have no Resistance."
+ */
 export function abilityIgnoresResistance(attacker, ctx = {}) {
   if (!isPokemon(attacker)) return false;
-  return /this pok[eé]mon's attacks ignore resistance/.test(cardAbilityText(attacker)) && !isAbilitySuppressed(attacker, ctx);
+  const own = cardAbilityText(attacker);
+  if ((/this pok[eé]mon's attacks ignore resistance/.test(own) || IGNORES_W_AND_R.test(own)) && !isAbilitySuppressed(attacker, ctx)) {
+    return true;
+  }
+  return dedupe(sideInPlay(ctx)).some((holder) => {
+    const t = cardAbilityText(holder);
+    return (
+      /your opponent's pok[eé]mon in play have no resistance/.test(t) &&
+      !isAbilitySuppressed(holder, ctx) &&
+      inPlayConditionMet(t, holder, ctx)
+    );
+  });
+}
+
+const IGNORES_W_AND_R = /damage from this pok[eé]mon's attacks isn't affected by weakness or resistance/;
+
+/** Zygarde Earthen Aura (sm6-71): this Pokémon's attack damage ignores Weakness. */
+export function abilityIgnoresWeakness(attacker, ctx = {}) {
+  if (!isPokemon(attacker)) return false;
+  return IGNORES_W_AND_R.test(cardAbilityText(attacker)) && !isAbilitySuppressed(attacker, ctx);
 }
 
 /**
@@ -2345,6 +2404,33 @@ export function abilityAttackHandMinimum(card, ctx = {}) {
 }
 
 /**
+ * Why `attacker` can't attack because of an Ability, or null. Vileplume Disgusting Pollen
+ * (sm3-6), on the other side: "As long as this Pokémon is your Active Pokémon, your opponent's
+ * Basic Pokémon can't attack." Regigigas Seal of Antiquity (sm4-84), on itself: "This Pokémon
+ * can't attack unless Regirock, Regice, and Registeel are on your Bench." `ctx` is the attacking
+ * side's context.
+ */
+export function abilityAttackLockReason(attacker, ctx = {}) {
+  if (!attacker) return null;
+  const own = cardAbilityText(attacker);
+  const unless = own.match(/this pok[eé]mon can't attack unless (.+?) (?:is|are) on your bench/);
+  if (unless && !isAbilitySuppressed(attacker, ctx)) {
+    const names = unless[1].split(/,\s*(?:and\s+)?|\s+and\s+/).map((n) => n.trim()).filter(Boolean);
+    const benched = sideTops(ctx.sideBench || []).map((c) => lower(c.name));
+    const missing = names.filter((n) => !benched.some((b) => b.includes(n)));
+    if (missing.length) return `This Pokémon can't attack unless ${names.join(', ')} are on your Bench.`;
+  }
+  for (const holder of dedupe(opponentInPlay(ctx))) {
+    const t = cardAbilityText(holder);
+    const basics = /your opponent's basic pok[eé]mon can't attack/.test(t);
+    if (!basics || isAbilitySuppressed(holder, opponentHolderCtx(ctx))) continue;
+    if (!holderPositionMet(t, holder, ctx)) continue;
+    if (isBasicPokemon(attacker)) return `${holder.name}'s Ability stops Basic Pokémon attacking.`;
+  }
+  return null;
+}
+
+/**
  * Lugia ex Pressure (customhb): "As long as this Pokémon is in the Active Spot, your opponent's
  * attacks cost {C} more." `ctx` is the attacking side's context; holders sit on the other side.
  */
@@ -2352,7 +2438,8 @@ export function abilityOpponentAttackCostIncrease(ctx = {}) {
   let total = 0;
   for (const holder of dedupe(opponentInPlay(ctx))) {
     const t = cardAbilityText(holder);
-    const m = t.match(/your opponent's attacks cost ((?:\{c\})+) more/);
+    // Goomy Sticky Membrane (sm6-91): "your opponent's Pokémon's attacks cost {C} more".
+    const m = t.match(/your opponent's (?:pok[eé]mon's )?attacks cost ((?:\{c\})+) more/);
     if (!m || isAbilitySuppressed(holder, opponentHolderCtx(ctx))) continue;
     if (!holderPositionMet(t, holder, ctx)) continue;
     total += (m[1].match(/\{c\}/g) || []).length;
