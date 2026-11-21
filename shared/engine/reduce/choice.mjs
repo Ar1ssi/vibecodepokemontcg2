@@ -35,7 +35,7 @@ import {
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
 import { continueRetreat, isExactRetreatPayment, applyRetreatSwap } from './retreat.mjs';
 import {
-  GROWTH_ATTACH_EFFECT, resumeGrowthAttach,
+  GROWTH_ATTACH_EFFECT, resumeGrowthAttach, ENERGY_EVOLUTION_EFFECT, resumeEnergyEvolution,
   STADIUM_EVOLVE_SEARCH_EFFECT, resumeStadiumEvolveSearch,
 } from './attach.mjs';
 import { settleTrainerPrizeWin, endTurnAfterTrainer } from './trainer.mjs';
@@ -103,6 +103,13 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     resumeGrowthAttach(draft, {
       selection: payload.selection || [],
       resumeToken: token,
+      events,
+    });
+  } else if (token.effectType === ENERGY_EVOLUTION_EFFECT) {
+    resumeEnergyEvolution(draft, {
+      selection: payload.selection || [],
+      resumeToken: token,
+      activeRng,
       events,
     });
   } else if (token.effectType === STADIUM_EVOLVE_SEARCH_EFFECT) {

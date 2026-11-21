@@ -1502,6 +1502,49 @@ export function abilityKoConfusesAttacker(card, ctx = {}) {
 }
 
 /**
+ * Honedge Final Hour (sm6-46): "If this Pokémon is your Active Pokémon and is Knocked Out by damage
+ * from an opponent's attack, put 3 damage counters on 1 of your opponent's Pokémon." The count, or
+ * 0; the caller checks the Active Spot and the attack.
+ */
+export function abilityKoCountersOnOpponent(card, ctx = {}) {
+  if (!isPokemon(card)) return 0;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is your active pok[eé]mon and is knocked out by damage from an opponent's attack, put (\d+) damage counters? on 1 of your opponent's pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(match[1]);
+}
+
+/**
+ * Sigilyph-GX Mirror Counter (sm8-98): "If this Pokémon is your Active Pokémon and is damaged by an
+ * attack from your opponent's Pokémon-GX or Pokémon-EX (even if this Pokémon is Knocked Out), put
+ * damage counters on the Attacking Pokémon equal to the damage done to this Pokémon."
+ * `{ gxOrEx }` when the holder has that wording and is live, else null.
+ */
+export function abilityMirrorCounter(card, ctx = {}) {
+  if (!isPokemon(card)) return null;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is your active pok[eé]mon and is damaged by an attack from your opponent's (pok[eé]mon-gx or pok[eé]mon-ex|pok[eé]mon)(?: \(even if this pok[eé]mon is knocked out\))?, put damage counters on the attacking pok[eé]mon equal to the damage done to this pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return null;
+  return { gxOrEx: /gx/.test(match[1]) };
+}
+
+/**
+ * Gyarados Commotion (sm7.5-20): "If this Pokémon is your Active Pokémon and is damaged by an
+ * opponent's attack (even if this Pokémon is Knocked Out), put 2 damage counters on each of your
+ * Benched Pokémon." The count, or 0.
+ */
+export function abilityDamagedOwnBenchCounters(card, ctx = {}) {
+  if (!isPokemon(card)) return 0;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is your active pok[eé]mon and is damaged by an opponent's attack(?: \(even if this pok[eé]mon is knocked out\))?, put (\d+) damage counters? on each of your benched pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(match[1]);
+}
+
+/**
  * Gengar ex Gnawing Curse: damage counters put on a Pokémon when the opponent attaches an Energy
  * from their hand to it. 0 when the holder has no such wording or is suppressed. The caller
  * passes the holder's owner context and checks that the attacher is the other player.
@@ -2234,6 +2277,81 @@ function sideTops(cards) {
   return rootsOf(cards).filter(isPokemon).map((root) => topPokemonCard(cards, root));
 }
 
+/**
+ * Toxapex Toxic Spikes (sm1-63): "Whenever your opponent's Active Pokémon retreats, their new
+ * Active Pokémon is Poisoned." The conditions the live holders on `ctx.opponentSideCards` give the
+ * retreating player's new Active, with the holder's name as `source`.
+ */
+export function opponentRetreatConditions(ctx = {}) {
+  const out = [];
+  const holderCtx = { ...ctx, sideCards: ctx.opponentSideCards, opponentSideCards: ctx.sideCards };
+  for (const top of sideTops(ctx.opponentSideCards || [])) {
+    const match = cardAbilityText(top).match(
+      /whenever your opponent's active pok[eé]mon retreats, their new active pok[eé]mon is (asleep|burned|confused|paralyzed|poisoned)/
+    );
+    if (!match || isAbilitySuppressed(top, holderCtx)) continue;
+    out.push({ condition: match[1][0].toUpperCase() + match[1].slice(1), source: top.name });
+  }
+  return out;
+}
+
+const liveText = (card, ctx, re) => (isPokemon(card) && !isAbilitySuppressed(card, ctx) ? cardAbilityText(card).match(re) : null);
+
+/** Komala Comatose (sm2-114): an Energy attached from the hand to this Active Pokémon makes it Asleep. */
+export function abilityAttachMakesSelfAsleep(card, ctx = {}) {
+  return Boolean(
+    liveText(card, ctx, /as long as this pok[eé]mon is your active pok[eé]mon, whenever you attach an energy from your hand to it, it is now asleep/)
+  );
+}
+
+/**
+ * Primarina Harmonics (sm8-67): "Whenever you attach an Energy card from your hand to 1 of your
+ * Pokémon, except with an attack, Ability, or Trainer card, attach up to 2 Energy cards to that
+ * Pokémon instead of 1." The holder's name when any live holder is on `ctx.sideCards`, else null.
+ */
+export function abilityDoubleHandAttach(ctx = {}) {
+  const holder = sideTops(ctx.sideCards || []).find((top) =>
+    liveText(top, ctx, /whenever you attach an energy card from your hand to 1 of your pok[eé]mon, except with an attack, ability, or trainer card, attach up to 2 energy cards to that pok[eé]mon instead of 1/)
+  );
+  return holder ? holder.name : null;
+}
+
+/**
+ * Eevee Energy Evolution (sm1-101): "When you attach a basic Energy card from your hand to this
+ * Pokémon, you may search your deck for a card that evolves from this Pokémon that is the same type
+ * as that Energy card and put it onto this Pokémon."
+ */
+export function abilityEnergyEvolution(card, ctx = {}) {
+  return Boolean(
+    liveText(card, ctx, /when you attach a basic energy card from your hand to this pok[eé]mon, you may search your deck for a card that evolves from this pok[eé]mon that is the same type as that energy card and put it onto this pok[eé]mon/)
+  );
+}
+
+/**
+ * Tapu Lele Charmed Charm (sm8-150): "Whenever you attach a Pokémon Tool card that has "Fairy
+ * Charm" in its name from your hand to this Pokémon during your turn, you may leave your
+ * opponent's Active Pokémon Confused." The named Tool text and the condition, or null.
+ */
+export function abilityToolAttachCondition(card, ctx = {}) {
+  const match = liveText(
+    card,
+    ctx,
+    /whenever you attach a pok[eé]mon tool card that has ["“]([^"”]+)["”] in its name from your hand to this pok[eé]mon during your turn, you may leave your opponent's active pok[eé]mon (asleep|burned|confused|paralyzed|poisoned)/
+  );
+  return match ? { toolName: match[1], condition: match[2][0].toUpperCase() + match[2].slice(1) } : null;
+}
+
+/**
+ * Tyranitar-GX Lost Out (sm8-121): "If your opponent's Pokémon is Knocked Out by damage from this
+ * Pokémon's attacks, put that Pokémon and all cards attached to it in the Lost Zone instead of the
+ * discard pile."
+ */
+export function abilityLostZoneKnockouts(card, ctx = {}) {
+  return Boolean(
+    liveText(card, ctx, /if your opponent's pok[eé]mon is knocked out by damage from this pok[eé]mon's attacks, put that pok[eé]mon and all cards attached to it in the lost zone instead of the discard pile/)
+  );
+}
+
 /** Magnezone Dual Brains: "During your turn, you may play 2 Supporter cards." → 2, else 1. */
 export function abilitySupporterLimit(ctx = {}) {
   const dualBrains = sideTops(ctx.sideCards).some(
@@ -2258,9 +2376,10 @@ export function abilityTurnNotEnd(trainer, ctx = {}) {
     .some((root) => {
       const top = topPokemonCard(ctx.sideCards, root);
       const text = cardAbilityText(top).replace(/[\u2018\u2019]/g, "'");
-      const named = text.match(/your turn does not end when you use ([^.]+?)\./)?.[1];
+      // Metagross Extend (sm7-95) reads "when you play Steven's Resolve".
+      const named = text.match(/your turn does not end when you (?:use|play) ([^.]+?)\./)?.[1];
       if (!named || named.trim() !== name) return false;
-      if (/as long as this pok[eé]mon is in the active spot/.test(text) && !activeIds.has(root.instanceId)) {
+      if (/as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/.test(text) && !activeIds.has(root.instanceId)) {
         return false;
       }
       return !isAbilitySuppressed(top, ctx);

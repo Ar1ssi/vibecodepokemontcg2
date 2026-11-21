@@ -11,7 +11,7 @@ import { combinedToolRetreatCost } from '../rules/tool-combat.mjs';
 import { teamNoRetreatCostForActive } from '../rules/ability-executors.mjs';
 import { stadiumRetreatCoin } from '../rules/stadium-triggers.mjs';
 import { applyStadiumSwitchTriggers } from '../effects/stadium-trigger-apply.mjs';
-import { abilityNoRetreatCost, abilityRetreatCost } from '../rules/ability-combat.mjs';
+import { abilityNoRetreatCost, abilityRetreatCost, opponentRetreatConditions } from '../rules/ability-combat.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
 import { clearAttackMarkers } from '../rules/attack-markers.mjs';
 import {
@@ -19,9 +19,9 @@ import {
 } from '../rules/special-energy-parse.mjs';
 import { getStadiumRetreatCost, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
-import { clearConditions } from '../rules/special-conditions.mjs';
+import { addCondition, clearConditions } from '../rules/special-conditions.mjs';
 import {
-  activeAttackMarkers, inPlayView, energyProvisionContext, markerCount, abilitySideContext,
+  activeAttackMarkers, inPlayView, energyProvisionContext, markerCount, abilitySideContext, conditionsUpdatedEvent,
 } from './shared.mjs';
 
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
@@ -288,6 +288,9 @@ export function applyRetreatSwap(
       promotedId: benchPokemon.instanceId,
       playerId,
     });
+    for (const { condition } of opponentRetreatConditions(abilitySideContext(draft, playerId))) {
+      if (addCondition(benchPokemon, condition)) events.push(conditionsUpdatedEvent(benchPokemon, condition));
+    }
   }
 }
 

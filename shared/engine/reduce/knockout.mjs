@@ -18,7 +18,7 @@ import { isAbilitySuppressed, sideContextFor, abilityBenchLimit } from '../rules
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
-  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker,
+  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker, abilityKoCountersOnOpponent,
 } from '../rules/ability-combat.mjs';
 import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
@@ -1444,6 +1444,16 @@ function applyKnockoutHolderAbilities(draft, { victim, victimPlayerId, wasActive
     ];
   }
 
+  // Final Hour: all the counters go on the one Pokémon the holder's owner picks.
+  const koCounters = wasActive && koByOpponentAttack ? abilityKoCountersOnOpponent(holder, ctx) : 0;
+  if (koCounters > 0) {
+    const opponentId = Object.keys(draft.players).find((id) => id !== victimPlayerId);
+    draft.__koToolCounters = [
+      ...(draft.__koToolCounters || []),
+      { playerId: victimPlayerId, targetPlayerId: opponentId, remaining: koCounters, perPick: koCounters, source: holder.name },
+    ];
+  }
+
   // The printed wording says "if this Pokémon is your Active Pokémon", so the Active check is here.
   if (wasActive && koByOpponentAttack && attackerActive && abilityKoConfusesAttacker(holder, ctx)) {
     for (const condition of ['Confused', 'Poisoned']) {
@@ -1565,7 +1575,9 @@ export function settleKoToolCounters(draft) {
     draft.pendingChoice = createPendingChoice({
       player: entry.playerId,
       source: entry.source,
-      prompt: `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
+      prompt: entry.perPick
+        ? `${entry.source}: put ${entry.perPick} damage counters on 1 of your opponent's Pokémon`
+        : `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
       options,
       min: 1,
       max: 1,
@@ -1589,7 +1601,8 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
   if (!entry) return;
   const ref = findCard(draft, (selection || [])[0]);
   if (ref && ref.playerId === targetPlayerId && (ref.zoneId === 'active' || ref.zoneId === 'bench') && !ref.card.attachedTo) {
-    ref.card.damage = (ref.card.damage || 0) + 10;
+    const placed = Math.min(entry.perPick || 1, entry.remaining);
+    ref.card.damage = (ref.card.damage || 0) + placed * 10;
     events.push({
       type: 'damageCountersPlaced',
       instanceId: ref.card.instanceId,
@@ -1598,7 +1611,7 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
       damage: ref.card.damage,
       source: entry.source,
     });
-    entry.remaining -= 1;
+    entry.remaining -= placed;
   }
   if (!(entry.remaining > 0)) queue.shift();
   if (queue.length > 0) draft.__koToolCounters = queue;

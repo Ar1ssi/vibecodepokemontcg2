@@ -6,6 +6,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { listConditions } from '../rules/special-conditions.mjs';
 
 let nextId = 1;
 const mon = (name, extra = {}) =>
@@ -505,4 +506,156 @@ test('Trumbeak Mountain Pass (sm8-165) Lost Zones itself and a Supporter on top 
   assert.deepEqual(res.state.players.p1.zones.lostZone.map((c) => c.name), ['Trumbeak']);
   assert.deepEqual(res.state.players.p2.zones.lostZone.map((c) => c.name), ['Cynthia']);
   assert.match(setup(true).error || '', /no cards in their deck/);
+});
+
+// --- Trigger Abilities: each fires from the board event its text names. ---
+
+const resolveAll = (res, pick) => {
+  for (let n = 0; n < 8 && !res.error && res.state.pendingChoice; n++) {
+    const pc = res.state.pendingChoice;
+    const selection = pick ? pick(pc) : pc.options.slice(0, Math.max(1, pc.min || 0)).map((o) => o.instanceId);
+    res = command(res.state, pc.player, 'resolveChoice', { choiceId: pc.choiceId, selection });
+  }
+  return res;
+};
+const conditionsOf = (card) => listConditions(card);
+
+test('Toxapex Toxic Spikes (sm1-63): the opponent’s new Active after a retreat is Poisoned', () => {
+  const state = board();
+  state.turn = { player: 'p2', number: 6, phase: 'main' };
+  state.players.p1.zones.active.push(mon('Toxapex', ability('Whenever your opponent’s Active Pokémon retreats, their new Active Pokémon is Poisoned.')));
+  const old = mon('Old', { retreatCost: [] });
+  const incoming = mon('New');
+  state.players.p2.zones.active.push(old);
+  state.players.p2.zones.bench.push(incoming);
+  const res = command(state, 'p2', 'retreat', { benchInstanceId: incoming.instanceId, discardEnergyIds: [] });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(conditionsOf(res.state.players.p2.zones.active[0]), ['Poisoned']);
+});
+
+test('Komala Comatose (sm2-114): an Energy from the hand puts the Active Komala to sleep', () => {
+  const state = board();
+  const komala = mon('Komala', ability('As long as this Pokémon is your Active Pokémon, whenever you attach an Energy from your hand to it, it is now Asleep.'));
+  const fire = energy('Fire', null);
+  state.players.p1.zones.active.push(komala);
+  state.players.p1.zones.hand.push(fire);
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const res = command(state, 'p1', 'attachCard', { instanceId: fire.instanceId, targetInstanceId: komala.instanceId });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(conditionsOf(res.state.players.p1.zones.active[0]), ['Asleep']);
+});
+
+test('Primarina Harmonics (sm8-67): the hand attach may bring a second Energy', () => {
+  const state = board();
+  const primarina = mon('Primarina', ability('Whenever you attach an Energy card from your hand to 1 of your Pokémon, except with an attack, Ability, or Trainer card, attach up to 2 Energy cards to that Pokémon instead of 1.'));
+  const target = mon('Target');
+  const [w1, w2] = [energy('Water', null), energy('Water', null)];
+  state.players.p1.zones.active.push(primarina);
+  state.players.p1.zones.bench.push(target);
+  state.players.p1.zones.hand.push(w1, w2);
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const res = resolveAll(command(state, 'p1', 'attachCard', { instanceId: w1.instanceId, targetInstanceId: target.instanceId }));
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.bench.filter((c) => c.attachedTo === target.instanceId).length, 2);
+});
+
+test('Eevee Energy Evolution (sm1-101) evolves into the deck card of the attached Energy’s type', () => {
+  const state = board();
+  const eevee = mon('Eevee', ability('When you attach a basic Energy card from your hand to this Pokémon, you may search your deck for a card that evolves from this Pokémon that is the same type as that Energy card and put it onto this Pokémon. (This counts as evolving this Pokémon.) Shuffle your deck afterward.'));
+  const evo = (name, type) => mon(name, { stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'Eevee', types: [type] });
+  state.players.p1.zones.active.push(eevee);
+  state.players.p1.zones.deck.push(evo('Flareon', 'Fire'), evo('Vaporeon', 'Water'));
+  const water = energy('Water', null);
+  state.players.p1.zones.hand.push(water);
+  state.players.p2.zones.active.push(mon('Opponent'));
+  let offered = [];
+  const res = resolveAll(command(state, 'p1', 'attachCard', { instanceId: water.instanceId, targetInstanceId: eevee.instanceId }), (pc) => {
+    offered = pc.options.map((o) => o.name);
+    return [pc.options[0].instanceId];
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(offered, ['Vaporeon']);
+  assert.ok(res.state.players.p1.zones.active.some((c) => c.name === 'Vaporeon' && c.attachedTo === eevee.instanceId));
+});
+
+test('Tapu Lele Charmed Charm (sm8-150): a Fairy Charm Tool from the hand Confuses the opponent’s Active', () => {
+  const state = board();
+  const lele = mon('Tapu Lele', ability('Whenever you attach a Pokémon Tool card that has "Fairy Charm" in its name from your hand to this Pokémon during your turn, you may leave your opponent’s Active Pokémon Confused.'));
+  const charm = trainer('Fairy Charm Lightning', 'Pokémon Tool');
+  state.players.p1.zones.active.push(lele);
+  state.players.p1.zones.hand.push(charm);
+  state.players.p2.zones.active.push(mon('Opponent'));
+  const res = command(state, 'p1', 'attachCard', { instanceId: charm.instanceId, targetInstanceId: lele.instanceId });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(conditionsOf(res.state.players.p2.zones.active[0]), ['Confused']);
+});
+
+/** p2's `damage` attack against p1's Active holder of `text` (Bench: two 100-HP Pokémon). */
+function opponentHits(text, damage, holderHp, attackerExtra = {}) {
+  const state = board();
+  state.turn = { player: 'p2', number: 6, phase: 'main' };
+  state.players.p1.zones.active.push(mon('Holder', { hp: holderHp, ...ability(text) }));
+  state.players.p1.zones.bench.push(mon('Bench A', { hp: 100 }), mon('Bench B', { hp: 100 }));
+  state.players.p2.zones.active.push(mon('Attacker', { hp: 300, attacks: [{ name: 'Hit', cost: [], damage: String(damage), text: '' }], ...attackerExtra }));
+  state.players.p2.zones.bench.push(mon('Opponent Bench', { hp: 100 }));
+  const res = resolveAll(command(state, 'p2', 'attack', { attackIndex: 0 }));
+  assert.equal(res.error ?? null, null, res.reason);
+  const damageOf = (playerId, name) =>
+    [...res.state.players[playerId].zones.active, ...res.state.players[playerId].zones.bench].find((c) => c.name.startsWith(name))?.damage || 0;
+  return damageOf;
+}
+
+test('Honedge Final Hour (sm6-46): Knocked Out in the Active Spot, 3 counters go on 1 opponent’s Pokémon', () => {
+  const damageOf = opponentHits('If this Pokémon is your Active Pokémon and is Knocked Out by damage from an opponent’s attack, put 3 damage counters on 1 of your opponent’s Pokémon.', 100, 60);
+  assert.equal(damageOf('p2', 'Attacker') + damageOf('p2', 'Opponent Bench'), 30);
+});
+
+test('Gyarados Commotion (sm7.5-20): damaged in the Active Spot, 2 counters on each own Benched Pokémon', () => {
+  const damageOf = opponentHits('If this Pokémon is your Active Pokémon and is damaged by an opponent’s attack (even if this Pokémon is Knocked Out), put 2 damage counters on each of your Benched Pokémon.', 30, 200);
+  assert.equal(damageOf('p1', 'Bench A'), 20);
+  assert.equal(damageOf('p1', 'Bench B'), 20);
+});
+
+test('Sigilyph-GX Mirror Counter (sm8-98) returns the damage to a Pokémon-GX attacker only', () => {
+  const text = 'If this Pokémon is your Active Pokémon and is damaged by an attack from your opponent’s Pokémon-GX or Pokémon-EX (even if this Pokémon is Knocked Out), put damage counters on the Attacking Pokémon equal to the damage done to this Pokémon.';
+  assert.equal(opponentHits(text, 50, 200, { name: 'Attacker-GX', subtypes: ['Basic', 'GX'] })('p2', 'Attacker'), 50);
+  assert.equal(opponentHits(text, 50, 200)('p2', 'Attacker'), 0);
+});
+
+test('Tyranitar-GX Lost Out (sm8-121): its Knock Outs go to the Lost Zone', () => {
+  const state = board();
+  state.players.p1.zones.active.push(
+    mon('Tyranitar-GX', {
+      attacks: [{ name: 'Hit', cost: [], damage: '200', text: '' }],
+      ...ability('If your opponent’s Pokémon is Knocked Out by damage from this Pokémon’s attacks, put that Pokémon and all cards attached to it in the Lost Zone instead of the discard pile.'),
+    })
+  );
+  const victim = mon('Victim', { hp: 100 });
+  state.players.p2.zones.active.push(victim, energy('Grass', victim.instanceId));
+  state.players.p2.zones.bench.push(mon('Next'));
+  const res = resolveAll(command(state, 'p1', 'attack', { attackIndex: 0 }));
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(res.state.players.p2.zones.lostZone.map((c) => c.name).sort(), ['Basic Grass Energy', 'Victim']);
+});
+
+test('Metagross Extend (sm7-95): Steven’s Resolve does not end the turn while Metagross is Active', () => {
+  const run = (zone) => {
+    const state = board();
+    const metagross = mon('Metagross', ability('As long as this Pokémon is your Active Pokémon, your turn does not end when you play Steven’s Resolve.'));
+    if (zone === 'active') state.players.p1.zones.active.push(metagross);
+    else {
+      state.players.p1.zones.active.push(mon('Active'));
+      state.players.p1.zones.bench.push(metagross);
+    }
+    const resolve = trainer('Steven’s Resolve', 'Supporter', {
+      effect: 'Search your deck for up to 3 cards and put them into your hand. Then, shuffle your deck. Your turn ends.',
+    });
+    state.players.p1.zones.hand.push(resolve);
+    state.players.p2.zones.active.push(mon('Opponent'));
+    const res = resolveAll(command(state, 'p1', 'playTrainer', { instanceId: resolve.instanceId }));
+    assert.equal(res.error ?? null, null, res.reason);
+    return res.state.turn.player;
+  };
+  assert.equal(run('active'), 'p1');
+  assert.equal(run('bench'), 'p2');
 });

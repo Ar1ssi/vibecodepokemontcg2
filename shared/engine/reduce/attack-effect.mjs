@@ -24,7 +24,15 @@ import { evaluateToolKoPrevention, attachedToolOnDamageEffects } from '../rules/
 import { stadiumAttackCoinModifier } from '../rules/stadium-triggers.mjs';
 import { turnDamageBonusAfterWR } from '../rules/turn-damage-bonus.mjs';
 import { getEnergyValue } from '../rules/retreat.mjs';
-import { abilityHandDiscardProtector, extraAttackAvailable, healBlockedByAbility } from '../rules/ability-combat.mjs';
+import {
+  abilityHandDiscardProtector,
+  extraAttackAvailable,
+  healBlockedByAbility,
+  abilityMirrorCounter,
+  abilityDamagedOwnBenchCounters,
+  abilityLostZoneKnockouts,
+} from '../rules/ability-combat.mjs';
+import { isExCard, isGxCard } from '../rules/card-classify.mjs';
 import { parseOnDamageAbilities, parseOnDamageStatus, parseOnAttackedSwitch } from '../rules/ability-triggers.mjs';
 import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
@@ -337,7 +345,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
   draft.__attackEffectPhase = true;
   // "If … would be Knocked Out by damage from this attack, put that Pokémon and all cards attached
   // to it in the Lost Zone instead of discarding it" (design 036 A12): read by handleKnockout.
-  if (LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name))) {
+  if (
+    LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name)) ||
+    abilityLostZoneKnockouts(attackerView, abilitySideContext(draft, playerId))
+  ) {
     draft.__attackLostZoneKnockouts = defenderPlayerId;
   }
 
@@ -1202,6 +1213,24 @@ export function resolveAttackEffectPhase(draft, ctx) {
           });
           if (thorns?.count > 0 && (!thorns.koOnly || defenderKnockedOut)) {
             thornsDamage += thorns.count * 10;
+          }
+          const defenderSide = abilitySideContext(draft, defenderPlayerId);
+          const mirror = abilityMirrorCounter(defenderView, defenderSide);
+          const attackerTop = inPlayView(draft, attacker);
+          if (mirror && (!mirror.gxOrEx || isGxCard(attackerTop) || isExCard(attackerTop))) {
+            thornsDamage += dmgDealt;
+          }
+          const benchCounters = abilityDamagedOwnBenchCounters(defenderView, defenderSide);
+          for (const benched of benchCounters > 0 ? rootsIn(draft.players[defenderPlayerId]?.zones?.bench || []) : []) {
+            benched.damage = (benched.damage || 0) + benchCounters * 10;
+            events.push({
+              type: 'damageCountersPlaced',
+              instanceId: benched.instanceId,
+              victimPlayerId: defenderPlayerId,
+              attackerPlayerId: defenderPlayerId,
+              damage: benched.damage,
+              source: defenderView.name,
+            });
           }
 
           if (thornsDamage > 0) {
