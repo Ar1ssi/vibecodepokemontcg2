@@ -43,6 +43,7 @@ import {
   switchOutBlocked,
   cardEffectShielded,
   playerShieldBlocks,
+  pokemonHasType,
 } from './trainer-steps.mjs';
 import {
   ATTACK_STEP_HANDLERS,
@@ -1193,7 +1194,11 @@ export function executeSteps(draft, {
           }
           break;
         }
-        const count = step.count || 1;
+        const sideCards = [...(player.zones.active || []), ...(player.zones.bench || [])];
+        const typedInPlay = step.perOwnType
+          ? sideCards.filter((c) => !c.attachedTo && isPokemon(c) && pokemonHasType(topPokemonCard(sideCards, c) || c, step.perOwnType)).length
+          : 1;
+        const count = (step.count || 1) * typedInPlay;
         // "Each player draws N cards" (Togetic Shared Peace): the user first, then the opponent.
         for (const drawer of step.eachPlayer ? [player, opponent] : [player]) {
           if (!drawer) continue;

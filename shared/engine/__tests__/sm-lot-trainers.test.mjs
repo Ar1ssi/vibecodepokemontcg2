@@ -192,3 +192,83 @@ test('Fighting Memory (sm4-94) makes Silvally-GX a Fighting Pokémon', () => {
   assert.equal(dealt(memory, { name: 'Silvally-GX', subtypes: ['Basic', 'GX'] }, weakTo('Fighting')), 200);
   assert.equal(dealt(memory, { name: 'Type: Null' }, weakTo('Fighting')), 100);
 });
+
+/** p1 plays the Trainer `makeCard()` builds (after the board, so ids stay unique) once `setup` ran. */
+function play(makeCard, setup, pick) {
+  const state = board();
+  const card = makeCard();
+  state.players.p1.zones.active.push(mon('Active'));
+  state.players.p2.zones.active.push(mon('Opponent'));
+  state.players.p1.zones.hand.push(card);
+  setup(state);
+  return resolveAll(command(state, 'p1', 'playTrainer', { instanceId: card.instanceId }), pick);
+}
+
+test('Mysterious Treasure (sm6-113) discards a card, then finds only a Psychic or Dragon Pokémon', () => {
+  const card = () => trainer('Mysterious Treasure', 'Item', 'Discard a card from your hand. If you do, search your deck for a Psychic or Dragon Pokémon, reveal it, and put it into your hand. Then, shuffle your deck.');
+  const prompts = [];
+  const res = play(card, (state) => {
+    state.players.p1.zones.hand.push(mon('Junk'));
+    state.players.p1.zones.deck.push(mon('Mew', { types: ['Psychic'] }), mon('Charmander', { types: ['Fire'] }));
+  }, (pc) => {
+    prompts.push(pc.options.map((o) => o.name));
+    return [pc.options.find((o) => o.name !== 'Charmander').instanceId];
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.deepEqual(prompts.at(-1), ['Mew']);
+  assert.deepEqual(res.state.players.p1.zones.hand.map((c) => c.name), ['Mew']);
+  assert.ok(res.state.players.p1.zones.discard.some((c) => c.name === 'Junk'));
+});
+
+test('The Masked Royal (sm7-139) attaches only to a Stage 2 Grass, Fire or Water Pokémon', () => {
+  const card = () => trainer('The Masked Royal', 'Item', 'Attach a basic Energy card from your hand to one of your Stage 2 Grass, Fire, or Water Pokémon.');
+  const res = play(card, (state) => {
+    Object.assign(state.players.p1.zones.active[0], { stage: 'Stage 2', subtypes: ['Stage 2'], types: ['Psychic'] });
+    state.players.p1.zones.bench.push(mon('Venusaur', { stage: 'Stage 2', subtypes: ['Stage 2'], types: ['Grass'] }));
+    state.players.p1.zones.hand.push(energy('Grass'));
+  }, (pc) => {
+    assert.ok(!pc.options.some((o) => o.name === 'Active'), 'the Psychic Stage 2 is not a target');
+    return [pc.options[0].instanceId];
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  const venusaur = res.state.players.p1.zones.bench.find((c) => c.name === 'Venusaur');
+  assert.ok(res.state.players.p1.zones.bench.some((c) => c.attachedTo === venusaur.instanceId));
+});
+
+test('Blaine’s Last Stand (sm7.5-58) draws 2 cards for each Fire Pokémon in play', () => {
+  const card = () => trainer('Blaine’s Last Stand', 'Supporter', 'You can play this card only when it is the last card in your hand.\n\nDraw 2 cards for each Fire Pokémon you have in play.');
+  const res = play(card, (state) => {
+    state.players.p1.zones.active[0].types = ['Fire'];
+    state.players.p1.zones.bench.push(mon('Fire 2', { types: ['Fire'] }), mon('Water', { types: ['Water'] }));
+  });
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.hand.length, 4);
+});
+
+test('Switch Raft (sm7.5-62) needs a Water Active and heals the Pokémon moved to the Bench', () => {
+  const card = () => trainer('Switch Raft', 'Item', 'Switch your Active Water Pokémon with 1 of your Benched Pokémon. If you do, heal 30 damage from the Pokémon you moved to your Bench.');
+  const setup = (type) => (state) => {
+    Object.assign(state.players.p1.zones.active[0], { types: [type], damage: 50 });
+    state.players.p1.zones.bench.push(mon('Bench', { damage: 50 }));
+  };
+  assert.match(play(card, setup('Fire')).error || '', /Active Pokémon must be/);
+  const res = play(card, setup('Water'));
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.active[0].name, 'Bench');
+  assert.equal(res.state.players.p1.zones.active[0].damage, 50);
+  assert.equal(res.state.players.p1.zones.bench.find((c) => c.name === 'Active').damage, 20);
+});
+
+test('Cyrus ◇ (sm5-120) gets its printed play condition in place of TCGdex’s wording', async () => {
+  const { withPrintedStageFix } = await import('../rules/rules-state.mjs');
+  const tcgdex = 'You can’t play this card if you don’t have any Water or Metal Pokémon in play.\n\nYour opponent chooses 2 Benched Pokémon and shuffles the others, and all cards attached to them, into their deck.';
+  const text = withPrintedStageFix({ id: 'sm5-120', effect: tcgdex }).effect;
+  const card = () => trainer('Cyrus ◇', 'Supporter', text);
+  const setup = (type) => (state) => {
+    state.players.p1.zones.active[0].types = [type];
+    state.players.p1.zones.bench.push(mon('Benched Water', { types: ['Water'] }));
+  };
+  // A Water Pokémon on the Bench is not enough: the Active must be Water or Metal (pkmncards UPR 120).
+  assert.match(play(card, setup('Fire')).error || '', /Active Pokémon must be/);
+  assert.equal(play(card, setup('Metal')).error ?? null, null);
+});

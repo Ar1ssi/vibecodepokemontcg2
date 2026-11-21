@@ -390,14 +390,25 @@
         effect:
           'You can play this card only if you have more Prize cards remaining than your opponent.\n\nSwitch 1 of your opponent’s Benched Pokémon with their Active Pokémon.',
       },
+      // Cyrus ◇: TCGdex prints the condition as "if you don't have any Water or Metal Pokémon in
+      // play"; the card (pkmncards Ultra Prism 120) reads "only if your Active Pokémon is a {W} or {M}".
+      'sm5-120': {
+        wrongEffect: 'You can’t play this card if you don’t have any Water or Metal Pokémon in play.',
+        effect:
+          'You can play this card only if your Active Pokémon is a Water or Metal Pokémon.\n\nYour opponent chooses 2 Benched Pokémon and shuffles the others, and all cards attached to them, into their deck.',
+      },
     };
 
     export function withPrintedStageFix(detail) {
       const fix = PRINTED_STAGE_FIXES[detail?.id];
       if (!fix) return detail;
       // A blank-text fix only fills a blank: a later TCGdex correction wins.
-      const merged = { ...detail, ...fix };
-      if (fix.effect && String(detail.effect || '').trim()) merged.effect = detail.effect;
+      const { wrongEffect, ...fields } = fix;
+      const merged = { ...detail, ...fields };
+      // A wrong-text fix replaces only the known-wrong wording.
+      const current = String(detail.effect || '').trim();
+      const keep = wrongEffect ? !current.startsWith(wrongEffect) : Boolean(current);
+      if (fix.effect && keep) merged.effect = detail.effect;
       return merged;
     }
 

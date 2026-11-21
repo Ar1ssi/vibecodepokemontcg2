@@ -142,6 +142,8 @@ const LEADING_TRAINER_COSTS = [
   [/^discard (\d+) (?:of the )?other cards (?:from|in) your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]) })],
   [/^discard (\d+) energy cards from your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]), energyOnly: true })],
   [/^discard a card from your hand in order to/, () => ({ type: 'discardCost', count: 1 })],
+  // Mysterious Treasure (sm6-113): "Discard a card from your hand. If you do, search …".
+  [/^discard (a|\d+) cards? from your hand\. if you do, /, (m) => ({ type: 'discardCost', count: m[1] === 'a' ? 1 : Number(m[1]) })],
   // Typed hand-discard cost: Team Plasma Grunt, Fiery Torch, Engineer's Adjustments.
   [/^discard an? ((?:team plasma|energy|\{[a-z]\} energy)) card from your hand\./, (m) => ({ type: 'discardCost', count: 1, what: `${m[1]} card` })],
   [/^discard 1 energy card attached to (?:1 of )?your (?:own )?pokémon in order to/, () => ({ type: 'discardOwnAttachedEnergy', cost: true })],
@@ -334,7 +336,9 @@ function knownKindWhat(phrase) {
   // card" (Old Rod): any of the kinds; matchesSearch splits on " or ".
   const either = p.split(/,? or (?:an? )?|, /);
   if (either.length > 1) {
-    const whats = either.map(knownKindWhat);
+    // Mysterious Treasure (sm6-113): "a {P} or {N} Pokémon" — the bare types share the noun.
+    const noun = either.at(-1).match(/^\{[a-z]\} (pokémon)$/)?.[1];
+    const whats = either.map((part) => (noun && /^\{[a-z]\}$/.test(part) ? `${part} ${noun}` : part)).map(knownKindWhat);
     return whats.every(Boolean) ? whats.join(' or ') : null;
   }
   if (p === 'evolution') return 'Evolution Pokémon';
@@ -1464,6 +1468,9 @@ function parsePlayCondition(lower) {
   const lostZone = lower.match(/only if you have\s+(\d+)\s+or more cards in the lost zone/);
   if (lostZone) return `lostZone>=${lostZone[1]}`;
   if (lower.includes('only if there is any stadium card in play')) return 'stadiumInPlay';
+  // Switch Raft (sm7.5-62): "Switch your Active {W} Pokémon with 1 of your Benched Pokémon."
+  const switchActiveType = lower.match(/^switch your active \{([a-z])\} pokémon with 1 of your benched pokémon/);
+  if (switchActiveType) return `activeType=${switchActiveType[1].toUpperCase()}`;
   // Cyrus Prism Star: "only if your Active Pokémon is a {W} or {M} Pokémon."
   const ownActiveTypes = lower.match(
     /only if your active pokémon is a (?:\{([a-z])\} or )?\{([a-z])\} pokémon/
@@ -1562,6 +1569,15 @@ export function parseTrainerEffect(text = '') {
   const leadingDraw = lower.match(/^draw (\d+|an?) cards?\./);
   if (leadingDraw && result.recognizable && !result.steps.some((s) => /draw/i.test(s.type))) {
     result.steps.unshift({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
+  }
+  // Switch Raft (sm7.5-62): "If you do, heal 30 damage from the Pokémon you moved to your Bench."
+  if (/if you do, heal \d+ damage from the pokémon you moved to your bench/.test(lower)) {
+    result.steps = result.steps.map((s) => (s.type === 'healAmount' ? { ...s, target: 'switchedOut' } : s));
+  }
+  // Blaine's Last Stand (sm7.5-58): "Draw 2 cards for each {R} Pokémon you have in play."
+  const perType = lower.match(/draw (\d+) cards? for each \{([a-z])\} pokémon you have in play/);
+  if (perType) {
+    result.steps = result.steps.map((s) => (s.type === 'draw' ? { ...s, count: Number(perType[1]), perOwnType: perType[2] } : s));
   }
   return playCondition ? { ...result, playCondition } : result;
 }
@@ -2712,7 +2728,11 @@ function parseTrainerStepsInner(lower) {
       const typedTarget = lower.match(/from your hand to 1 of your (benched )?\{([a-z])\} pokémon/);
       if (typedTarget) target = `1 of your ${typedTarget[1] ? 'Benched ' : ''}{${typedTarget[2].toUpperCase()}} Pokémon`;
       else if (lower.includes('benched')) target = '1 of your Benched Pokémon';
-      else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
+      else if (lower.includes('stage 2')) {
+        // The Masked Royal (sm7-139): "to one of your Stage 2 {G}, {R}, or {W} Pokémon".
+        const types = lower.match(/stage 2 ((?:\{[a-z]\}(?:,? or |, )?)+) pokémon/)?.[1];
+        target = types ? `1 of your Stage 2 ${types.replace(/\{([a-z])\}/g, (m) => m.toUpperCase())} Pokémon` : '1 of your Stage 2 Pokémon';
+      }
       const symbol = at[2] || at[4];
       const typeWord = symbol ? SYMBOL_ENERGY_WORDS[symbol] : at[5] || null;
       const basic = Boolean(at[3] || typeWord);
