@@ -1915,7 +1915,9 @@ export function attackTargetClause(attackText) {
   if (each) {
     return { kind: 'damage', amount: Number(each[1]), count: Number(each[2]), scope: each[3] ? 'bench' : 'any' };
   }
-  const m = /does (\d+) damage to (\d+) of your opponent's (benched )?pok[ée]mon/i.exec(
+  // Excadrill ex Piercing Drill: "… to 1 of your opponent's Benched Pokémon that has any damage
+  // counters on it" — only a damaged Pokémon may be chosen.
+  const m = /does (\d+) damage to (\d+) of your opponent's (benched )?pok[ée]mon( that has any damage counters on it)?/i.exec(
     t
   );
   if (!m) return null;
@@ -1924,6 +1926,7 @@ export function attackTargetClause(attackText) {
     amount: Math.max(0, parseInt(m[1], 10) || 0),
     count: Math.max(1, parseInt(m[2], 10) || 1),
     scope: m[3] ? 'bench' : 'any',
+    ...(m[4] ? { filter: 'damaged' } : {}),
   };
 }
 

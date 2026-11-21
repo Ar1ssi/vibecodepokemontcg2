@@ -802,6 +802,11 @@ export function validateLegality(state, command) {
         if (cardRef && !isStadiumCard(cardRef.card)) {
           return { allowed: false, reason: 'invalid_stadium_target' };
         }
+        // Dropping a Stadium from hand on the slot is playing it: the same rules as playTrainer
+        // (one per turn, not the same name, attack and Ability play locks such as Cursed Land).
+        if (cardRef && payload.from === 'hand') {
+          return validateLegality(state, { type: 'playTrainer', playerId, payload: { instanceId: payload.instanceId } });
+        }
       }
 
       // Bench limit validation (Edge Case 9: bench full)
