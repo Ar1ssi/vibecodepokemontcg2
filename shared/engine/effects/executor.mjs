@@ -527,6 +527,7 @@ export function executeSteps(draft, {
     // discard must have moved an Energy this attack.
     if (
       step.requiresEnergyDiscard &&
+      !draft.attackEnergyDiscarded &&
       !events.some((e) => e.type === 'cardMoved' && e.reason === 'attack-energy-discard' && e.playerId === playerId)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_discarded', step: step.type });

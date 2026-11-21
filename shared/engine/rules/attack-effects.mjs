@@ -1024,6 +1024,9 @@ export function parseAttackEnergyDiscard(attack) {
   if (!sentence || /^(?:if heads|if tails|for each heads)\b/.test(sentence)) return null;
   // "You may discard … If you do, …" is offered and paid before damage (optional-cost-bonus.mjs).
   if (optionalCostBonusClause(attack?.text)?.cost?.kind === 'discardEnergy') return null;
+  // "You may discard … If you do, <effect>" (Hydreigon Dark Destruction) is an optional step whose
+  // cost gates the effect (attack-steps.mjs).
+  if (/^you may discard\b/.test(sentence) && /\bif you do, (?!this attack does)/.test(t)) return null;
 
   // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
   if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(sentence)) {

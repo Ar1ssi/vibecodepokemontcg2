@@ -646,6 +646,7 @@ function flipAndResolveAttack(draft, ctx) {
   // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  delete draft.attackEnergyDiscarded;
   // The attack this player used, for next-turn copy wordings (Mimikyu Copycat, Sudowoodo
   // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
   // opponent reads it only during their next turn (design 039).

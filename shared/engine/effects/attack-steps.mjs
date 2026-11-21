@@ -597,8 +597,24 @@ function moveToTargets(ctx, picked, targets, owner, targetOwner) {
 function atkDiscardSelfEnergy(ctx) {
   const { player, step } = ctx;
   const ref = attackerRef(ctx);
+  if (step.energyPair) return discardEnergyPair(ctx, ref);
   const energies = ref ? attachedCards(player, ref.card.instanceId).filter((c) => energyMatches(c, step)) : [];
   return discardChosen(ctx, energies, { label: energyLabel(step) });
+}
+
+// One Energy of each printed type (Latias Mist Ball: "a {R} Energy and a {P} Energy"), a basic
+// Energy of the type first; one card never pays for both.
+function discardEnergyPair(ctx, ref) {
+  const attached = ref ? attachedCards(ctx.player, ref.card.instanceId).filter(isEnergy) : [];
+  const picked = [];
+  for (const energyType of ctx.step.energyPair) {
+    const matches = attached.filter((c) => !picked.includes(c) && energyMatches(c, { energyType }));
+    const card = matches.find((c) => isBasicEnergy(c)) || matches[0];
+    if (card) picked.push(card);
+  }
+  if (picked.length === 0) return skip(ctx, 'no_energy');
+  for (const card of picked) discardCard(ctx.draft, card, ctx.events);
+  return null;
 }
 
 // "You may discard any number of [{R}] Energy cards attached to this Pokémon when you use this
@@ -3805,6 +3821,7 @@ function atkDiscardStadium(ctx) {
     });
   }
   if (ctx.step.optional && ctx.selection[0] !== ATTACK_YES) return skip(ctx, 'declined');
+  recordDiscardedForDamage(ctx, [stadium]);
   discardCurrentStadium(ctx.draft, ctx.events, ctx.playerId);
   return addChainedMarker(ctx);
 }
@@ -4589,7 +4606,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkSwitchSelf: optional(atkSwitchSelf, () => 'Switch this Pokémon with 1 of your Benched Pokémon'),
   atkGust: optional(atkGust, () => "Switch out your opponent's Active Pokémon"),
   atkMoveEnergy: optional(atkMoveEnergy, (step) => `Move ${whatOf(step)}`),
-  atkDiscardSelfEnergy,
+  atkDiscardSelfEnergy: optional(atkDiscardSelfEnergy, () => 'Discard an Energy from this Pokémon'),
   atkMoveSelfEnergyToHand: optional(atkMoveSelfEnergyToHand, () => 'Return an Energy attached to this Pokémon to your hand'),
   atkDiscardOppEnergy: optional(atkDiscardOppEnergy, oppEnergyOffer),
   atkDiscardBothActiveEnergy: optional(

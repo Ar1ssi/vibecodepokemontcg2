@@ -588,6 +588,8 @@ function moveAttachedCards(draft, { playerId, ids, to, reason, events }) {
         player.zones.hand.push(card);
       }
       events.push({ type: 'cardMoved', instanceId: id, from: zoneKey, to: destination, playerId, reason });
+      // Kindle / Swing and Skedaddle "If you do, …": read after a resumed choice too (executor.mjs).
+      if (reason === 'attack-energy-discard') draft.attackEnergyDiscarded = true;
       moved++;
       break;
     }

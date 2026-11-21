@@ -6,7 +6,7 @@ import { createGameState, createPlayerZones } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
-import { addCondition } from '../rules/special-conditions.mjs';
+import { addCondition, listConditions } from '../rules/special-conditions.mjs';
 
 let nextId = 1;
 const mon = (name, extra = {}) =>
@@ -413,4 +413,77 @@ test('Chimecho Bell of Silence (sm4-43) stops Pokémon with an Ability being pla
   const play = (card) => command(locked, 'p2', 'moveCard', { instanceId: card.instanceId, from: 'hand', to: 'bench' });
   assert.ok(play(withAbility).error);
   assert.equal(play(plain).error ?? null, null);
+});
+
+// ── chained effects ─────────────────────────────────────────────────────────
+
+const conditionsOf = (state, playerId) => listConditions(state.players[playerId].zones.active.find((c) => !c.attachedTo));
+
+test('Pachirisu Overshort (sm8-80): Paralyzed only when a Tool was discarded', () => {
+  const text =
+    'Before doing damage, discard all Pokémon Tool cards from your opponent’s Active Pokémon. If you discarded a Pokémon Tool card in this way, this attack does 40 more damage, and your opponent’s Active Pokémon is now Paralyzed.';
+  const tool = (s, { defender }) => s.players.p2.zones.active.push(trainer('Choice Band', 'Pokémon Tool', { trainerType: 'Tool', attachedTo: defender.instanceId }));
+  const hit = attack(board('Pachirisu', text, { damage: '20+', setup: tool }));
+  assert.equal(hit.dealt, 60);
+  assert.deepEqual(conditionsOf(hit.state, 'p2'), ['Paralyzed']);
+  assert.deepEqual(conditionsOf(attack(board('Pachirisu', text, { damage: '20+' })).state, 'p2'), []);
+});
+
+test('Bergmite Break Open (sm6-29) discards only the opponent’s Stadium, then Paralyzes', () => {
+  const text = 'If your opponent has a Stadium card in play, discard it. If you do, your opponent’s Active Pokémon is now Paralyzed.';
+  const stadium = (ownerId) => (s) => {
+    s.stadium = createCard({ instanceId: 900, name: 'Po Town', supertype: 'Trainer', subtypes: ['Stadium'], ownerId });
+  };
+  const theirs = attack(board('Bergmite', text, { damage: '10', setup: stadium('p2') }));
+  assert.equal(theirs.state.stadium, null);
+  assert.deepEqual(conditionsOf(theirs.state, 'p2'), ['Paralyzed']);
+  const mine = attack(board('Bergmite', text, { damage: '10', setup: stadium('p1') }));
+  assert.equal(mine.state.stadium?.name, 'Po Town');
+  assert.deepEqual(conditionsOf(mine.state, 'p2'), []);
+});
+
+test('Latias Mist Ball (SM135): tails discards one Fire and one Psychic Energy', () => {
+  const text = 'Flip a coin. If tails, discard a Fire Energy and a Psychic Energy from this Pokémon.';
+  const results = new Set(
+    [7, 8, 9, 10, 11, 12].map((seed) => {
+      const state = board('Latias', text, {
+        damage: '110',
+        setup: (s, { attacker }) => s.players.p1.zones.active.push(energy('Fire', attacker.instanceId), energy('Psychic', attacker.instanceId), energy('Water', attacker.instanceId)),
+      });
+      const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, createRng(seed));
+      return zoneNames(res.state, 'p1', 'discard').join(',');
+    })
+  );
+  assert.deepEqual([...results].sort(), ['', 'Basic Fire Energy,Basic Psychic Energy']);
+});
+
+test('Oricorio Kindle (sm2-14) and Hydreigon Dark Destruction (sm4-62) discard from both sides', () => {
+  const energies = (s, { attacker, defender }) => {
+    s.players.p1.zones.active.push(energy('Fire', attacker.instanceId), energy('Water', attacker.instanceId));
+    s.players.p2.zones.active.push(energy('Grass', defender.instanceId));
+  };
+  const kindle = attack(board('Oricorio', 'Discard an Energy from this Pokémon. If you do, discard an Energy from your opponent’s Active Pokémon.', { damage: '30', setup: energies }));
+  assert.equal(zoneNames(kindle.state, 'p1', 'discard').length, 1);
+  assert.deepEqual(zoneNames(kindle.state, 'p2', 'discard'), ['Basic Grass Energy']);
+  const destruction = 'You may discard an Energy from this Pokémon. If you do, discard an Energy from your opponent’s Active Pokémon.';
+  const paid = attack(board('Hydreigon', destruction, { damage: '120', setup: energies }));
+  assert.deepEqual(zoneNames(paid.state, 'p2', 'discard'), ['Basic Grass Energy']);
+  const declined = attack(board('Hydreigon', destruction, { damage: '120', setup: energies }), (pc) => [
+    (pc.options.find((o) => o.name === 'No') || pc.options[0]).instanceId,
+  ]);
+  assert.deepEqual(zoneNames(declined.state, 'p1', 'discard'), []);
+  assert.deepEqual(zoneNames(declined.state, 'p2', 'discard'), []);
+});
+
+test('Beedrill Sudden Sting (sm4-3): Paralyzed and Poisoned only after evolving from Kakuna this turn', () => {
+  const text = 'If this Pokémon evolved from Kakuna during this turn, your opponent’s Active Pokémon is now Paralyzed and Poisoned.';
+  const stack = (evolvedNow) => (s, { attacker }) => {
+    attacker.name = 'Weedle';
+    const kakuna = mon('Kakuna', { stage: 'Stage 1', subtypes: ['Stage 1'], attachedTo: attacker.instanceId });
+    const beedrill = mon('Beedrill', { stage: 'Stage 2', subtypes: ['Stage 2'], attachedTo: attacker.instanceId, attacks: attacker.attacks });
+    s.players.p1.zones.active.push(kakuna, beedrill);
+    if (evolvedNow) s.players.p1.flags.evolved = { [attacker.instanceId]: true };
+  };
+  assert.deepEqual(conditionsOf(attack(board('Weedle', text, { damage: '10', setup: stack(true) })).state, 'p2').sort(), ['Paralyzed', 'Poisoned']);
+  assert.deepEqual(conditionsOf(attack(board('Weedle', text, { damage: '10', setup: stack(false) })).state, 'p2'), []);
 });

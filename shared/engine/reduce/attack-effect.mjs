@@ -98,8 +98,19 @@ const LOST_ZONE_KNOCKOUT =
 /** Per status branch: whether its printed board condition holds now (null for other branches). */
 function statusConditionResults(draft, ctx, branches) {
   if (!branches.some((branch) => branch.when?.condition)) return [];
+  const conditionCtx = statusConditionCtx(draft, ctx);
+  return branches.map((branch) =>
+    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
+  );
+}
+
+// "If you discarded a Pokémon Tool card in this way, … is now Paralyzed" (Pachirisu Overshort,
+// sm8-80) reads what this attack's before-damage step discarded, so it is read after that step.
+const READ_AFTER_BEFORE_STEPS = new Set(['discardedCardIs']);
+
+function statusConditionCtx(draft, ctx) {
   const { attacker, defender, attackerView, playerId, defenderPlayerId, coin, headsCount } = ctx;
-  const conditionCtx = buildServerAttackContext(draft, {
+  return buildServerAttackContext(draft, {
     attackerPlayerId: playerId,
     defenderPlayerId,
     attacker,
@@ -111,9 +122,6 @@ function statusConditionResults(draft, ctx, branches) {
     headsCount,
     optionalCostPaid: ctx.optionalCostPaid,
   });
-  return branches.map((branch) =>
-    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
-  );
 }
 
 const ENERGY_LETTER_TYPES = {
@@ -1321,7 +1329,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
             headsCount,
             flips,
             conditionMet: (condition) =>
-              statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
+              READ_AFTER_BEFORE_STEPS.has(condition?.kind)
+                ? attackConditionMet(condition, statusConditionCtx(draft, ctx))
+                : statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
           });
 
       if (defenderConditions.length > 0 && defender) {
@@ -1645,6 +1655,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
               playerId,
               reason: 'attack-energy-discard',
             });
+            // "If you do, …" steps resumed from a later choice read it (executor.mjs).
+            draft.attackEnergyDiscarded = true;
           }
         }
       }

@@ -478,6 +478,11 @@ const TEMPLATES = [
 
   // Self Energy discard behind the attack's own coin (design 032); parseAttackSteps drops
   // the ungated form, which parseAttackEnergyDiscard runs.
+  // Latias Mist Ball (SM135): "If tails, discard a {R} Energy and a {P} Energy from this Pokémon."
+  [
+    /^discard an? \{([a-z])\} energy and an? \{([a-z])\} energy from this pokémon$/,
+    (m) => ({ type: 'atkDiscardSelfEnergy', count: 2, energyPair: [m[1].toUpperCase(), m[2].toUpperCase()] }),
+  ],
   [
     /^discard (an?|\d+|all) (?:\{([a-z])\} )?energy(?: cards?)? (?:from|attached to) this pokémon$/,
     (m) => ({
@@ -492,7 +497,15 @@ const TEMPLATES = [
   // clears the Stadium after damage. (Flygon Desert Geyser's conditional wording is a BLOCK.)
   [/^discard that stadium(?: card)?$/, () => ({ type: 'atkDiscardStadium', owner: 'any' })],
   // Single Strike Urshifu Field Crush (customhb).
-  [/^if your opponent has a stadium in play, discard it$/, () => ({ type: 'atkDiscardStadium', owner: 'opponent' })],
+  // Bergmite Break Open (sm6-29): with a status that reads the discard ("If you discarded a
+  // Stadium in this way, …", attack-conditions.mjs discardedCardIs), it goes before damage.
+  [
+    /^if your opponent has a stadium in play, discard it$/,
+    (m, rest, context) =>
+      context?.fullText && /if you discarded a stadium in this way, [^.]*\bis now\b/.test(context.fullText)
+        ? { type: 'atkDiscardStadium', owner: 'opponent', beforeDamage: true, countsForDamage: true }
+        : { type: 'atkDiscardStadium', owner: 'opponent' },
+  ],
   // Great Tusk ex Bedrock Breaker, Kingdra-EX Big Storm, Lugia VSTAR Tempest Dive ("You may …"),
   // Brock's Primeape Mega Thrash / Light Piloswine Knock Over ("If there is a Stadium card in
   // play, [you may] discard it").
@@ -2190,7 +2203,7 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
-      const step = build(m, rest, { wrOrder });
+      const step = build(m, rest, { wrOrder, fullText: normalized });
       if (!step) break;
       // One sentence, several steps (Scizor V Hack Off: a Tool and a Special Energy).
       if (Array.isArray(step)) {
@@ -2201,7 +2214,10 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
         break;
       }
       if (step.type === 'atkMill' && millHandled) break;
-      if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
+      // Hydreigon Dark Destruction (sm4-62): "You may discard an Energy from this Pokémon. If you
+      // do, <effect>." — the optional discard is the step the next sentence's cost gate reads.
+      const optionalCostDiscard = flags.optional && /^if you do,/.test(sentences[index + 1]?.trim() || '');
+      if (step.type === 'atkDiscardSelfEnergy' && !optionalCostDiscard && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
       if (step.type === 'atkDiscardOwnHand' && (step.upTo || step.what) && !handScaled) break;
       const { before, ...stepFlags } = flags;
       const { beforeDamage, ...built } = step;

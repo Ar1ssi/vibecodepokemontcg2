@@ -119,6 +119,12 @@ const REWRITES = [
     /\bput (\d+) damage counters on ([2-9]) of your opponent's (benched )?pok[ée]mon\b/gi,
     "choose $2 of your opponent's $3Pokémon and put $1 damage counters on each of them",
   ],
+  // Bergmite Break Open (TCGdex sm6-29): "If you do," after the Stadium discard is Flygon Desert
+  // Geyser's "If you discarded a Stadium in this way,".
+  [
+    /\b(if your opponent has a stadium)(?: card)? (in play, discard it\.) if you do, /gi,
+    '$1 $2 If you discarded a Stadium in this way, ',
+  ],
   // Not inside reminder text: "(… you cannot put it face down …)" states no effect.
   [/\bcannot\b(?![^()]*\))/gi, "can't"],
   [/\bcan no longer\b/gi, "can't"],
