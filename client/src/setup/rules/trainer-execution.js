@@ -481,7 +481,16 @@ async function runSearchStep(card, searchStep, done) {
     triggerCard: card,
     zoneFrom: 'deck',
     destination: toBench ? 'bench' : 'hand',
+    // upTo: Done with nothing chosen means "take nothing" (the picker asks
+    // first) instead of silently taking whichever card has focus.
+    upTo: true,
     onPick: (picked) => {
+      if (!picked) {
+        msg('  no card taken — deck shuffled');
+        shuffleAfter({ message: null });
+        done?.();
+        return;
+      }
       revealPicked(picked);
       if (toAttach) attachEnergyToPokemon(picked);
       else {

@@ -19,3 +19,17 @@ export async function movePicksInOrder(picks, moveOne) {
     }
   }
 }
+
+export const EMPTY_PICK_PROMPT = 'You have not chosen anything. Continue without choosing?';
+
+/**
+ * True when the player may proceed with `picks`. An empty selection (no pick,
+ * or only the `undefined` a single picker passes for "declined") needs the
+ * player's explicit yes; a real selection never asks.
+ * @param {unknown[]} picks
+ * @param {(message: string) => boolean} ask
+ */
+export function confirmPicksOrEmpty(picks, ask) {
+  if (picks.some((pick) => pick != null)) return true;
+  return ask(EMPTY_PICK_PROMPT) === true;
+}

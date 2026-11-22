@@ -20,7 +20,7 @@ import {
   resolveTargetSlotIndex,
   shouldSuppressClickAfterDrag,
 } from './card-picker-hitbox.mjs';
-import { movePicksInOrder } from './card-picker-moves.mjs';
+import { confirmPicksOrEmpty, movePicksInOrder } from './card-picker-moves.mjs';
 import { cardArtSrc } from './card-art-src.mjs';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
@@ -731,6 +731,8 @@ const confirmPicker = async (state) => {
     const explicit = state.slotAssignments[0] ?? state.slotCard ?? null;
     picks = [explicit != null || state.minCount > 0 ? explicit ?? cards[index] : undefined];
   }
+
+  if (!confirmPicksOrEmpty(picks, (message) => window.confirm(message))) return;
 
   // The moves below are awaited, so a second confirm click could land while
   // they run and move the same picks twice.
