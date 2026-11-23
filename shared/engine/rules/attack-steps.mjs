@@ -1540,8 +1540,9 @@ const BLOCKS = [
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
   ],
   [
-    // Drakloak Recon Directive: "Put the other card on the bottom of your deck."
-    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone|put the other cards? on the bottom of your deck)\./g,
+    // Drakloak Recon Directive: "Put the other card on the bottom of your deck." Comfey Flower Selecting
+    // (Crown Zenith GG14): "Put the other card in the Lost Zone."
+    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards? in the lost zone|put the other cards? on the bottom of your deck)\./g,
     (m) => ({
       type: 'atkLookTopTake',
       look: Number(m[1]),
