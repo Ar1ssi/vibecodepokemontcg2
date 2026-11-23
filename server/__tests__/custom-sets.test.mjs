@@ -335,3 +335,13 @@ test('a missing root is watched by polling until the folder appears', async () =
     live.close();
   }
 });
+
+test('the Homebrew set record lists its cards in display order; other sets keep set.json order', () => {
+  const base = sampleSet();
+  const [tyranitar, bill] = base.cards;
+  const larvitar = { ...tyranitar, id: 'customhbw-003', localId: '003', name: 'Larvitar', stage: 'Basic', evolveFrom: undefined, image: '/src/assets/custom-sets/customhbw/003' };
+  const cardsOf = (setId) => [tyranitar, bill, larvitar].map((card) => ({ ...card, id: card.id.replace('customhbw', setId), image: card.image.replace('customhbw', setId) }));
+  const store = storeOf(sampleSet({ cards: cardsOf('customhbw') }), sampleSet({ id: 'customhb', code: 'HB', cards: cardsOf('customhb') }));
+  assert.deepEqual(store.setRecord('customhbw').cards.map((card) => card.name), ['Tyranitar', 'Bill', 'Larvitar']);
+  assert.deepEqual(store.setRecord('customhb').cards.map((card) => card.name), ['Larvitar', 'Bill', 'Tyranitar']);
+});
