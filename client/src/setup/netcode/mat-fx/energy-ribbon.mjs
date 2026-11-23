@@ -15,8 +15,8 @@ const INK = [10, 8, 24];
 
 /** The three layers, outermost first: half-width scale, alpha scale, how far toward white. */
 const LAYERS = Object.freeze([
-  { width: 2.4, alpha: 0.16, white: 0 },
-  { width: 1, alpha: 0.7, white: 0.12 },
+  { width: 2.4, alpha: 0.2, white: 0 },
+  { width: 1, alpha: 0.88, white: 0.1 },
   { width: 0.3, alpha: 0.9, white: 0.62 },
 ]);
 const CORE = LAYERS[2];
