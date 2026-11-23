@@ -49,14 +49,15 @@ const run = (state, type, payload, seed = 3) => applyCommand(state, { type, play
 
 test('Dusk Ball offers only the {D} Pokémon in the deck and puts the chosen one into the hand', () => {
   const state = game();
-  const darkBasic = mon('Umbreon', ['Darkness'], { stage: 'Stage 1', evolvesFrom: 'Eevee' });
+  const darkStage1 = mon('Umbreon', ['Darkness'], { stage: 'Stage 1', evolvesFrom: 'Eevee' });
   const darkEx = mon('Darkrai ex', ['Darkness']);
+  const dualType = mon('Spiritomb', ['Psychic', 'Darkness']);
   const psychic = mon('Mew', ['Psychic']);
   const darkEnergy = createCard({
     instanceId: nextId++, name: 'Basic Darkness Energy', supertype: 'Energy', subtypes: ['Basic'], energyType: 'Darkness',
   });
   const item = createCard({ instanceId: nextId++, name: 'Potion', supertype: 'Trainer', subtypes: ['Item'], trainerType: 'Item', text: 'x' });
-  state.players.p1.zones.deck.push(psychic, darkBasic, darkEnergy, item, darkEx);
+  state.players.p1.zones.deck.push(psychic, darkStage1, darkEnergy, dualType, item, darkEx);
   const ball = duskBall();
   state.players.p1.zones.hand.push(ball);
 
@@ -66,14 +67,14 @@ test('Dusk Ball offers only the {D} Pokémon in the deck and puts the chosen one
   assert.ok(choice, 'Dusk Ball asks which {D} Pokémon to take');
   assert.deepEqual(
     choice.options.map((o) => o.instanceId).sort((a, b) => a - b),
-    [darkBasic.instanceId, darkEx.instanceId].sort((a, b) => a - b)
+    [darkStage1.instanceId, dualType.instanceId, darkEx.instanceId].sort((a, b) => a - b)
   );
 
   res = run(res.state, 'resolveChoice', { choiceId: choice.choiceId, selection: [darkEx.instanceId] }, 4);
   assert.equal(res.error ?? null, null, res.reason);
   const p1 = res.state.players.p1.zones;
   assert.deepEqual(p1.hand.map((c) => c.instanceId), [darkEx.instanceId]);
-  assert.equal(p1.deck.length, 4);
+  assert.equal(p1.deck.length, 5);
   assert.ok(!p1.deck.some((c) => c.instanceId === darkEx.instanceId));
   assert.ok(p1.discard.some((c) => c.instanceId === ball.instanceId), 'Dusk Ball goes to the discard pile');
   const eventTypes = res.events.map((e) => e.type);
@@ -82,6 +83,7 @@ test('Dusk Ball offers only the {D} Pokémon in the deck and puts the chosen one
     [darkEx.instanceId],
     'the chosen Pokémon is revealed'
   );
+  assert.ok(eventTypes.includes('cardMoved'));
   assert.ok(eventTypes.indexOf('deckShuffled') > eventTypes.indexOf('cardMoved'), 'the deck is shuffled afterward');
 });
 
@@ -99,6 +101,24 @@ test('Dusk Ball takes only one {D} Pokémon', () => {
   assert.equal(choice.max, 1);
   const both = run(res.state, 'resolveChoice', { choiceId: choice.choiceId, selection: [a.instanceId, b.instanceId] }, 4);
   assert.equal(both.error, 'invalid_selection', 'two picks are refused');
+});
+
+test('Dusk Ball may find nothing even with a {D} Pokémon in the deck, and still shuffles', () => {
+  const state = game();
+  const dark = mon('Darkrai', ['Darkness']);
+  state.players.p1.zones.deck.push(dark, mon('Mew', ['Psychic']));
+  const ball = duskBall();
+  state.players.p1.zones.hand.push(ball);
+
+  let res = run(state, 'playTrainer', { instanceId: ball.instanceId });
+  const choice = res.state.pendingChoice;
+  assert.ok(choice);
+  assert.equal(choice.min, 0);
+  res = run(res.state, 'resolveChoice', { choiceId: choice.choiceId, selection: [] }, 4);
+  assert.equal(res.error ?? null, null, res.reason);
+  assert.equal(res.state.players.p1.zones.hand.length, 0);
+  assert.equal(res.state.players.p1.zones.deck.length, 2);
+  assert.ok(res.events.some((e) => e.type === 'deckShuffled'));
 });
 
 test('Dusk Ball with no {D} Pokémon in the deck takes nothing and still shuffles', () => {
