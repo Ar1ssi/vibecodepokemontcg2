@@ -5,6 +5,7 @@
 //        TYPE      energy type of the card, e.g. Fire (default Darkness)
 //        SIDE      self (default) | opp: whose Active Pokémon plays it
 //        TIMES     comma-separated ms to shoot instead of the stepped range
+//        PAD       crop half-size round the card, in card heights (default 1.7)
 //        BASE_URL  server origin (default http://localhost:4000)
 //        GPU       1 = the machine's own GPU (ANGLE d3d11) instead of SwiftShader: fast, for iterating
 //        CHROMIUM  browser executable (omit to use Playwright's own install; CHROMIUM_PATH works too)
@@ -15,7 +16,7 @@ import path from 'node:path';
 import { chromiumPath, launchOptions, openBoard } from './board-mode.mjs';
 
 const [kind = 'tera', outDir = `fx-${kind}-frames`, stepArg = '100', durArg = '2600'] = process.argv.slice(2);
-const { CARD_IMG, TYPE = 'Darkness', SIDE = 'self', TIMES = '', BASE_URL = 'http://localhost:4000', GPU, SIO_JS } = process.env;
+const { CARD_IMG, TYPE = 'Darkness', SIDE = 'self', TIMES = '', PAD = '1.7', BASE_URL = 'http://localhost:4000', GPU, SIO_JS } = process.env;
 if (kind !== 'tera' && kind !== 'mega') throw new Error(`kind must be tera or mega, got ${kind}`);
 if (!CARD_IMG) throw new Error('set CARD_IMG to a card image file or URL');
 
@@ -76,7 +77,7 @@ const rect = await page.evaluate(
 );
 if (rect.played === false) throw new Error('the entry did not play (no scene draws the card)');
 
-const pad = rect.height * 1.7;
+const pad = rect.height * Number(PAD);
 const x = Math.max(0, Math.round(rect.left + rect.width / 2 - pad));
 const y = Math.max(0, Math.round(rect.top + rect.height / 2 - pad));
 const clip = { x, y, width: Math.round(Math.min(1280 - x, 2 * pad)), height: Math.round(Math.min(800 - y, 2 * pad)) };

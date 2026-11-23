@@ -1,6 +1,6 @@
 // The colours of Terastallization: one crystal colour per Tera type, as in Scarlet/Violet, and the
-// tones built from it for the entry (tera-entry.mjs), the crystal coat a Tera Pokémon wears
-// (tera-skin.js, board3d/tera-coat.mjs) and their gems. Pure.
+// tones built from it for the entry (tera-crystal.mjs) and the crystal coat a Tera Pokémon wears
+// (tera-skin.js, board3d/tera-coat.mjs). Pure.
 import { normalizeEnergyType } from '../../../actions/move-card-bundle/energy-token-assets.mjs';
 
 export const TERA_PALETTE = Object.freeze({
@@ -48,16 +48,3 @@ export function teraPaletteFor(type) {
 
 /** The Tera palette for a card, from its first printed type. */
 export const teraPaletteForCard = (card) => teraPaletteFor(Array.isArray(card?.types) ? card.types[0] : null);
-
-/**
- * A gem's three tones from a Tera palette, 0–255: `deep` at its root, `body` along it, `hot` on
- * its ridges, rim and glints (the body lifted toward white, never white itself).
- * @returns {{ deep: number[], body: number[], hot: number[] }}
- */
-export function teraGemColours(palette = TERA_PALETTE) {
-  return {
-    deep: mixRgb(palette.deep, INK, 0.3),
-    body: palette.cyan,
-    hot: mixRgb(palette.cyan, palette.white, 0.3),
-  };
-}

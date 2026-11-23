@@ -67,7 +67,7 @@ export const evolve = (plan) => {
   if (!rect) return 0;
   // Design 027: a Mega or Tera evolution plays its signature entry instead, and holds to its burst.
   const evolved = registry.get(plan.instanceId)?.card;
-  const signatureHold = playSignatureEntry(signatureEntryKind(evolved), plan.instanceId, evolved);
+  const signatureHold = playSignatureEntry(signatureEntryKind(evolved), plan.instanceId, evolved, rect);
   if (signatureHold !== false) return signatureHold;
   // Design 066: every other evolution plays TCG Live's Card_Evolution over the evolved card.
   playEvolveScene({ rect, turn: frameTurnOf(registry.get(id)?.element) });
