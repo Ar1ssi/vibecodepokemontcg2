@@ -40,7 +40,7 @@ specs/<type>.mjs  (beats: at/until/layer/drawer/params; attacker/defender motion
 | Bloom | `board3d/fx/fx-layer.js` `BLOOM = { strength 0.2, radius 0.3, threshold 2.4 }` — only HDR > 2.4 blooms; the story behind it is in techniques § HDR |
 | Heights and stand angles (lane units; camera looks almost straight down so nothing stands past 0.5) | `moves/beat-lift.mjs` `LIFT` — read its header before changing a stand |
 | Shared GLSL: noise/fbm, billboard + lean, dissolve, fire ramp, board refraction, blend settings | `board3d/fx/elements/element-glsl.mjs` |
-| Kind capacities | sprite 512 · bolt 1024 · debris 256 · waterDrop 256 · crystal 192 · waterBeam 128 · flameJet 128 · smoke 128 · haze 96 · fireball 64 · plasma 64 · lens 32 · shell 16 |
+| Kind capacities | sprite 512 · bolt 1024 · debris 256 · waterDrop 256 · waterBeam 128 · flameJet 128 · smoke 128 · haze 96 · fireball 64 · plasma 64 · lens 32 |
 | Composite (design 089) | `board3d/fx/tone.mjs`: a texel's cover goes over the board exactly; light its alpha cannot account for is rolled off by its brightest channel (`TONE`) and screened on. Light keeps its hue; nothing clips to white |
 | Sprite params | `texture, at{x,y,z}, size, aspect, rotation°, colour rgb 0–1 (HDR ok), alpha, frame, blend 'add'/'over', channel 'r'/'a'/'rgba', alignDeg, dissolve` (`sprite.mjs normalizeSprite`) |
 | Card motion presets | `moves/card-motion.mjs` attacker: brace, lunge, dash, rear-lurch, warp, rise, stomp, spin, none · defender: knock, stagger, float, sink, freeze |

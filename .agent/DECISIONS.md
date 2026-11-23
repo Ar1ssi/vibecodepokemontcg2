@@ -6,8 +6,9 @@
 # Pruned, folded or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-11-13.md, DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120, D214 each exist twice — cite as `D119[rules]`. Designs 074 and 088 name two each: cite by file name.
-#   Next id = highest D number in this file and the archives + 1 (next: D259).
+#   Next id = highest D number in this file and the archives + 1 (next: D260).
 
+- D259 2026-11-23 [mat-fx] Mega/Tera entries are designs 035–037's canvas scenes again (user), through stage-post.js (bloom, roll-off, fringe), holding to the reveal; Tera skin stays tera-coat.mjs. (Supersedes D250)
 - D258 2026-11-20 [netcode] 090-homebrew-clock: the homebrew chess clock is room-level (never engine state, so replay/undo stay deterministic); 0:00 ends the game through a server-only `timeOut` command.
 - D257 2026-11-12 [logging] 088-unified-logging: an export is complete on purpose (both hands, deck order) and each one is announced in room chat; entries join on sv/cs, no correlation id; format NDJSON v1, read with tools/log.mjs.
 - D256 2026-11-12 [netcode] 088-unified-logging: GameRoom journals every applyCommand (rng cursor + state hash) and rebases on any in-place state change, so an export replays; a new mutation site must call journal.rebase.
@@ -16,7 +17,6 @@
 - D253 2026-11-13 [harness] CI (.github/workflows/ci.yml) runs `eslint --quiet .` and the unit suite on pushes to main and on PRs: lint errors are a gate, formatting warnings are not.
 - D252 2026-11-13 [mat-fx] A Stadium board is keyed by its Homebrew card's name (lower case, `-` joined), never its number: a set renumbering sent 22 Stadiums to no board or the wrong one (I282). (environmentKeyFor)
 - D251 2026-11-13 [server] server/access-policy.mjs: production admin UI only with its own ADMIN_PASSWORD; CORS only by ALLOWED_ORIGINS (WebSocket upgrades unchecked); the page loads the server's own Socket.IO client.
-- D250 2026-11-15 [mat-fx] Mega/Tera entries are FX-layer scenes on the scene clock (kinds `crystal`, `shell`) after TCG Live’s prefabs; the Tera skin is one coat shader (tera-coat.mjs). (Supersedes D122)
 - D249 2026-11-14 [mat-fx] FX composite is two draws: cover by alpha, then light screened after a hue-keeping roll-off (fx/tone.mjs); no effect may clip to white. Motions are spread by rule (motion-variety.mjs). (design 089)
 - D248 2026-11-14 [engine] `attackStarted` opens every attack before its first effect; the client plays the attack scene from it, then the slide, and holds choice prompts until the scene ends (choice-gate.mjs). (design 089)
 - D247 2026-11-13 [server] Deploys serve an esbuild bundle (one hashed script + sheet, immutable); unhashed files are `no-cache`; dev stays unbundled ESM. Deps: esbuild, compression. (Amends D4; design 088)
