@@ -1062,6 +1062,16 @@ const TCGDEX_BASE = tcgdexApiBase();
       return cards.filter((card) => String(card?.name || '').toLowerCase().includes(needle));
     }
     
+    // Custom sets (customhb) carry no per-card dates; the card editor numbers cards in the order they
+    // were made, so card number stands in for "date added". 'set' keeps the set.json order.
+    export const CUSTOM_SET_SORT_ORDERS = Object.freeze(['set', 'newest', 'oldest']);
+
+    export function sortCustomSetCards(cards = [], order = 'set') {
+      if (order === 'newest') return sortCardsWithinGroup(cards, { sortBy: 'number', sortDirection: 'desc' });
+      if (order === 'oldest') return sortCardsWithinGroup(cards, { sortBy: 'number', sortDirection: 'asc' });
+      return [...cards];
+    }
+
     export function sortCardsWithinGroup(cards = [], options = {}) {
       const { sortBy = 'number', sortDirection = 'asc' } = options;
       const direction = sortDirection === 'desc' ? -1 : 1;

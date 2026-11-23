@@ -6,6 +6,7 @@ import test from 'node:test';
       fetchSetCards,
       filterCardsByName,
       sortCardsWithinGroup,
+      sortCustomSetCards,
     } from '../core/set-browser.mjs';
     import { getStarterDeckCatalog, getStarterDecks, loadStarterDecks } from '../core/starter-decks.mjs';
     import { getSleeves, loadSleeveCatalog } from '../core/sleeves.mjs';
@@ -123,6 +124,21 @@ import test from 'node:test';
     
       const byName = sortCardsWithinGroup(cards, { sortBy: 'name', sortDirection: 'asc' });
       assert.equal(byName[0].id, 'b');
+    });
+
+    // customhb set.json lists 578, 458, 457… (editor order); card number stands in for date added.
+    test('sortCustomSetCards: set order kept, newest/oldest by card number', () => {
+      const cards = [
+        { id: 'customhb-578', localId: '578' },
+        { id: 'customhb-458', localId: '458' },
+        { id: 'customhb-691', localId: '691' },
+      ];
+      const ids = (list) => list.map((card) => card.localId).join(',');
+      assert.equal(ids(sortCustomSetCards(cards, 'set')), '578,458,691');
+      assert.equal(ids(sortCustomSetCards(cards, 'newest')), '691,578,458');
+      assert.equal(ids(sortCustomSetCards(cards, 'oldest')), '458,578,691');
+      assert.equal(ids(sortCustomSetCards(cards, 'bogus')), '578,458,691');
+      assert.equal(ids(cards), '578,458,691');
     });
     
 // TCGdex /sets/sv03.5 lists sv03.5-004 Charmander and sv03.5-165 Rare Candy with no category
