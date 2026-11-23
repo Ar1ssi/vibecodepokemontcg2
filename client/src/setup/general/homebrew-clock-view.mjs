@@ -8,7 +8,7 @@
 import { formatClock } from '../../../../shared/engine/homebrew-clock.mjs';
 
 export const CLOCK_LOW_MS = 30 * 1000;
-export const CLOCK_TOGGLE_LABEL = 'Homebrew clock: 3:00 each, +15 s per turn';
+export const CLOCK_TOGGLE_LABEL = 'Homebrew clock: 10:00 each, +40 s per turn';
 export const CLOCK_TOGGLE_HINT = 'Runs when both decks have a homebrew card. Out of time loses.';
 
 /**
