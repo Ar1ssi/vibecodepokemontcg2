@@ -646,6 +646,9 @@ function flipAndResolveAttack(draft, ctx) {
   // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  delete draft.attackEnergyDiscarded;
+  delete draft.attackBenchedFromDeck;
+  delete draft.attackPleaRefused;
   // The attack this player used, for next-turn copy wordings (Mimikyu Copycat, Sudowoodo
   // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
   // opponent reads it only during their next turn (design 039).
@@ -654,7 +657,11 @@ function flipAndResolveAttack(draft, ctx) {
     // the attack, not to the attack a next-turn copier reads (design 049 review).
     const printedAttack = { ...attack };
     for (const key of ['bonusBeforeWR', 'grantedBy', 'copiedFrom', 'waivesUseGate']) delete printedAttack[key];
+    // The attack it replaces stays readable for this attack's own "used … during your last turn"
+    // reads (Araquanid Bubble Trap, attack-damage-context.mjs lastTurnAttackOf); one level only.
+    const { previous: _older, ...previous } = attackerPlayer.lastAttack || {};
     attackerPlayer.lastAttack = {
+      ...(attackerPlayer.lastAttack ? { previous } : {}),
       attack: printedAttack,
       isGx: isGxAttack(attack),
       attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',

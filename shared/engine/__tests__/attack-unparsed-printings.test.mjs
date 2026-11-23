@@ -576,12 +576,14 @@ test('Unown T: an empty opponent hand skips straight to their pick from yours', 
 test('Mischievous Tentacles: shows the top card; Yes shuffles, No keeps the order', () => {
   const b = board(MISCHIEVOUS_TENTACLES, { name: 'Inkay' });
   const asked = attack(b);
-  assert.match(asked.state.pendingChoice.prompt, /top card of your opponent's deck is p2 deck 0/);
+  // The card is named on the options only: the prompt also reaches the opponent (view.mjs).
+  assert.ok(asked.state.pendingChoice.options.every((o) => o.name.includes('p2 deck 0')));
+  assert.doesNotMatch(asked.state.pendingChoice.prompt, /p2 deck 0/);
   const before = zone(asked, 'p2', 'deck').map((c) => c.instanceId);
-  const kept = choose(structuredClone(asked), [asked.state.pendingChoice.options.find((o) => o.name === 'No').instanceId], b.rng);
+  const kept = choose(structuredClone(asked), [asked.state.pendingChoice.options.find((o) => o.name.startsWith('No')).instanceId], b.rng);
   // p2 draws its top card as its turn starts.
   assert.deepEqual(zone(kept, 'p2', 'deck').map((c) => c.instanceId), before.slice(1));
-  const shuffled = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name === 'Yes').instanceId], b.rng);
+  const shuffled = choose(asked, [asked.state.pendingChoice.options.find((o) => o.name.startsWith('Yes')).instanceId], b.rng);
   assert.ok(shuffled.events.some((e) => e.type === 'deckShuffled' && e.playerId === 'p2'));
 });
 

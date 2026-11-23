@@ -2593,13 +2593,47 @@ function healPerHeads(ctx) {
   });
 }
 
-// Pokédex / New Pokédex — the player reorders the top N cards of their deck.
+// Pseudo-option ids for Rotom Dex's "put them back in any order or shuffle them into your deck".
+const REARRANGE_ORDER = -21;
+const REARRANGE_SHUFFLE = -22;
+
+// Pokédex / New Pokédex — the player reorders the top N cards of their deck. Rotom Dex—Poké Finder
+// Mode (sm3-122, `orShuffle`) may instead shuffle them into the deck.
 function rearrangeTop(ctx) {
   const { player, step } = ctx;
   const deck = player.zones.deck || [];
   const count = Math.min(step.count || 0, deck.length);
-  if (count <= 1) return null;
+  if (count <= 1 && !step.orShuffle) return null;
   const viewed = deck.slice(0, count);
+
+  if (step.orShuffle && !ctx.memo?.ordering) {
+    if (ctx.selection?.[0] === REARRANGE_SHUFFLE) {
+      if (ctx.activeRng) shuffleInPlace(ctx.activeRng, deck);
+      ctx.events.push({ type: 'deckShuffled', playerId: player.playerId });
+      return null;
+    }
+    if (ctx.selection?.[0] === REARRANGE_ORDER) {
+      if (count <= 1) return null;
+      return ctx.ask({
+        prompt: `${sourceName(ctx, 'Trainer')}: Choose the order of the top ${count} cards (first is on top)`,
+        options: viewed,
+        min: count,
+        max: count,
+        memo: { ordering: true },
+      });
+    }
+    if (count === 0) return null;
+    ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count });
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Put the top ${count} cards back in any order, or shuffle them into your deck?`,
+      options: [
+        { instanceId: REARRANGE_ORDER, name: 'Put back in any order', type: 'option' },
+        { instanceId: REARRANGE_SHUFFLE, name: 'Shuffle into deck', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
 
   if (ctx.selection) {
     const byId = new Map(viewed.map((c) => [c.instanceId, c]));
@@ -5053,7 +5087,7 @@ function putHandBasicAsActive(ctx) {
 function opponentDiscardToLostZonePerPokemon(ctx) {
   const { player, opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const symbol = String(step.energyType || '').match(/\{([a-z])\}/)?.[1];
+  const symbol = String(step.energyType || '').match(/\{([a-z])\}/i)?.[1]?.toLowerCase();
   const count = rootsOf(player).filter(
     (root) => !symbol || pokemonHasType(topPokemonCard(player, root), symbol)
   ).length;

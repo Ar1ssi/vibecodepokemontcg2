@@ -803,6 +803,9 @@ function applyOpponentTurnStartDraws(draft, { nextPlayerId, events }) {
 export function advanceTurn(draft, { nextPlayerId, events }) {
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  delete draft.attackEnergyDiscarded;
+  delete draft.attackBenchedFromDeck;
+  delete draft.attackPleaRefused;
   returnSetAsideHands(draft, { endingTurn: draft.turn.number || 1, events });
   // The flags object is replaced wholesale below; a Checkup Knockout may have just
   // entitled the incoming player, and that entitlement must survive the reset so the

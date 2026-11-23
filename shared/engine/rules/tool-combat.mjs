@@ -434,6 +434,11 @@ export function attachedToolMarkers(zoneCards, root) {
     if (cost) markers.push({ kind: 'attackCostIncrease', count: (cost[1].match(/\{[a-z]\}/g) || []).length, source });
     const less = t.match(TOOL_ATTACK_DO_LESS);
     if (less) markers.push({ kind: 'outgoingReduce', amount: Number(less[1]), afterWR: false, source });
+    // Weakness Policy (sm3-126) "… has no Weakness"; Metal Frying Pan (sm6-112) only for a {M} holder.
+    const noWeakness = t.match(/the (?:\{([a-z])\} )?pok[eé]mon this card is attached to [^.]*?has no weakness/);
+    if (noWeakness && (!noWeakness[1] || attackerTypes(holderView(root, zoneCards)).includes(TYPE_LETTER[noWeakness[1]]))) {
+      markers.push({ kind: 'noWeakness', source });
+    }
     return markers;
   });
 }
@@ -511,7 +516,7 @@ export function combinedToolRetreatCost(
   baseRetreat,
   pokemon,
   zoneCards,
-  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null } = {}
+  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null, turnNumber = null } = {}
 ) {
   let cost = baseRetreat || 0;
   const holder = holderView(pokemon, zoneCards);
@@ -521,6 +526,8 @@ export function combinedToolRetreatCost(
     benchCards,
     sideCards,
     opponentSideCards,
+    // Wimpod Wimp Out (sm3-16): "During your first turn, this Pokémon has no Retreat Cost."
+    turnNumber,
   });
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;
@@ -541,6 +548,48 @@ export function combinedToolRetreatCost(
     }
   }
   return cost;
+}
+
+/**
+ * Silvally-GX Memories (sm4-94 Fighting Memory, sm5-121 Electric Memory, …): "The Silvally-GX this
+ * card is attached to is a {F} Pokémon." The type word the holder becomes (lowercase), or null.
+ */
+export function toolTypeOverride(holder, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (!holder || toolBlocked(blockTools, stadium)) return null;
+  const squash = (v) => lower(v).replace(/[^a-z0-9]/g, '');
+  for (const tool of attachedTools(holder, zoneCards)) {
+    const match = cardAbilityText(tool).match(/(?:^|\.\s)the ([^.]+?) this card is attached to is an? \{([a-z])\} pok[eé]mon\.?(?:$|\s)/);
+    if (!match || squash(match[1]) !== squash(holder.name)) continue;
+    const type = TYPE_LETTER[match[2]];
+    if (type) return type;
+  }
+  return null;
+}
+
+/**
+ * Escape Board (sm5-122): "… and it can retreat even if it's Asleep or Paralyzed." The conditions
+ * an attached, live Tool lets `pokemon` retreat through (lowercase), or an empty list.
+ */
+export function toolRetreatIgnoresConditions(pokemon, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (toolBlocked(blockTools, stadium)) return [];
+  for (const tool of attachedTools(pokemon, zoneCards)) {
+    const match = cardAbilityText(tool)
+      .replace(/[\u2018\u2019]/g, "'")
+      .match(/can retreat even if it's (asleep|paralyzed)(?: or (asleep|paralyzed))?/);
+    if (match) return [match[1], match[2]].filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * Dashing Pouch (sm4-92): "If the Pokémon this card is attached to discards Energy for its Retreat
+ * Cost, put that Energy into your hand instead of the discard pile."
+ */
+export function toolRetreatEnergyToHand(pokemon, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (toolBlocked(blockTools, stadium)) return false;
+  return attachedTools(pokemon, zoneCards).some((tool) =>
+    /discards energy for its retreat cost, put that energy into your hand instead of the discard pile/.test(cardAbilityText(tool))
+  );
 }
 
 /**

@@ -339,6 +339,8 @@ function timesAsForEach(text) {
 
 const BASE_SWAP = [
   /^if (.+?), this attack's base damage is (\d+)(?: instead of \d+)?\.?$/,
+  // Cinccino Amazing Plea (sm4-86): "If no, this attack does 80 damage to your opponent's Active Pokémon."
+  /^if (no), this attack does (\d+) damage to your opponent's active pokémon\.?$/,
   /^if (.+?), this attack does (\d+) damage instead of \d+\.?$/,
 ];
 
@@ -638,7 +640,11 @@ export function parseAttackDamage(
       // Revealed-hand scaling (Poltergeist, Liberation-GX, Wonder Flare) counts one card kind.
       count = handKind === 'trainer' ? ctx.opponentHandTrainerCount : ctx.opponentHandEnergyCount;
       label = `${handKind === 'trainer' ? 'Trainer' : 'Energy'} cards in opponent's hand`;
-    } else if (/^(?:energy )?cards? you returned|^damage counters? you (?:put|placed)|^benched pok[ée]mon you discarded in this way/.test(unit)) {
+    } else if (
+      /^(?:energy )?cards? you returned|^damage counters? you (?:put|placed)|^benched pok[ée]mon you discarded in this way/.test(unit) ||
+      // Gourgeist Pumpkin Bomb (sm4-45) / Miltank Milk Cannon (sm8-158): an optional cost's count.
+      (/^cards? you (?:discarded|revealed) in this way/.test(unit) && typeof ctx.optionalCostCount === 'number')
+    ) {
       // Yanmega Wind Return / Meganium Bouncy Move: the optional cost the player paid
       // (ctx.optionalCostCount, set with ctx.optionalCostPaid by the reducer).
       count = ctx.optionalCostCount;
@@ -784,7 +790,15 @@ export function parseAttackDamage(
     // Work Together): tails leaves the printed damage.
     const scaleSentence = text.split(/(?<=\.)\s+/).find((s) => /damage for each/.test(s)) || '';
     const headsGated = /^if heads,/.test(scaleSentence) && !/heads/.test(unit);
-    if (headsGated && ctx.coin !== 'heads') {
+    // Toxapex Venom Fever (sm8-69): "If your opponent's Active Pokémon is Poisoned, this attack does
+    // 50 damage for each …" — a "does N damage for each" scaling gated by a board condition.
+    const stateGate = !isMore && !headsGated ? /^if (.+?), this attack does \d+ damage for each\b/.exec(scaleSentence)?.[1] : null;
+    const stateGateMet = stateGate ? sharedCondition(stateGate, ctx, attacker) : null;
+    if (stateGateMet === false) {
+      total = 0;
+      components.push('per-each');
+      notes.push(`scaling not applied (condition not met: ${stateGate})`);
+    } else if (headsGated && ctx.coin !== 'heads') {
       components.push('per-each');
       notes.push(
         ctx.coin === 'tails' ? 'scaling not applied (tails)' : 'heads-gated scaling — resolve the coin'
@@ -1734,7 +1748,13 @@ export function eachPokemonDamage(attackText) {
   // Pichu [Neo Genesis 12] Zzzap: "Does 20 damage to each Pokémon in play that has a Pokémon
   // Power."; Pupitar [Neo Discovery 45] Dust Devil: "Does 10 damage to each non-{F} Pokémon in
   // play." Both sides, the attacker too when it matches.
-  const inPlay = /(?:^|\.\s+)does (\d+) damage to each (?:non-\{([a-z])\} )?pokémon in play( that has a pokémon power)?\./.exec(text);
+  // Pupitar [Celestial Storm 75] Dust Devil: "This attack does 20 damage to each non-Fighting
+  // Pokémon (both yours and your opponent's)." (TCGdex spells the type.)
+  const inPlay =
+    /(?:^|\.\s+)does (\d+) damage to each (?:non-\{([a-z])\} )?pokémon in play( that has a pokémon power)?\./.exec(text) ||
+    /(?:^|\.\s+)this attack does (\d+) damage to each non-\{([a-z])\} pokémon \(both yours and your opponent's\)()/.exec(
+      symbolizeTypeWords(text).toLowerCase()
+    );
   if (inPlay) {
     const [, amount, exceptType, power] = inPlay;
     const filter = {
@@ -1872,10 +1892,20 @@ export function attackTargetClause(attackText) {
   }
   // Alolan Exeggutor-GX Tropical Head: "This attack does 20 damage times the amount of Energy
   // attached to this Pokémon to 1 of your opponent's Pokémon." reduce.mjs multiplies `amount`.
+  // Corsola Bubble Shoot (sm7.5-27) prints the type: "… times the amount of Water Energy attached …".
   const perEnergy =
-    /does (\d+) damage times the amount of energy attached to (?:this pok[ée]mon|[^.]+?) to 1 of your opponent's pok[ée]mon/i.exec(t);
+    /does (\d+) damage times the amount of (?:\{([a-z])\} )?energy attached to (?:this pok[ée]mon|[^.]+?) to 1 of your opponent's pok[ée]mon/i.exec(
+      symbolizeTypeWords(t)
+    );
   if (perEnergy) {
-    return { kind: 'damage', amount: Number(perEnergy[1]), count: 1, scope: 'any', amountPerEnergy: true };
+    return {
+      kind: 'damage',
+      amount: Number(perEnergy[1]),
+      count: 1,
+      scope: 'any',
+      amountPerEnergy: true,
+      ...(perEnergy[2] ? { amountPerEnergyType: perEnergy[2].toUpperCase() } : {}),
+    };
   }
   // Dark Ivysaur Fury Strikes: "Your opponent puts 3 markers onto his or her Pokémon (divided as
   // he or she chooses). … this attack does 10 damage to each Pokémon for each marker on it." The

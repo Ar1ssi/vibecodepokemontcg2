@@ -28,13 +28,14 @@ import {
 import {
   promoteBenchToActive, koEnergyTargets, moveKoEnergy, PRIZE_CHOICE_EFFECT, resolvePrizeChoice,
   KO_HAND_DISCARD_EFFECT, resolveKoHandDiscard, KO_TOOL_COUNTERS_EFFECT, resolveKoToolCounter,
+  BENCH_LIMIT_EFFECT, resolveBenchLimitTrim,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
   PRIZE_TRAINER_EFFECT, resumePrizeTrainer, TOOL_ENERGY_BENCH_EFFECT, moveToolEnergyToBench,
 } from './knockout.mjs';
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
 import { continueRetreat, isExactRetreatPayment, applyRetreatSwap } from './retreat.mjs';
 import {
-  GROWTH_ATTACH_EFFECT, resumeGrowthAttach,
+  GROWTH_ATTACH_EFFECT, resumeGrowthAttach, ENERGY_EVOLUTION_EFFECT, resumeEnergyEvolution,
   STADIUM_EVOLVE_SEARCH_EFFECT, resumeStadiumEvolveSearch,
 } from './attach.mjs';
 import { settleTrainerPrizeWin, endTurnAfterTrainer } from './trainer.mjs';
@@ -102,6 +103,13 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
     resumeGrowthAttach(draft, {
       selection: payload.selection || [],
       resumeToken: token,
+      events,
+    });
+  } else if (token.effectType === ENERGY_EVOLUTION_EFFECT) {
+    resumeEnergyEvolution(draft, {
+      selection: payload.selection || [],
+      resumeToken: token,
+      activeRng,
       events,
     });
   } else if (token.effectType === STADIUM_EVOLVE_SEARCH_EFFECT) {
@@ -489,6 +497,14 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       playerId: initiatorPlayerId,
       targetPlayerId: token.targetPlayerId,
       selection: payload.selection || [],
+      events,
+    });
+  } else if (token.effectType === BENCH_LIMIT_EFFECT) {
+    draft.pendingChoice = null;
+    resolveBenchLimitTrim(draft, {
+      playerId: initiatorPlayerId,
+      selection: payload.selection || [],
+      count: token.count || 0,
       events,
     });
   } else if (token.effectType === KO_HAND_DISCARD_EFFECT) {

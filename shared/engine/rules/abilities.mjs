@@ -710,7 +710,16 @@ export function parseAbility(text = '') {
   }
 
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
-  if (
+  // Karrablast Shell On (sm4-7): "search your deck for a card that evolves from this Pokémon and
+  // put it onto this Pokémon to evolve it" evolves the holder (trainer-steps searchEvolve).
+  const evolvesSelf = /search your deck for (?:a|an evolution) card that evolves from this pok[eé]mon and put it onto this pok[eé]mon/.test(lower);
+  if (evolvesSelf) {
+    steps.push({
+      type: 'searchEvolve',
+      ontoSource: true,
+      guidance: 'Once during your turn: search your deck for a card that evolves from this Pokémon and evolve it.',
+    });
+  } else if (
     lower.includes('search your deck') ||
     lower.includes('look through your deck') ||
     (lower.includes('find') && lower.includes('from your deck')) ||
@@ -1301,7 +1310,18 @@ export function parseAbility(text = '') {
   // Also excludes the opponent-facing evolve-lock wording ("your opponent can't
   // play any Pokémon from their hand to evolve their Pokémon", Primal Law):
   // without it a passive lock parsed as an activated evolve ability too.
-  if (
+  // Ditto Prism Star Almighty Evolution (sm8-154): "put any Stage 1 card from your hand onto this
+  // Pokémon to evolve it" — any Stage 1, whatever it evolves from.
+  const anyStageFromHand = /put any (stage 1|stage 2) card from your hand onto this pok[eé]mon to evolve it/.exec(lower);
+  if (anyStageFromHand) {
+    steps.push({
+      type: 'evolveSelfFromHand',
+      stage: anyStageFromHand[1] === 'stage 1' ? 'Stage 1' : 'Stage 2',
+      anyName: true,
+      guidance: `Once during your turn: put any ${anyStageFromHand[1]} card from your hand onto this Pokémon.`,
+    });
+  } else if (
+    !evolvesSelf &&
     lower.includes('evolve') &&
     (lower.includes('this pokémon') || lower.includes('onto this pokémon')) &&
     !/from (?:your|his or her|their) hand to evolve/.test(lower)
