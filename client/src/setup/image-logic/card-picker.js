@@ -550,8 +550,11 @@ export const findDropSlotAt = (state, x, y) => {
   );
 };
 
+// Under the ALL tab the rest of the pile is shown, but only a VALID card can be picked.
+const isPickable = (state, card) => !state.validCandidates || state.validCandidates.has(card);
+
 export const assignCardToSlot = (state, card, slotIndex = -1) => {
-  if (!card || !state.slotAssignments?.length) return;
+  if (!card || !state.slotAssignments?.length || !isPickable(state, card)) return;
   for (let i = 0; i < state.slotAssignments.length; i += 1) {
     if (state.slotAssignments[i] === card) state.slotAssignments[i] = null;
   }
@@ -831,13 +834,16 @@ const confirmPicker = async (state) => {
 };
 
 
-const setCandidateList = (state, candidates) => {
+// `keepPicks`: switching VALID / ALL changes what is shown, not what was picked.
+const setCandidateList = (state, candidates, { keepPicks = false } = {}) => {
   state.cards = candidates;
   state.index = clampIndex(state.index, Math.max(0, candidates.length - 1));
   state.stack.innerHTML = '';
   state.slides = [];
-  state.selected.clear();
-  state.slotAssignments.fill(null);
+  if (!keepPicks) {
+    state.selected.clear();
+    state.slotAssignments.fill(null);
+  }
 
   if (!candidates.length) return;
 
@@ -845,6 +851,7 @@ const setCandidateList = (state, candidates) => {
     const slide = document.createElement('div');
     slide.className = 'discard-pile-slide card-picker-slide';
     slide.dataset.index = String(i);
+    if (!isPickable(state, card)) slide.classList.add('is-unpickable');
 
     const badge = document.createElement('span');
     badge.className = 'card-picker-select-badge';
@@ -885,6 +892,7 @@ const setCandidateList = (state, candidates) => {
   });
 
   goToIndex(state, clampIndex(state.index, candidates.length - 1));
+  if (keepPicks) updateSelectionUI(state);
   if (state.slotElements?.length) renderSlotCards(state);
 };
 
@@ -1379,6 +1387,7 @@ export const openCardPicker = async ({
     onKeyDown: null,
     allCandidates,
     filteredCandidates: candidates,
+    validCandidates: allCandidates ? new Set(candidates) : null,
     filterValidBtn: filters.querySelector('.card-picker-filter.is-active'),
     filterAllBtn: filters.querySelector('.card-picker-filter:not(.is-active)'),
   };
@@ -1420,12 +1429,12 @@ export const openCardPicker = async ({
     state.filterValidBtn.addEventListener('click', () => {
       state.filterValidBtn.classList.add('is-active');
       state.filterAllBtn.classList.remove('is-active');
-      setCandidateList(state, state.filteredCandidates);
+      setCandidateList(state, state.filteredCandidates, { keepPicks: true });
     });
     state.filterAllBtn.addEventListener('click', () => {
       state.filterAllBtn.classList.add('is-active');
       state.filterValidBtn.classList.remove('is-active');
-      setCandidateList(state, state.allCandidates);
+      setCandidateList(state, state.allCandidates, { keepPicks: true });
     });
   }
 
