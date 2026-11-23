@@ -321,8 +321,12 @@ function attackerQualifies(text, attacker, holder, ctx) {
  * and in-play conditions. Unverifiable holder position fails closed.
  */
 function sourceConditionMet(text, holder, target, attacker, ctx) {
-  if (/to your benched pok[eé]mon|of your benched pok[eé]mon/.test(text)) {
+  // "…done to your Benched {D} Pokémon" (Umbreon Dark Shield): Benched only, and only that type.
+  const benchTarget = text.match(/(?:to|of) your benched ((?:\{[a-z]\}\s*)*)pok[eé]mon/);
+  if (benchTarget) {
     if (ctx.zone !== 'bench' && ctx.isActive !== false) return false;
+    const symbols = typeSymbols(benchTarget[1]);
+    if (symbols.length && !symbols.some((ty) => attackerTypes(target).includes(lower(ty)))) return false;
   }
   if (/don't have a rule box/.test(text) && isRuleBoxPokemon(target)) return false;
   const attackerEnergy = text.match(

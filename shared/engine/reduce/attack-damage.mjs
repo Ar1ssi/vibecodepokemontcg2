@@ -13,7 +13,7 @@ import { attachedTrainerDamageReduction } from '../rules/legacy-attached-trainer
 import { applyLegacyDamageModifiers } from '../rules/legacy-power-wording.mjs';
 import { countUnit, normalizeUnit } from '../rules/scaling-count.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
-import { evaluateToolKoPrevention, isExCard, isTeraCard } from '../rules/tool-combat.mjs';
+import { evaluateToolKoPrevention, isExCard, isTeraCard, attackerTypes, TYPE_LETTER } from '../rules/tool-combat.mjs';
 import { cardAbilityText } from '../rules/ability-executors.mjs';
 import {
   abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers,
@@ -149,15 +149,17 @@ export function damageBenchedPokemon(
     return;
   }
   // Bench shields stop the opponent's attacks, not the attacker's own recoil.
+  // "…done to your Benched {D} Pokémon" (Umbreon Dark Shield) covers only Benched Pokémon of that type.
+  const victimTypes = attackerTypes(inPlayView(draft, victim) || victim);
   const benchProtected = !ownAttack && allVictimCards.some((c) => {
     if (c.attachedTo) return false;
-    const t = String(
-      c?.ability?.text ?? c?.abilityText ?? c?.text ?? c?.effect ?? ''
-    ).toLowerCase();
-    return (
-      t.includes('prevent all damage done to your benched pokémon') ||
-      t.includes('prevent all damage done to your benched pokemon')
-    );
+    const t = (cardAbilityText(c) || String(c?.ability?.text ?? c?.abilityText ?? c?.text ?? c?.effect ?? ''))
+      .toLowerCase()
+      .replace(/[\u2018\u2019]/g, "'");
+    const m = t.match(/prevent all damage done to your benched ((?:\{[a-z]\}\s*)*)pok[eé]mon/);
+    if (!m) return false;
+    const wanted = [...m[1].matchAll(/\{([a-z])\}/g)].map((x) => TYPE_LETTER[x[1]]).filter(Boolean);
+    return wanted.length === 0 || wanted.some((ty) => victimTypes.includes(ty));
   });
   if (benchProtected) {
     events.push({

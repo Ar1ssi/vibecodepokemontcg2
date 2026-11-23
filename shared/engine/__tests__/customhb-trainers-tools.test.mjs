@@ -153,6 +153,22 @@ test('HB 491 Mega Signal: 3 Basic Darkness Energy pay Mega Absol Z ex\'s {P}{P}{
   assert.equal(!attack(game({ p1: cards, p2: [mon('Def')] })).error, true);
 });
 
+// customhb 721 is not in the checked-in set.json; its ability text is verbatim from the exported log (ptcg-log 20261123-142340).
+const DARK_SHIELD = { name: 'Dark Shield', type: 'Ability', text: 'As long as this Pokémon is in play, prevent all damage done to your Benched {D} Pokémon.' };
+test('HB 721 Umbreon Dark Shield: "prevent all damage done to your Benched {D} Pokémon" leaves the Active and non-{D} Pokémon alone', () => {
+  const umbreon = () => mon('Umbreon', { types: ['Darkness'], abilities: [DARK_SHIELD] });
+  const hit = (defender, bench) => activeDamage(attack(game({ p1: [mon('Hitter', { attacks: [{ name: 'Hit', cost: [], damage: '40', text: '' }] })], p2: [defender], p2Bench: bench })));
+  assert.equal(hit(mon('Absol', { types: ['Darkness'] }), [umbreon()]), 40, 'Active {D} Pokémon takes damage');
+
+  const sweep = { name: 'Sweep', cost: [], damage: '', text: "This attack does 30 damage to each of your opponent's Benched Pokémon." };
+  const benchDamage = (benched) => {
+    const state = game({ p1: [mon('Sweeper', { attacks: [sweep] })], p2: [mon('Def')], p2Bench: [benched, umbreon()] });
+    return attack(state).state.players.p2.zones.bench.find((c) => c.instanceId === benched.instanceId).damage || 0;
+  };
+  assert.equal(benchDamage(mon('Dark Bench', { types: ['Darkness'] })), 0, 'Benched {D} Pokémon is protected');
+  assert.equal(benchDamage(mon('Fire Bench', { types: ['Fire'] })), 30, 'Benched non-{D} Pokémon is not');
+});
+
 test('HB 574 Sky Pillar: {N} Pokémon take 20 less damage only from Pokémon with {W}, {F} or {P} Energy', () => {
   const water = mon('Waterish');
   const fire = mon('Fireish');
