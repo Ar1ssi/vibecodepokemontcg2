@@ -17,6 +17,7 @@ import {
   isCustomSetId,
   validateCustomSet,
 } from '../shared/custom-sets/custom-set-schema.mjs';
+import { orderHomebrewSetCards, usesHomebrewDisplayOrder } from '../shared/custom-sets/homebrew-display-order.mjs';
 import { PTCGL_SET_IDS } from '../client/src/setup/deck-builder/core/deck-text-import.mjs';
 import { LEGACY_SET_CODE_TO_TCGDEX_ID } from '../shared/engine/rules/legacy-set-ids.mjs';
 
@@ -44,7 +45,8 @@ function setRecordOf(set) {
     symbol: '',
     // `category` rides along (TCGdex's own set record has none) so the set browser sorts Pokémon from Trainers
     // without the cached /cards?category= lists, which predate any custom set (D226).
-    cards: set.cards.map((card) => ({
+    // The set browser lists a set in this order; the Homebrew set's is sorted here (homebrew-display-order.mjs).
+    cards: (usesHomebrewDisplayOrder(set.id) ? orderHomebrewSetCards(set.cards) : set.cards).map((card) => ({
       id: card.id,
       localId: card.localId,
       name: card.name,
