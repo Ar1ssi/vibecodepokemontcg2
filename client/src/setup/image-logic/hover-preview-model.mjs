@@ -11,6 +11,7 @@ export const HOVER_FADE_IN_MS = 120;
 export const HOVER_FADE_OUT_MS = 80;
 export const HOVER_EDGE_GAP = 12;
 export const HOVER_MIN_WIDTH = 160;
+export const HOVER_MAX_WIDTH = 480;
 export const HOVER_MAX_HEIGHT_FRAC = 0.9;
 export const CARD_ASPECT = 1.397;
 
@@ -97,18 +98,20 @@ const isUsableRect = (rect) =>
   Boolean(rect) && Number.isFinite(rect.left) && rect.width > 0 && rect.height > 0;
 
 /**
- * The blurred band between the board's left edge and the mat art. Each probe rect is one half's art
- * box (`--mat-offset-x`/`--mat-width`) in viewport coordinates; the narrower band wins so the
- * preview never overlaps either half. No measurable probe → width 0 (no band).
+ * The free space either side of the mat art. Each probe rect is one half's art box
+ * (`--mat-offset-x`/`--mat-width`) in viewport coordinates. `left`/`width` span the board's left edge
+ * to the nearer art edge (the blurred band); `artRight` is the farther art edge, so the right side
+ * runs from there to the viewport edge. No measurable probe → width 0, `artRight` null.
  */
 export function gutterBox({ boardRect, probeRects, viewport }) {
   const left = Math.max(0, boardRect?.left ?? 0);
   const rects = (probeRects || []).filter(isUsableRect);
   if (!boardRect || rects.length === 0) {
-    return { left, top: 0, width: 0, height: viewport.height };
+    return { left, top: 0, width: 0, height: viewport.height, artRight: null };
   }
   const right = Math.min(...rects.map((rect) => rect.left));
-  return { left, top: 0, width: Math.max(0, right - left), height: viewport.height };
+  const artRight = Math.max(...rects.map((rect) => rect.left + rect.width));
+  return { left, top: 0, width: Math.max(0, right - left), height: viewport.height, artRight };
 }
 
 const fitCard = (width, viewport) => {
@@ -127,37 +130,61 @@ const intersects = (a, b) =>
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
 
+// A card hugging the art edge inside `room` px of free space, or null when it would be under the minimum.
+const sideBox = ({ room, artEdge, side, viewport }) => {
+  const usable = room - 2 * HOVER_EDGE_GAP;
+  if (usable < HOVER_MIN_WIDTH) return null;
+  const { width, height } = fitCard(Math.min(usable, HOVER_MAX_WIDTH), viewport);
+  const left = side === 'left' ? artEdge - HOVER_EDGE_GAP - width : artEdge + HOVER_EDGE_GAP;
+  return { left, top: (viewport.height - height) / 2, width, height };
+};
+
 /**
- * Where the preview goes, in whole viewport pixels. `band`: centred in the blurred band. `edge`: the
- * band is too narrow (two-player / `sim` layouts have none), so it overlays the board's left edge at
- * HOVER_MIN_WIDTH. Either mirrors to the right (`band-right`/`edge-right`) when it would cover the
- * hovered card. Vertically centred, clamped inside the viewport.
+ * Where the preview goes, in whole viewport pixels, vertically centred. `band`: against the mat art's
+ * left edge; `band-right`: against its right edge, where the band plus the sidebox leave far more
+ * room. The side that fits the larger card wins (left on a tie); a side that would cover the hovered
+ * card loses to one that doesn't. `edge`: no side fits (two-player / `sim` layouts have no art box),
+ * so it overlays the board's left edge at HOVER_MIN_WIDTH, mirrored to `edge-right` over the source.
  */
 export function previewPlacement({ gutter, boardRect, sourceRect, viewport }) {
-  const boardLeft = boardRect?.left ?? 0;
-  const boardRight = boardRect ? boardRect.left + boardRect.width : viewport.width;
-  const usable = gutter.width - 2 * HOVER_EDGE_GAP;
-  const inBand = usable >= HOVER_MIN_WIDTH;
-  const { width, height } = fitCard(inBand ? usable : HOVER_MIN_WIDTH, viewport);
-  const top = (viewport.height - height) / 2;
+  const sides = [
+    {
+      mode: 'band',
+      box: sideBox({ room: gutter.width, artEdge: gutter.left + gutter.width, side: 'left', viewport }),
+    },
+    {
+      mode: 'band-right',
+      box:
+        gutter.artRight == null
+          ? null
+          : sideBox({ room: viewport.width - gutter.artRight, artEdge: gutter.artRight, side: 'right', viewport }),
+    },
+  ].filter((side) => side.box);
 
-  let left = inBand ? gutter.left + (gutter.width - width) / 2 : boardLeft + HOVER_EDGE_GAP;
-  let mode = inBand ? 'band' : 'edge';
-  if (intersects({ left, top, width, height }, sourceRect)) {
-    // layoutToCssVars centres the art, so the right band mirrors the left one.
-    const rightBandLeft = boardRight - (gutter.left - boardLeft) - gutter.width;
-    left = inBand
-      ? rightBandLeft + (gutter.width - width) / 2
-      : boardRight - HOVER_EDGE_GAP - width;
-    mode = `${mode}-right`;
+  let chosen = null;
+  if (sides.length > 0) {
+    const clear = sides.filter((side) => !intersects(side.box, sourceRect));
+    const pool = clear.length > 0 ? clear : sides;
+    chosen = pool.reduce((best, side) => (side.box.width > best.box.width ? side : best));
+  } else {
+    const boardLeft = boardRect?.left ?? 0;
+    const boardRight = boardRect ? boardRect.left + boardRect.width : viewport.width;
+    const { width, height } = fitCard(HOVER_MIN_WIDTH, viewport);
+    const top = (viewport.height - height) / 2;
+    const covers = intersects({ left: boardLeft + HOVER_EDGE_GAP, top, width, height }, sourceRect);
+    chosen = {
+      mode: covers ? 'edge-right' : 'edge',
+      box: { left: covers ? boardRight - HOVER_EDGE_GAP - width : boardLeft + HOVER_EDGE_GAP, top, width, height },
+    };
   }
 
+  const { box } = chosen;
   return {
-    left: Math.round(clamp(left, 0, viewport.width - width)),
-    top: Math.round(clamp(top, 0, viewport.height - height)),
-    width: Math.round(width),
-    height: Math.round(height),
-    mode,
+    left: Math.round(clamp(box.left, 0, viewport.width - box.width)),
+    top: Math.round(clamp(box.top, 0, viewport.height - box.height)),
+    width: Math.round(box.width),
+    height: Math.round(box.height),
+    mode: chosen.mode,
   };
 }
 
