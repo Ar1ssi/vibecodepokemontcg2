@@ -141,14 +141,7 @@ function repeatedSymbolCount(segment) {
 
 // Energy-provided clause conditions → machine-readable tags.
 function provisionCondition(segment) {
-  if (/3 or more stage 2 pok/.test(segment)) return 'threeStage2';
-  if (/stage 2 pok/.test(segment)) return 'stage2';
-  if (/evolution pok/.test(segment)) return 'evolution';
-  if (/ultra beast/.test(segment)) return 'ultraBeast';
-  if (/basic pok/.test(segment)) return 'hostBasic';
-  if (/is a pokémon sp\b/.test(segment)) return 'hostSP';
-  if (/δ|delta species/.test(segment)) return 'delta';
-  if (/any other special energy/.test(segment)) return 'otherSpecial';
+  // The Prize clause first: Reversal-style text also names "Evolution Pokémon" inside it.
   if (/more prize cards (left|remaining) than your opponent/.test(segment)) {
     if (/pokémon-gx or pokémon-ex/.test(segment)) return 'trailingPrizesNotGxEx';
     if (/excluding pokémon lv\.x|lv\.x/.test(segment)) return 'trailingPrizesNotLvX';
@@ -157,6 +150,14 @@ function provisionCondition(segment) {
     }
     return 'trailingPrizes';
   }
+  if (/3 or more stage 2 pok/.test(segment)) return 'threeStage2';
+  if (/stage 2 pok/.test(segment)) return 'stage2';
+  if (/evolution pok/.test(segment)) return 'evolution';
+  if (/ultra beast/.test(segment)) return 'ultraBeast';
+  if (/basic pok/.test(segment)) return 'hostBasic';
+  if (/is a pokémon sp\b/.test(segment)) return 'hostSP';
+  if (/δ|delta species/.test(segment)) return 'delta';
+  if (/any other special energy/.test(segment)) return 'otherSpecial';
   const host = segment.match(/only while (?:this card|it) is attached to an? ([^.]*?) pok/);
   if (host) {
     const types = symbolTypes(host[1]);
@@ -378,11 +379,15 @@ function parseProvision(name, lower) {
     break;
   }
   const steps = [];
-  for (const sentence of lower.split(/(?<=\.)\s+/)) {
+  // "(Pokémon ex, Pokémon V, etc. have Rule Boxes)" stays inside its sentence: splitting at "etc." cut
+  // Reversal-style conditions off their provide clause (design 091).
+  for (const sentence of lower.split(/(?<!\betc\.)(?<=\.)\s+/)) {
     if (!/provide/.test(sentence)) continue;
     const seg = sentence.match(/provides? ([^.]*?energy[^.]*)/);
     if (!seg) continue;
-    const condition = provisionCondition(seg[1]);
+    // A leading "If …," clause before "provides" also conditions it (Reversal-style wording).
+    const leadingIf = sentence.slice(0, seg.index).match(/^if .*/)?.[0];
+    const condition = provisionCondition(seg[1]) ?? (leadingIf ? provisionCondition(leadingIf) : null);
     const step = parseProvideClause(seg[1]);
     if (step) steps.push(step);
     if (condition) steps[steps.length - 1].condition = condition;
@@ -419,9 +424,13 @@ function parseAttachRestriction(lower) {
     restrict('evolution');
   } else {
     const typed = lower.match(/can only be attached to \{([a-z])\} pokémon/);
+    // Any owner family ("can only be attached to a Ranger's Pokémon", customhb): the host's name carries the owner.
+    const owned = lower.match(/can only be attached to (?:a |an )?([a-z][a-z .'-]*?)'s pokémon/);
     if (typed) {
       const hostType = SYMBOL_TYPES[typed[1]];
       if (hostType) steps.push({ type: 'attachRestriction', kind: 'type', hostType, discardIfNot: true });
+    } else if (owned) {
+      steps.push({ type: 'attachRestriction', kind: 'owner', owner: owned[1], discardIfNot: true });
     }
   }
 
@@ -453,7 +462,8 @@ const hosted = (symbol) => (symbol ? { hostType: SYMBOL_TYPES[symbol] } : {});
 const cardCount = (phrase) => (phrase === 'a card' ? 1 : Number(phrase.match(/\d+/)[0]));
 
 const ATTACH_DRAW_RE = clause(`${ATTACH_TO}, draw ${CARDS}`);
-const ATTACH_SEARCH_RE = clause(`${ATTACH_TO}, (search your deck for [^.]*\\.?)`);
+// "you may search" (customhb Rally Energy): the search already allows finding nothing.
+const ATTACH_SEARCH_RE = clause(`${ATTACH_TO}, (?:you may )?(search your deck for [^.]*\\.?)`);
 const ATTACH_HEAL_RE = clause(`${ATTACH_TO}, heal (\\d+) damage from (?:that pokémon|it)`);
 const ATTACH_REMOVE_RE = clause(`${ATTACH_TO}, remove (?:up to )?${COUNTERS}( and all special conditions)?`);
 const ATTACH_CURE_RE = clause(`${ATTACH_TO}, remove all special conditions`);
@@ -472,6 +482,9 @@ const FREE_RETREAT_RE = clause(`${HOST} has no retreat cost`);
 const RETREAT_LESS_RE = clause(`retreat cost of ${HOST} is ((?:\\{c\\})+) less`);
 const FULL_IMMUNITY_RE = clause(`${HOST} recovers from all special conditions and can't be affected by any special conditions`);
 const ONE_IMMUNITY_RE = clause(`${HOST} can't be (asleep|confused|paralyzed|poisoned|burned)`);
+// Therapeutic Energy (Paldea Evolved 193) "recovers from being Asleep, Confused, or Paralyzed and can't be
+// affected by those Special Conditions"; any list of conditions reads the same (customhb Remedy Energy).
+const LISTED_IMMUNITY_RE = clause(`${HOST} recovers from being ([a-z, ]+?) and can't be affected by those special conditions`);
 const EFFECT_SHIELD_RE = clause(`prevent all effects of (?:your opponent's )?attacks[^.]*?done to ${HOST}`);
 const ABILITY_SHIELD_RE = clause(`prevent all effects of your opponent's pokémon's abilities done to ${HOST}`);
 const BENCH_SHIELD_RE = clause(`as long as ${HOST} is on your bench, prevent all damage done to it by attacks from your opponent's pokémon`);
@@ -784,8 +797,10 @@ function parseEffects(lower) {
   const fullImmunity = lower.match(FULL_IMMUNITY_RE);
   if (fullImmunity) {
     push({ type: 'statusImmunity', conditions: ALL_STATUS, ...hosted(fullImmunity[1]) });
-  } else if (/the pokémon this card is attached to recovers from being asleep, confused, or paralyzed and can't be affected by those special conditions/.test(lower)) {
-    push({ type: 'statusImmunity', conditions: ['Asleep', 'Confused', 'Paralyzed'] });
+  } else if (LISTED_IMMUNITY_RE.test(lower)) {
+    const [, symbol, list] = lower.match(LISTED_IMMUNITY_RE);
+    const conditions = Object.keys(STATUS_WORDS).filter((word) => new RegExp(`\\b${word}\\b`).test(list));
+    if (conditions.length) push({ type: 'statusImmunity', conditions: conditions.map((word) => STATUS_WORDS[word]), ...hosted(symbol) });
   }
   if (/if the pokémon that holon energy gl is attached to also has a basic \{([a-z])\} energy card attached to it, that pokémon can't be affected by any special conditions/.test(lower)) {
     push({ type: 'statusImmunity', conditions: ALL_STATUS, condition: 'hostHasBasic:Grass' });
@@ -1453,6 +1468,7 @@ const knownStage = (host) => Boolean(host?.stage) || Boolean(host?.subtypes?.len
 const RESTRICTION_HOSTS = {
   type: (host, step) => (host?.types?.length ? hostIsType(host, step.hostType) : null),
   teamRocket: (host) => /^team rocket'?s\b/i.test(plainName(host)),
+  owner: (host, step) => plainName(host).toLowerCase().startsWith(`${step.owner}'s `),
   darkOrRocket: (host) => /\bdark\b|\brocket'?s\b/i.test(plainName(host)),
   teamMagma: (host) => /\bteam magma\b/i.test(plainName(host)),
   teamAqua: (host) => /\bteam aqua\b/i.test(plainName(host)),
