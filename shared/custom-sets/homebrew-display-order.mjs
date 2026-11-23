@@ -2,7 +2,7 @@
 // so the order is set here, where every publish passes. Pokémon are grouped by type, then by evolution family
 // (A to Z by the family's root). A family lists whole lines, never printings alternating stage by stage: its regular
 // cards line by line (each line one type, Basic up), then its MEGAs, then its shiny cards the same way. Tera Pokémon
-// Eevee's evolutions and the Colorless Hisuian Zoroark ex are listed under their own type rather than with their family. Trainers and Energy keep
+// Eevee's evolutions are listed under their own type, and the Hisuian Zorua lines each under theirs rather than with their family. Trainers and Energy keep
 // the set.json order.
 
 export const HOMEBREW_DISPLAY_ORDER_SET_IDS = Object.freeze(['customhb']);
@@ -32,9 +32,11 @@ const typeOf = (card) => (Array.isArray(card.types) && card.types[0]) || '';
 const isPokemon = (card) => card?.category === 'Pokemon';
 const isMega = (card) => card.stage === 'MEGAHB' || /^Mega /.test(card.name);
 const numberOf = (card) => Number.parseInt(card.localId, 10) || 0;
-// Tera Pokémon, Eevee's evolutions and these cards (keyed by name, D252) are each listed alone under their own type.
-const LISTED_UNDER_OWN_TYPE = new Set(['Hisuian Zoroark ex']);
-const listsAlone = (card) => card.stage === 'TERAHB' || card.evolveFrom === 'Eevee' || LISTED_UNDER_OWN_TYPE.has(card.name);
+// Tera Pokémon and Eevee's evolutions are each listed alone under their own type.
+const listsAlone = (card) => card.stage === 'TERAHB' || card.evolveFrom === 'Eevee';
+// Families (by Basic name, D252) whose lines of each type are listed apart, each under its own type: the Colorless
+// Hisuian Zorua line sits in Colorless, the Psychic one in Psychic.
+const SPLIT_BY_TYPE_FAMILIES = new Set(['Hisuian Zorua']);
 
 function typeRank(type) {
   const rank = TYPE_ORDER.indexOf(type);
@@ -65,7 +67,11 @@ function familiesOf(cards) {
     else byKeyAndType.set(typed, index);
   });
   cards.forEach((card, index) => {
-    for (const from of byKey.get(familyKeyOf(card.evolveFrom)) || []) union(from, index);
+    const fromKey = familyKeyOf(card.evolveFrom);
+    const sameTypeOnly = SPLIT_BY_TYPE_FAMILIES.has(fromKey);
+    for (const from of byKey.get(fromKey) || []) {
+      if (!sameTypeOnly || typeOf(cards[from]) === typeOf(card)) union(from, index);
+    }
   });
   const families = new Map();
   cards.forEach((card, index) => {
