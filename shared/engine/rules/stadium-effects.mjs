@@ -19,6 +19,7 @@ import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './car
 import { isDeltaSpecies, resolveAttachedEnergyType } from './energy-effects.mjs';
 import { getSpecialEnergyHpBonus, stadiumBlanksSpecialEnergy } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
+import { symbolizeTypeWordsOnly } from './attack-text.mjs';
 //
 // Layers:
 //   - `classifyStadiumEffect` — buckets a card into an effect family.
@@ -48,8 +49,9 @@ const lower = (v) =>
 const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
+// TCGdex spells Energy symbols as type words ("Basic Grass Pokémon", "Colorless more").
 const textOf = (card) =>
-  lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
+  lower(symbolizeTypeWordsOnly(card?.text ?? card?.effect ?? card?.cardText ?? ''));
 
 /**
  * Battle Style (Single Strike) is printed as a name prefix ("Single Strike
@@ -1060,6 +1062,22 @@ export function parseStadiumOncePerTurn(card) {
       typeFilter: 'lightning',
     };
   }
+  // Life Forest ◇ (sm8-180): "heal 60 damage and remove all Special Conditions from 1 of their
+  // Grass Pokémon" — any of the player's Pokémon of that type, Active or Benched.
+  const healCure = t.match(
+    /heal (\d+) damage and remove all special conditions from 1 of (?:his or her|their|your) ((?:\{[a-z]\} )?)pok[eé]mon/
+  );
+  if (healCure) {
+    const letter = healCure[2].match(/\{([a-z])\}/)?.[1];
+    return {
+      ...base,
+      kind: 'heal',
+      n: parseInt(healCure[1], 10),
+      target: 'any',
+      cure: true,
+      ...(letter ? { types: [SUBJECT_TYPE_WORDS[letter]] } : {}),
+    };
+  }
   // Pokémon Center: "heal 20 damage from 1 of his or her Benched Pokémon".
   const healBench = t.match(
     /heal (\d+) damage from 1 of (?:his or her|their|your) benched pok[eé]mon/
@@ -1397,7 +1415,7 @@ export function stadiumFilterMatches(card, stadiumCard) {
     const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
     if (stage && stage !== 'stage2') return false;
   }
-  if (/basic pokémon/.test(t)) {
+  if (/basic (?:\{[a-z]\} )?pokémon/.test(t)) {
     const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
     if (stage && stage !== 'basic') return false;
   }
@@ -1845,6 +1863,9 @@ export function parseStadiumRetreatModifier(card) {
   if (/\{c\}\s+more to retreat|pays? \{c\} more to retreat|more to retreat/.test(t)) {
     return 1;
   }
+  // Mount Lanakila (sm3-118): "The Retreat Cost of each Basic Pokémon in play … is {C} more."
+  const more = t.match(/retreat cost[^.]* is ((?:\{c\})+)\s+more/);
+  if (more) return more[1].length / 3;
   if (/(less|reduc|lower)/.test(t)) {
     // Altar of the Moone: "is {C}{C} less".
     const symbols = t.match(/((?:\{c\})+)\s+less/);
@@ -2122,7 +2143,7 @@ export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { d
   const bonus = parseStadiumAttackDamageBonus(stadiumCard);
   if (bonus <= 0 || !attacker) return 0;
   const t = textOf(stadiumCard);
-  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+do\s+\d+\s+more damage to the ([^(.]*)/);
+  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+do\s+\d+\s+more damage to (?:the )?([^(.]*)/);
   if (!m) return 0;
   const matches = stadiumSubjectPredicate(m[1]);
   if (!matches || !matches(attacker)) return 0;
@@ -2131,7 +2152,8 @@ export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { d
   if (/pok[eé]mon-ex$/.test(target)) {
     return isLegacyPokemonEx(defender) ? bonus : 0;
   }
-  return /^(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
+  // Devoured Field (sm4-93) prints "to the opponent's Active Pokémon".
+  return /^(?:your )?(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
 }
 
 /**

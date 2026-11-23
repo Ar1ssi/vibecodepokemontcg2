@@ -12,16 +12,17 @@ import { legacyAttachedTrainer } from '../rules/legacy-attached-trainer.mjs';
 import {
   mayAttachAnyTechnicalMachine, parseTmAttachRestriction, tmAttachAllowed,
 } from '../rules/tool-attacks.mjs';
-import { isPokemonToolCard, attachedTools, isExCard } from '../rules/tool-combat.mjs';
+import { isPokemonToolCard, attachedTools, isExCard, toolRetreatIgnoresConditions } from '../rules/tool-combat.mjs';
 import {
   toolCapacity, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
   isHandActivatedAbility,
+  isDiscardActivatedAbility,
 } from '../rules/ability-executors.mjs';
 import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
   abilitySupporterLimit, abilitySetupActive, abilityPlayLocks, abilityEvolvePermission,
   abilityEvolveLock, abilityEvolutionCardLock, abilityRetreatLock, abilitySummonRestricted,
-  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityOpponentAttackCostIncrease,
+  abilityFirstTurnAttack, extraAttackAvailable, abilityAttackHandMinimum, abilityAttackLockReason, abilityBenchLimit, abilityOpponentAttackCostIncrease,
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { handEnergyForDiscard, handCardsForLostZone } from '../effects/attack-steps.mjs';
@@ -92,6 +93,14 @@ function playLockReason(player, kinds, turnNumber) {
   return blocking.source
     ? `${blocking.source} stops you playing that card during this turn.`
     : "Your opponent's attack stops you playing that card during this turn.";
+}
+
+/** Chimecho Bell of Silence: a Pokémon card that prints an Ability is also 'pokemonWithAbility'. */
+function abilityPokemonKind(card) {
+  if (!card || !isPokemon(card)) return [];
+  const abilities = Array.isArray(card.abilities) ? card.abilities : card.ability ? [card.ability] : [];
+  const printsAbility = abilities.some((a) => a && !/power|body|ancient trait/i.test(String(a.type || '')));
+  return printsAbility ? ['pokemonWithAbility'] : [];
 }
 
 /** Printed kind of one of a card's abilities: 'power' (Poké-Power), 'body' (Poké-Body), 'ability'. */
@@ -410,7 +419,9 @@ export function validateReferences(state, command) {
       // Luxray Swelling Flash / Charjabug Battery are activated from the hand.
       const legalZones = isHandActivatedAbility(cardRef?.card)
         ? ['hand']
-        : ['active', 'bench'];
+        : isDiscardActivatedAbility(cardRef?.card)
+          ? ['discard']
+          : ['active', 'bench'];
       if (
         !cardRef ||
         !legalZones.includes(cardRef.zoneId) ||
@@ -802,13 +813,19 @@ export function validateLegality(state, command) {
         if (cardRef && !isStadiumCard(cardRef.card)) {
           return { allowed: false, reason: 'invalid_stadium_target' };
         }
+        // Dropping a Stadium from hand on the slot is playing it: the same rules as playTrainer
+        // (one per turn, not the same name, attack and Ability play locks such as Cursed Land).
+        if (cardRef && payload.from === 'hand') {
+          return validateLegality(state, { type: 'playTrainer', playerId, payload: { instanceId: payload.instanceId } });
+        }
       }
 
       // Bench limit validation (Edge Case 9: bench full)
       if (payload.to === 'bench' && payload.from !== 'bench') {
         const bench = player.zones?.bench || [];
         const benchPokemonCount = bench.filter((c) => !c.attachedTo).length;
-        if (benchPokemonCount >= 5) {
+        // Sudowoodo Roadblock lowers the limit below 5.
+        if (benchPokemonCount >= abilityBenchLimit(sideContextFor(state, playerId))) {
           return { allowed: false, reason: 'bench_full' };
         }
       }
@@ -831,9 +848,13 @@ export function validateLegality(state, command) {
       ) {
         // Heavy Rock/Horror House: "can't play any cards from their hand" blocks playing
         // Basic Pokémon from hand as well (design 048).
-        const handPlayLock = playLockReason(player, ['pokemon'], state.turn?.number || 1);
-        if (handPlayLock) return { allowed: false, reason: handPlayLock };
         const cardRef = findCard(state, payload.instanceId);
+        const handPlayLock = playLockReason(
+          player,
+          ['pokemon', ...abilityPokemonKind(cardRef?.card)],
+          state.turn?.number || 1
+        );
+        if (handPlayLock) return { allowed: false, reason: handPlayLock };
         if (cardRef && !isPokemon(cardRef.card)) {
           return {
             allowed: false,
@@ -888,7 +909,7 @@ export function validateLegality(state, command) {
         // Chaos Wheel / Trick Wind lock Pokémon Tools; an Item lock (Itchy Pollen) does not
         // reach Tools or Technical Machines. Evolution Jammer locks evolving from hand.
         const attachKinds = isPokemon(cardRef.card)
-          ? ['evolve']
+          ? ['evolve', ...abilityPokemonKind(cardRef.card)]
           : isToolOrMachineTrainer(cardRef.card)
             ? ['tool', 'trainer']
             : [];
@@ -929,7 +950,9 @@ export function validateLegality(state, command) {
       if (cardRef && isEnergy(cardRef.card)) {
         const plan = cardRef.zoneId === 'hand' ? energyAttachPlanMatch(state, player, cardRef.card, payload.targetInstanceId) : null;
         const planAllows = Boolean(plan && plan.plan.hostId === plan.hostId && plan.plan.attached < plan.plan.count);
-        if (player.flags?.energyAttached && !planAllows) {
+        // Dragonair Dragon's Wish: "During your next turn, you may attach any number of Energy cards".
+        const attachLimitLifted = player.handAttachUnlimitedTurn === (state.turn?.number || 1) && cardRef.zoneId === 'hand';
+        if (player.flags?.energyAttached && !planAllows && !attachLimitLifted) {
           // Check for unlimited energy acceleration abilities (Phase 4)
           const inPlayPokemon = [
             ...(player.zones?.active || []),
@@ -1207,6 +1230,8 @@ export function validateLegality(state, command) {
       if (attackLockReason) return { allowed: false, reason: attackLockReason };
       // Mega Golurk ex Restricted Activation (customhb): "This Pokémon can't use attacks unless you
       // have 10 or more cards in your hand."
+      const abilityLock = abilityAttackLockReason(inPlayView(state, active), sideContextFor(state, playerId));
+      if (abilityLock) return { allowed: false, reason: abilityLock };
       const handGate = abilityAttackHandMinimum(inPlayView(state, active), sideContextFor(state, playerId));
       if (handGate && (player.zones?.hand || []).length < handGate) {
         return { allowed: false, reason: `This Pokémon can't attack unless you have ${handGate} or more cards in your hand.` };
@@ -1318,13 +1343,17 @@ export function validateLegality(state, command) {
       if (!active) {
         return { allowed: false, reason: 'No active Pokémon to retreat.' };
       }
-      if (active.specialCondition === 'Paralyzed') {
+      const retreatsThrough = toolRetreatIgnoresConditions(active, player.zones?.active || [], {
+        blockTools: isStadiumToolNegation(state.stadium?.card || state.stadium),
+        stadium: state.stadium?.card || state.stadium,
+      });
+      if (active.specialCondition === 'Paralyzed' && !retreatsThrough.includes('paralyzed')) {
         return {
           allowed: false,
           reason: "Paralyzed — this Pokémon can't retreat.",
         };
       }
-      if (active.specialCondition === 'Asleep') {
+      if (active.specialCondition === 'Asleep' && !retreatsThrough.includes('asleep')) {
         return {
           allowed: false,
           reason: "Asleep — this Pokémon can't retreat.",

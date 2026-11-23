@@ -24,7 +24,15 @@ import { evaluateToolKoPrevention, attachedToolOnDamageEffects } from '../rules/
 import { stadiumAttackCoinModifier } from '../rules/stadium-triggers.mjs';
 import { turnDamageBonusAfterWR } from '../rules/turn-damage-bonus.mjs';
 import { getEnergyValue } from '../rules/retreat.mjs';
-import { abilityHandDiscardProtector, extraAttackAvailable, healBlockedByAbility } from '../rules/ability-combat.mjs';
+import {
+  abilityHandDiscardProtector,
+  extraAttackAvailable,
+  healBlockedByAbility,
+  abilityMirrorCounter,
+  abilityDamagedOwnBenchCounters,
+  abilityLostZoneKnockouts,
+} from '../rules/ability-combat.mjs';
+import { isExCard, isGxCard } from '../rules/card-classify.mjs';
 import { parseOnDamageAbilities, parseOnDamageStatus, parseOnAttackedSwitch } from '../rules/ability-triggers.mjs';
 import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
@@ -98,8 +106,19 @@ const LOST_ZONE_KNOCKOUT =
 /** Per status branch: whether its printed board condition holds now (null for other branches). */
 function statusConditionResults(draft, ctx, branches) {
   if (!branches.some((branch) => branch.when?.condition)) return [];
+  const conditionCtx = statusConditionCtx(draft, ctx);
+  return branches.map((branch) =>
+    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
+  );
+}
+
+// "If you discarded a Pokémon Tool card in this way, … is now Paralyzed" (Pachirisu Overshort,
+// sm8-80) reads what this attack's before-damage step discarded, so it is read after that step.
+const READ_AFTER_BEFORE_STEPS = new Set(['discardedCardIs']);
+
+function statusConditionCtx(draft, ctx) {
   const { attacker, defender, attackerView, playerId, defenderPlayerId, coin, headsCount } = ctx;
-  const conditionCtx = buildServerAttackContext(draft, {
+  return buildServerAttackContext(draft, {
     attackerPlayerId: playerId,
     defenderPlayerId,
     attacker,
@@ -111,9 +130,6 @@ function statusConditionResults(draft, ctx, branches) {
     headsCount,
     optionalCostPaid: ctx.optionalCostPaid,
   });
-  return branches.map((branch) =>
-    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
-  );
 }
 
 const ENERGY_LETTER_TYPES = {
@@ -329,7 +345,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
   draft.__attackEffectPhase = true;
   // "If … would be Knocked Out by damage from this attack, put that Pokémon and all cards attached
   // to it in the Lost Zone instead of discarding it" (design 036 A12): read by handleKnockout.
-  if (LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name))) {
+  if (
+    LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name)) ||
+    abilityLostZoneKnockouts(attackerView, abilitySideContext(draft, playerId))
+  ) {
     draft.__attackLostZoneKnockouts = defenderPlayerId;
   }
 
@@ -973,6 +992,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
           });
 
           const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
+          // Aegislash Ticking Knock Out: damaged by an attack while marked, it is Knocked Out.
+          if (koHp > 0 && defenderMarkers.some((m) => m.kind === 'koIfDamaged')) {
+            dmgDealt = Math.max(dmgDealt, koHp - (defender.damage || 0));
+          }
           const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
 
           if (wouldKo) {
@@ -1191,6 +1214,24 @@ export function resolveAttackEffectPhase(draft, ctx) {
           if (thorns?.count > 0 && (!thorns.koOnly || defenderKnockedOut)) {
             thornsDamage += thorns.count * 10;
           }
+          const defenderSide = abilitySideContext(draft, defenderPlayerId);
+          const mirror = abilityMirrorCounter(defenderView, defenderSide);
+          const attackerTop = inPlayView(draft, attacker);
+          if (mirror && (!mirror.gxOrEx || isGxCard(attackerTop) || isExCard(attackerTop))) {
+            thornsDamage += dmgDealt;
+          }
+          const benchCounters = abilityDamagedOwnBenchCounters(defenderView, defenderSide);
+          for (const benched of benchCounters > 0 ? rootsIn(draft.players[defenderPlayerId]?.zones?.bench || []) : []) {
+            benched.damage = (benched.damage || 0) + benchCounters * 10;
+            events.push({
+              type: 'damageCountersPlaced',
+              instanceId: benched.instanceId,
+              victimPlayerId: defenderPlayerId,
+              attackerPlayerId: defenderPlayerId,
+              damage: benched.damage,
+              source: defenderView.name,
+            });
+          }
 
           if (thornsDamage > 0) {
             attacker.damage = (attacker.damage || 0) + thornsDamage;
@@ -1317,7 +1358,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
             headsCount,
             flips,
             conditionMet: (condition) =>
-              statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
+              READ_AFTER_BEFORE_STEPS.has(condition?.kind)
+                ? attackConditionMet(condition, statusConditionCtx(draft, ctx))
+                : statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
           });
 
       if (defenderConditions.length > 0 && defender) {
@@ -1403,9 +1446,11 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
         const ref = attacker ? findCard(draft, attacker.instanceId) : null;
-        const energyCards = ref
-          ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
-          : 0;
+        const energyCards = attackTarget.amountPerEnergyType
+          ? attachedEnergyOfType(draft, attacker, attackTarget.amountPerEnergyType)
+          : ref
+            ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
+            : 0;
         attackTarget = energyCards > 0 ? { ...attackTarget, amount: attackTarget.amount * energyCards } : null;
       }
       // Probopass Metal Bomber: as many picks as the attacker has Energy of the printed type.
@@ -1641,6 +1686,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
               playerId,
               reason: 'attack-energy-discard',
             });
+            // "If you do, …" steps resumed from a later choice read it (executor.mjs).
+            draft.attackEnergyDiscarded = true;
           }
         }
       }

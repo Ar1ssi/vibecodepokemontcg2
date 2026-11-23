@@ -491,6 +491,28 @@ export function optionalCostOffer(draft, { playerId, attacker, attack, clause })
     }
     case 'shuffleEnergy':
       return energy.length > 0 ? yesNo('shuffle all Energy attached to this Pokémon into your deck') : null;
+    case 'discardOwnTools': {
+      const tools = ownToolCards(draft, playerId);
+      if (tools.length === 0) return null;
+      return {
+        prompt: `${attack.name}: choose Pokémon Tools to discard from your Pokémon (${bonus} more damage each, pick none to decline).`,
+        options: tools.map((c) => ({ instanceId: c.instanceId, name: c.name, type: 'card' })),
+        min: 0,
+        max: tools.length,
+        allowedIds: tools.map((c) => c.instanceId),
+      };
+    }
+    case 'revealHandNamed': {
+      const cards = namedHandCards(draft, playerId, cost.name);
+      if (cards.length === 0) return null;
+      return {
+        prompt: `${attack.name}: choose ${cost.name} cards to reveal (${bonus} damage each).`,
+        options: cards.map((c) => ({ instanceId: c.instanceId, name: c.name, type: 'card' })),
+        min: 0,
+        max: cards.length,
+        allowedIds: cards.map((c) => c.instanceId),
+      };
+    }
     case 'discardBench': {
       const bench = (draft.players[playerId]?.zones?.bench || []).filter((c) => !c.attachedTo && isPokemon(c));
       if (bench.length === 0) return null;
@@ -553,6 +575,20 @@ function costEnergyCards(draft, { playerId, attacker, cost }) {
   return cards.filter((c) => types.some((type) => matchesSearch(c, `${type} Energy`)));
 }
 
+/** Every Pokémon Tool attached to the player's Pokémon (Pumpkin Bomb). */
+function ownToolCards(draft, playerId) {
+  const player = draft.players[playerId];
+  return [...(player?.zones?.active || []), ...(player?.zones?.bench || [])].filter(
+    (c) => c.attachedTo != null && isPokemonToolCard(c)
+  );
+}
+
+/** Hand cards with the printed name (Milk Cannon: "Moomoo Milk"). */
+function namedHandCards(draft, playerId, name) {
+  const wanted = String(name || '').trim().toLowerCase();
+  return (draft.players[playerId]?.zones?.hand || []).filter((c) => String(c.name || '').trim().toLowerCase() === wanted);
+}
+
 /** The Pokémon Tools attached to the attacker. */
 function attachedToolCards(draft, playerId, attacker) {
   if (!attacker) return [];
@@ -588,6 +624,8 @@ function moveAttachedCards(draft, { playerId, ids, to, reason, events }) {
         player.zones.hand.push(card);
       }
       events.push({ type: 'cardMoved', instanceId: id, from: zoneKey, to: destination, playerId, reason });
+      // Kindle / Swing and Skedaddle "If you do, …": read after a resumed choice too (executor.mjs).
+      if (reason === 'attack-energy-discard') draft.attackEnergyDiscarded = true;
       moved++;
       break;
     }
@@ -621,6 +659,17 @@ export function payOptionalCost(draft, { playerId, attacker, token, selection, a
       if (ids.length === 0) return declined;
       const n = moveAttachedCards(draft, { playerId, ids, to: 'hand', reason: 'attack-return-energy', events });
       return { paid: n > 0, count: n };
+    }
+    case 'discardOwnTools': {
+      if (picked.length === 0) return declined;
+      const n = moveAttachedCards(draft, { playerId, ids: [...new Set(picked)], to: 'discard', reason: 'attack-tool-discard', events });
+      return { paid: n > 0, count: n };
+    }
+    case 'revealHandNamed': {
+      const cards = namedHandCards(draft, playerId, cost.name).filter((c) => picked.includes(c.instanceId));
+      if (cards.length === 0) return declined;
+      events.push({ type: 'cardsRevealed', playerId, cards: cards.map((c) => ({ instanceId: c.instanceId, name: c.name })) });
+      return { paid: true, count: cards.length };
     }
     case 'discardTool': {
       const ids = picked.slice(0, 1);

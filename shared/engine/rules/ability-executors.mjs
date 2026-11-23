@@ -10,7 +10,7 @@ import { isBasicPokemon, isPokemon, isEnergy, isAttachedAsTool } from '../cards.
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
-import { canonicalEffectWording } from './effect-wording.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -37,8 +37,10 @@ function modernWording(text) {
   let rewritten = legacyRewriteCache.get(text);
   if (rewritten === undefined) {
     // Custom-set prints say "in your Active slot" for "in the Active Spot" (customhb Neutralizing Gas).
-    // Hand-typed wordings read as their printed spelling first (effect-wording.mjs).
-    rewritten = rewriteLegacyPowerWording(canonicalEffectWording(text).toLowerCase()).replace(
+    // Hand-typed wordings read as their printed spelling first (effect-wording.mjs), and TCGdex's
+    // type words ("any Water Energy", "Colorless more", "GrassGrass") as the {X} symbols every
+    // reader matches (symbolizeTypeWords also applies canonicalEffectWording).
+    rewritten = rewriteLegacyPowerWording(symbolizeTypeWords(text).toLowerCase()).replace(
       /\bin (?:your|the) active (?:slot|spot)\b/g,
       'in the active spot'
     );
@@ -103,6 +105,14 @@ const HAND_ACTIVATION_CLAUSE =
 
 export function isHandActivatedAbility(card) {
   return HAND_ACTIVATION_CLAUSE.test(textOf(card));
+}
+
+// Darkrai-GX Restoration (sm3-88) / Giratina Distortion Door (sm8-97): "if this Pokémon is in your
+// discard pile, you may put it onto your Bench" — used from the discard pile.
+const DISCARD_ACTIVATION_CLAUSE = /if this pok[eé]mon is in your discard pile, you may put it onto your bench/;
+
+export function isDiscardActivatedAbility(card) {
+  return DISCARD_ACTIVATION_CLAUSE.test(textOf(card));
 }
 
 // Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".

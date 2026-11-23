@@ -252,11 +252,11 @@ const CONDITIONAL_PROVISION = [
   [/^unit energy/, (lower) => [
     { type: 'provide', energyTypes: printedComboTypes(lower, ['Fighting', 'Dark', 'Fairy']), count: 1, combination: true },
   ]],
-  [/^beast energy prism star$/, () => [
+  [/^beast energy (?:prism star|◇)$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
     { type: 'provide', energyTypes: ['Any'], count: 1, condition: 'ultraBeast' },
   ]],
-  [/^super boost energy prism star$/, () => [
+  [/^super boost energy (?:prism star|◇)$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
     { type: 'provide', energyTypes: ['Any'], count: 1, condition: 'stage2' },
     { type: 'provide', energyTypes: ['Any'], count: 4, condition: 'threeStage2' },
@@ -678,7 +678,7 @@ function parseEffects(lower) {
   if (bonus) {
     push({ type: 'damageBonus', amount: Number(bonus[2]), hostType: typeOf(bonus[1]), target: 'opponentActive' });
   } else if (beastBonus) {
-    push({ type: 'damageBonus', amount: Number(beastBonus[1]), hostType: 'Ultra Beast', target: 'opponentActive' });
+    push({ type: 'damageBonus', amount: Number(beastBonus[1]), hostType: 'Ultra Beast', condition: 'ultraBeast', target: 'opponentActive' });
   }
   // Unseen Forces prints "is attached to attack," (SE14).
   if (/if the pokémon (?:darkness|\{d\}) energy is attached to attacks?, the attack does (\d+) more damage/.test(lower)) {
@@ -1253,6 +1253,9 @@ function conditionMet(condition, pokemon, zoneArray) {
       return stageKey(pokemon) !== 'basic';
     case 'noRuleBox':
       return !isRuleBoxPokemon(pokemon);
+    // Beast Energy ◇ (sm6-117): "The attacks of the Ultra Beast this card is attached to …".
+    case 'ultraBeast':
+      return isUltraBeast(pokemon);
     case 'delta':
       return /δ|delta/i.test(String(pokemon?.name ?? '')) || (pokemon?.subtypes || []).map((s) => String(s).toLowerCase()).includes('delta species');
     case 'otherSpecial': {

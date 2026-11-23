@@ -74,7 +74,13 @@ const showCard = (state, index) => {
   if (index < 0 || index >= cards.length) return;
   state.index = index;
   if (state.holoWrapper) stopHoloAnimation(state.holoWrapper);
-  const built = buildSlideContent(cards[index]);
+  const built = buildSlideContent(cards[index], {
+    onHolo: (wrapper) => {
+      if (state.index !== index || !wrapper.isConnected) return;
+      state.holoWrapper = wrapper;
+      startHoloAnimation(wrapper, MAT_HOLO_OPTIONS);
+    },
+  });
   state.holoWrapper = built.holoWrapper;
   carousel.stage.replaceChildren(built.node);
   if (state.holoWrapper) startHoloAnimation(state.holoWrapper, MAT_HOLO_OPTIONS);

@@ -26,7 +26,7 @@ import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   healLocked, addAttackMarker, markerFromTurn, markerUntilTurn,
 } from '../rules/attack-markers.mjs';
-import { healBlockedByAbility } from '../rules/ability-combat.mjs';
+import { healBlockedByAbility, abilityBenchLimit, sideContextFor } from '../rules/ability-combat.mjs';
 import { classifyEnergyEffect, resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
@@ -43,6 +43,7 @@ import {
   switchOutBlocked,
   cardEffectShielded,
   playerShieldBlocks,
+  pokemonHasType,
 } from './trainer-steps.mjs';
 import {
   ATTACK_STEP_HANDLERS,
@@ -144,6 +145,11 @@ function healTargetAllowed(draft, player, root, step) {
     if (remaining > step.maxRemainingHp) return false;
   }
   return true;
+}
+
+/** A player's Bench limit: 5, or fewer under an opposing Sudowoodo Roadblock. */
+function benchLimitOf(draft, player) {
+  return player?.playerId ? abilityBenchLimit(sideContextFor(draft, player.playerId)) : 5;
 }
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
@@ -523,10 +529,16 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // Dunsparce Strike and Run: only after this attack's own search put a Pokémon on the Bench.
+    if (step.requiresBenchedThisAttack && !draft.attackBenchedFromDeck) {
+      events.push({ type: 'effectStepSkipped', reason: 'nothing_benched', step: step.type });
+      continue;
+    }
     // "Discard an Energy from this Pokémon. If you do, …" (Swing and Skedaddle): the printed
     // discard must have moved an Energy this attack.
     if (
       step.requiresEnergyDiscard &&
+      !draft.attackEnergyDiscarded &&
       !events.some((e) => e.type === 'cardMoved' && e.reason === 'attack-energy-discard' && e.playerId === playerId)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_discarded', step: step.type });
@@ -1051,7 +1063,7 @@ export function executeSteps(draft, {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
               const benchCount = currentBench.filter((b) => !b.attachedTo).length;
-              if (benchCount >= 5) {
+              if (benchCount >= benchLimitOf(draft, player)) {
                 // Hard limit: bench is full, do not overfill bench
                 continue;
               }
@@ -1064,6 +1076,8 @@ export function executeSteps(draft, {
                 if (isFossilItem(c)) becomeFossilPokemon(c);
                 c.enteredPlayTurn = draft.turn?.number ?? null;
                 player.zones.bench.push(c);
+                // Dunsparce Strike and Run: "If you put any Pokémon onto your Bench in this way".
+                draft.attackBenchedFromDeck = true;
               } else if (dest === 'discard') {
                 player.zones.discard.push(c);
               } else {
@@ -1105,7 +1119,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          const availableBenchSlots = Math.max(0, benchLimitOf(draft, player) - benchCount);
           if (availableBenchSlots <= 0) {
             events.push({
               type: 'effectStepSkipped',
@@ -1133,7 +1147,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, 5 - benchCount);
+          const availableBenchSlots = Math.max(0, benchLimitOf(draft, player) - benchCount);
           effectiveMaxCount = Math.min(maxCount, availableBenchSlots);
         }
 
@@ -1180,7 +1194,11 @@ export function executeSteps(draft, {
           }
           break;
         }
-        const count = step.count || 1;
+        const sideCards = [...(player.zones.active || []), ...(player.zones.bench || [])];
+        const typedInPlay = step.perOwnType
+          ? sideCards.filter((c) => !c.attachedTo && isPokemon(c) && pokemonHasType(topPokemonCard(sideCards, c) || c, step.perOwnType)).length
+          : 1;
+        const count = (step.count || 1) * typedInPlay;
         // "Each player draws N cards" (Togetic Shared Peace): the user first, then the opponent.
         for (const drawer of step.eachPlayer ? [player, opponent] : [player]) {
           if (!drawer) continue;
@@ -2309,7 +2327,7 @@ export function executeSteps(draft, {
         // Twist Mountain: Restored Pokémon from hand to Bench.
         const hand = player.zones.hand || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+        if (bench.filter((c) => !c.attachedTo).length >= benchLimitOf(draft, player)) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }
@@ -2336,7 +2354,7 @@ export function executeSteps(draft, {
         const zoneKey = step.source === 'discard' ? 'discard' : 'hand';
         const zone = player.zones[zoneKey] || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= 5) {
+        if (bench.filter((c) => !c.attachedTo).length >= benchLimitOf(draft, player)) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }

@@ -58,3 +58,30 @@ test('face-down options show the card back and no name', () => {
   assert.deepEqual(req.candidates[0], { instanceId: 7, name: 'Face-down card', type: '', image: { src: 'back.png' } });
   assert.equal(req.candidates[1].name, 'Pikachu');
 });
+
+test('a choice carrying its whole pile gets the VALID / ALL tabs, sharing the pickable cards', () => {
+  const choice = {
+    prompt: 'Nest Ball',
+    min: 0,
+    max: 1,
+    options: [{ instanceId: 20, name: 'Bulbasaur', src: 'b.png', type: 'Pokémon' }],
+    zoneView: {
+      zone: 'deck',
+      cards: [
+        { instanceId: 21, name: 'Iono', src: 'i.png', type: 'Supporter' },
+        { instanceId: 20, name: 'Bulbasaur', src: 'b.png', type: 'Pokémon' },
+      ],
+    },
+  };
+  const request = buildChoicePickerRequest(choice, () => {});
+  assert.deepEqual(request.allCandidates.map((c) => c.instanceId), [21, 20]);
+  assert.equal(request.allCandidates[1], request.candidates[0]);
+  assert.deepEqual(request.allCandidates[0].image, { src: 'i.png' });
+});
+
+test('no ALL tab without a pile, or when the pile is just the options', () => {
+  const options = [{ instanceId: 20, name: 'Bulbasaur', src: 'b.png' }];
+  assert.equal(buildChoicePickerRequest({ options }, () => {}).allCandidates, undefined);
+  const zoneView = { zone: 'discard', cards: options };
+  assert.equal(buildChoicePickerRequest({ options, zoneView }, () => {}).allCandidates, undefined);
+});

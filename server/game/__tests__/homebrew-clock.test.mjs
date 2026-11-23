@@ -14,7 +14,7 @@ import {
   syncClock,
 } from '../../../shared/engine/homebrew-clock.mjs';
 
-// Design 090: the homebrew chess clock (3:00 bank, +15 s per finished turn, 0:00 loses).
+// Design 090: the homebrew chess clock (10:00 bank, +40 s per finished turn, 0:00 loses).
 
 const card = (id, ownerId, n) => createCard({ instanceId: `${ownerId}-${n}`, ownerId, name: 'Card', id });
 
@@ -63,7 +63,7 @@ test('clockRunner: the chooser of a pending prompt, else the turn player; nobody
   assert.equal(clockRunner({ turn: { phase: 'ended', number: 4, player: 'p1' } }), null);
 });
 
-test('syncClock charges the runner, credits +15 s per finished turn, and never twice after undo', () => {
+test('syncClock charges the runner, credits the increment per finished turn, and never twice after undo', () => {
   const state = { players: { p1: { zones: { deck: [{ id: 'customhb-1' }] } }, p2: { zones: { deck: [{ id: 'customhb-2' }] } } }, turn: { phase: 'main', number: 1, player: 'p1' } };
   const clock = syncClock(createClock(), state, 0);
   assert.equal(clock.armed, true);
@@ -94,7 +94,7 @@ test('the clock stays off unless both decks are homebrew, or when the toggle is 
 });
 
 test('formatClock rounds up to whole seconds', () => {
-  assert.equal(formatClock(CLOCK_BANK_MS), '3:00');
+  assert.equal(formatClock(CLOCK_BANK_MS), '10:00');
   assert.equal(formatClock(14_001), '0:15');
   assert.equal(formatClock(0), '0:00');
   assert.equal(formatClock(-5), '0:00');
