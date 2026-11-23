@@ -14,6 +14,7 @@ import { classifyAttackRow } from '../lib/attack-behaviour.mjs';
 import { oracleCorpus } from '../lib/oracle-harness.mjs';
 import { classifyRow } from '../lib/ability-behaviour.mjs';
 import { classifyTrainer } from '../lib/trainer-behaviour.mjs';
+import { hasRecognizedPassiveStadiumEffect, isStadiumLostCity } from '../../shared/engine/rules/stadium-effects.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SYMBOL = {
@@ -65,6 +66,11 @@ function printedKeys() {
   return keys;
 }
 
+const stadiumLayerReads = (card) => {
+  const stadium = { name: card.name, type: 'Trainer', trainerType: 'Stadium', text: card.effect || '' };
+  return hasRecognizedPassiveStadiumEffect(stadium) || isStadiumLostCity(stadium);
+};
+
 export function engineCheck(set) {
   const printed = printedKeys();
   const findings = [];
@@ -96,6 +102,9 @@ export function engineCheck(set) {
   }
   for (const card of set.cards.filter((c) => c.category === 'Trainer')) {
     parts += 1;
+    // Stadium text is read by its own layer (stadium-effects.mjs), not parseTrainerEffect: a Stadium that
+    // layer runs is no gap (audit-all-trainers routes Stadiums the same way).
+    if (card.trainerType === 'Stadium' && stadiumLayerReads(card)) continue;
     const r = classifyTrainer({ name: card.name, text: card.effect, subtype: card.trainerType });
     const gaps = r.gaps.filter((g) => !(card.trainerType !== 'Item' && card.trainerType !== 'Supporter' && g === 'passive-only'));
     if (gaps.length) findings.push({ card, kind: 'trainer', name: card.name, verdict: 'gap', text: card.effect, detail: gaps.join('; '), printed: false });
