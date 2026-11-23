@@ -290,7 +290,8 @@ const CLAUSES = [
     () => ({ desc: { kind: 'benchVsOpponent', op: 'lte' }, printedNegated: false }),
   ],
   [
-    /^your benched (?:\{([a-z])\} )?pokémon have any damage counters on them$/,
+    // Also "any of your Benched Pokémon have damage counters on them" (customhb Druddigon, design 091).
+    /^(?:any of )?your benched (?:\{([a-z])\} )?pokémon have (?:any )?damage counters on them$/,
     (m) => ({
       desc: { kind: 'damagedBench', ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}) },
       printedNegated: false,

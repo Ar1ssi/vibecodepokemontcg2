@@ -88,6 +88,9 @@ function pokemonMatcher(phrase) {
     .replace(/\bpokémon-ex\b/, 'pokémon-ex')
     .trim();
   if (text === 'pokémon') return () => true;
+  // An owner family ("Ranger's Pokémon", "Team Rocket's Pokémon"): the card's name starts with the owner.
+  const owner = /^([a-z][a-z .'-]*?)'s pokémon$/.exec(text);
+  if (owner) return (entry) => lower(entry.name).replace(/[’‘]/g, "'").startsWith(`${owner[1]}'s `);
   const parts = text.split(/\s+and\s+/);
   const kindSets = parts.map((part) => kindsOf(part.replace(/s$/, '')) || kindsOf(part));
   if (kindSets.every(Boolean)) {
