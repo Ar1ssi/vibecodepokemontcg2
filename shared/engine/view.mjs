@@ -6,6 +6,7 @@
  */
 
 import { cloneCard } from './cards.mjs';
+import { choiceForChooser } from './choice-zone-view.mjs';
 
 /**
  * Strips all hidden card information, returning only identity.
@@ -200,7 +201,7 @@ export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } =
   let pendingChoice = null;
   if (state.pendingChoice) {
     if (!isSpectator && state.pendingChoice.player === playerId) {
-      pendingChoice = JSON.parse(JSON.stringify(state.pendingChoice));
+      pendingChoice = choiceForChooser(state, state.pendingChoice);
     } else {
       pendingChoice = redactPendingChoiceForOpponent(state.pendingChoice);
     }
@@ -333,7 +334,7 @@ export function viewForSolo(state, nearId, { attackExtrasFor, costDiscountsFor }
     ...view,
     solo: true,
     choiceSeat,
-    pendingChoice: choiceSeat ? JSON.parse(JSON.stringify(choice)) : view.pendingChoice,
+    pendingChoice: choiceSeat ? choiceForChooser(state, choice) : view.pendingChoice,
     them: far
       ? {
           ...view.them,

@@ -22,6 +22,11 @@ import {
 } from './card-picker-hitbox.mjs';
 import { confirmPicksOrEmpty, movePicksInOrder } from './card-picker-moves.mjs';
 import { cardArtSrc } from './card-art-src.mjs';
+import { upgradeSlideToHolo } from './slide-holo-upgrade.mjs';
+import { isShowingCardBack } from '../deck-builder/core/card-compare.mjs';
+import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
+import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
+import { loadFoilManifest, foilManifestNow } from '../foil/tcgl-foil-store.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 /** @type {object | null} */
@@ -97,7 +102,7 @@ export const pickCardPickerIndices = (indices) => {
   if (!pickerState || pickerState.mode === 'browse') return false;
   for (const i of indices) {
     const card = pickerState.cards[i];
-    if (!card) return false;
+    if (!card || !isPickable(pickerState, card)) return false;
     assignCardToSlot(pickerState, card, pickerState.multiSelect ? -1 : 0);
   }
   confirmPicker(pickerState);
@@ -117,30 +122,37 @@ const disableNativeDrag = (node) => {
   });
 };
 
+// A face-down slide shows a sleeve: never look it up and foil it.
+const isCardBackArt = (src) =>
+  ['self', 'opp'].some((user) => isShowingCardBack(src, cardBackSrcForUser(user)));
+
+const buildSlideHolo = (src, effect, card, manifest) => {
+  const wrapper = buildHoloCard(src, effect, {
+    trainer: isTrainerCard(card),
+    cardId: foilCardId(card, manifest),
+    reverse: isReverseHoloCard(card, manifest),
+    manifest,
+  });
+  wrapper.classList.add('mat-holo', 'discard-pile-holo');
+  disableNativeDrag(wrapper);
+  return wrapper;
+};
+
 // Exported for the card-focus view (design 067), which mounts the same holo card outside the carousel.
-export const buildSlideContent = (card) => {
+// `onHolo(wrapper)`: a card whose foil can't be known yet (its rarity or the foil manifest isn't
+// loaded) starts as a plain scan; with this callback it is looked up and swapped for its holo card,
+// and the callback runs once that wrapper is in the slide.
+export const buildSlideContent = (card, { onHolo = null } = {}) => {
   const src = cardArtSrc(card);
   const existingRarity = card?.wrapper?.dataset?.rarity;
   if (existingRarity && src) {
-    const wrapper = buildHoloCard(src, existingRarity, {
-      trainer: isTrainerCard(card),
-      cardId: foilCardId(card),
-      reverse: isReverseHoloCard(card),
-    });
-    wrapper.classList.add('mat-holo', 'discard-pile-holo');
-    disableNativeDrag(wrapper);
+    const wrapper = buildSlideHolo(src, existingRarity, card, foilManifestNow());
     return { node: wrapper, holoWrapper: wrapper };
   }
 
   const effect = resolveFoilEffect(card);
   if (effect && src) {
-    const wrapper = buildHoloCard(src, effect, {
-      trainer: isTrainerCard(card),
-      cardId: foilCardId(card),
-      reverse: isReverseHoloCard(card),
-    });
-    wrapper.classList.add('mat-holo', 'discard-pile-holo');
-    disableNativeDrag(wrapper);
+    const wrapper = buildSlideHolo(src, effect, card, foilManifestNow());
     return { node: wrapper, holoWrapper: wrapper };
   }
 
@@ -149,6 +161,16 @@ export const buildSlideContent = (card) => {
   img.alt = card?.name ?? '';
   img.className = 'discard-pile-card';
   img.draggable = false;
+  if (onHolo && src && !isCardBackArt(src)) {
+    upgradeSlideToHolo(card, img, {
+      loadCardData: ensureCardData,
+      loadManifest: loadFoilManifest,
+      resolveEffect: resolveFoilEffect,
+      build: (foilCard, foilEffect, manifest) => buildSlideHolo(src, foilEffect, foilCard, manifest),
+    }).then((wrapper) => {
+      if (wrapper) onHolo(wrapper);
+    });
+  }
   return { node: img, holoWrapper: null };
 };
 
@@ -528,8 +550,11 @@ export const findDropSlotAt = (state, x, y) => {
   );
 };
 
+// Under the ALL tab the rest of the pile is shown, but only a VALID card can be picked.
+const isPickable = (state, card) => !state.validCandidates || state.validCandidates.has(card);
+
 export const assignCardToSlot = (state, card, slotIndex = -1) => {
-  if (!card || !state.slotAssignments?.length) return;
+  if (!card || !state.slotAssignments?.length || !isPickable(state, card)) return;
   for (let i = 0; i < state.slotAssignments.length; i += 1) {
     if (state.slotAssignments[i] === card) state.slotAssignments[i] = null;
   }
@@ -691,6 +716,7 @@ const toggleSelection = (state) => {
   if (!state.multiSelect) return;
   const card = state.cards[state.index];
   const existingIdx = state.slotAssignments.indexOf(card);
+  if (existingIdx < 0 && !isPickable(state, card)) return;
   if (existingIdx >= 0) {
     state.slotAssignments[existingIdx] = null;
   } else {
@@ -729,7 +755,10 @@ const confirmPicker = async (state) => {
     // selection passes `undefined` through instead of silently adopting the
     // currently-focused card. Required pickers keep the focus fallback.
     const explicit = state.slotAssignments[0] ?? state.slotCard ?? null;
-    picks = [explicit != null || state.minCount > 0 ? explicit ?? cards[index] : undefined];
+    // Under the ALL tab the focused card may be one that can't be picked: never adopt it.
+    const focused = isPickable(state, cards[index]) ? cards[index] : null;
+    if (explicit == null && state.minCount > 0 && !focused) return;
+    picks = [explicit != null || state.minCount > 0 ? explicit ?? focused : undefined];
   }
 
   if (!confirmPicksOrEmpty(picks, (message) => window.confirm(message))) return;
@@ -809,13 +838,16 @@ const confirmPicker = async (state) => {
 };
 
 
-const setCandidateList = (state, candidates) => {
+// `keepPicks`: switching VALID / ALL changes what is shown, not what was picked.
+const setCandidateList = (state, candidates, { keepPicks = false } = {}) => {
   state.cards = candidates;
   state.index = clampIndex(state.index, Math.max(0, candidates.length - 1));
   state.stack.innerHTML = '';
   state.slides = [];
-  state.selected.clear();
-  state.slotAssignments.fill(null);
+  if (!keepPicks) {
+    state.selected.clear();
+    state.slotAssignments.fill(null);
+  }
 
   if (!candidates.length) return;
 
@@ -823,13 +855,20 @@ const setCandidateList = (state, candidates) => {
     const slide = document.createElement('div');
     slide.className = 'discard-pile-slide card-picker-slide';
     slide.dataset.index = String(i);
+    if (!isPickable(state, card)) slide.classList.add('is-unpickable');
 
     const badge = document.createElement('span');
     badge.className = 'card-picker-select-badge';
     badge.hidden = true;
     slide.appendChild(badge);
 
-    const built = buildSlideContent(card);
+    const built = buildSlideContent(card, {
+      onHolo: (wrapper) => {
+        slide.holoWrapper = wrapper;
+        slide.holoRunning = false;
+        if (state.slides.includes(slide)) syncHoloAnimations(state);
+      },
+    });
     // The decorator may return a replacement node (design 013 wraps the card in a
     // positioned container holding the inspector chrome); holoWrapper is read off the
     // build result, not the replacement, so the sync keeps pointing at the real card.
@@ -857,6 +896,7 @@ const setCandidateList = (state, candidates) => {
   });
 
   goToIndex(state, clampIndex(state.index, candidates.length - 1));
+  if (keepPicks) updateSelectionUI(state);
   if (state.slotElements?.length) renderSlotCards(state);
 };
 
@@ -997,7 +1037,7 @@ const attachSwipe = (state) => {
         const slide = state.slides[state.index];
         const cardNode =
           slide?.querySelector('.discard-pile-card, .mat-holo') ?? slide;
-        if (cardNode) beginCardDrag(event, cardNode);
+        if (cardNode && isPickable(state, state.cards[state.index])) beginCardDrag(event, cardNode);
         return;
       }
       if (Math.abs(dx) > Math.abs(dy) * 1.15) {
@@ -1351,6 +1391,7 @@ export const openCardPicker = async ({
     onKeyDown: null,
     allCandidates,
     filteredCandidates: candidates,
+    validCandidates: allCandidates ? new Set(candidates) : null,
     filterValidBtn: filters.querySelector('.card-picker-filter.is-active'),
     filterAllBtn: filters.querySelector('.card-picker-filter:not(.is-active)'),
   };
@@ -1392,12 +1433,12 @@ export const openCardPicker = async ({
     state.filterValidBtn.addEventListener('click', () => {
       state.filterValidBtn.classList.add('is-active');
       state.filterAllBtn.classList.remove('is-active');
-      setCandidateList(state, state.filteredCandidates);
+      setCandidateList(state, state.filteredCandidates, { keepPicks: true });
     });
     state.filterAllBtn.addEventListener('click', () => {
       state.filterAllBtn.classList.add('is-active');
       state.filterValidBtn.classList.remove('is-active');
-      setCandidateList(state, state.allCandidates);
+      setCandidateList(state, state.allCandidates, { keepPicks: true });
     });
   }
 
@@ -1433,15 +1474,20 @@ export const openCardPicker = async ({
   if (!isBrowse) renderSlotCards(state);
 
   if (triggerCard) {
-    const { node, holoWrapper } = buildSlideContent(triggerCard);
-    node.classList.add('card-picker-trigger-card');
-    triggerSlot.appendChild(node);
-    if (holoWrapper) {
-      holoWrapper.classList.add('card-picker-trigger-holo');
+    const showTriggerHolo = (holoWrapper) => {
+      holoWrapper.classList.add('card-picker-trigger-card', 'card-picker-trigger-holo');
       state.triggerHoloWrapper = holoWrapper;
       startHoloAnimation(holoWrapper, MAT_HOLO_OPTIONS);
       if (!isBrowse) syncChooseLayout(state);
-    }
+    };
+    const { node, holoWrapper } = buildSlideContent(triggerCard, {
+      onHolo: (wrapper) => {
+        if (pickerState === state) showTriggerHolo(wrapper);
+      },
+    });
+    node.classList.add('card-picker-trigger-card');
+    triggerSlot.appendChild(node);
+    if (holoWrapper) showTriggerHolo(holoWrapper);
   }
 };
 

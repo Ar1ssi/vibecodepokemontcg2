@@ -2806,6 +2806,11 @@ body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-s
   background: #f5d547;
   color: #1a1a1a;
 }
+/* ALL tab: the rest of the pile is shown for reference but can't be picked. */
+.card-picker-slide.is-unpickable {
+  filter: grayscale(0.85) brightness(0.55);
+  cursor: not-allowed;
+}
 
 /* Browse mode (discard pile) — large cards, centered */
 .card-picker-browse .card-picker-main--browse {
