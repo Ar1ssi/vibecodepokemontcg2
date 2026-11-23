@@ -158,3 +158,26 @@ test('Trainers and Energy keep their places; bad input is an empty list', () => 
   assert.equal(ordered[2], trainer);
   assert.deepEqual(orderHomebrewSetCards(null), []);
 });
+
+test('Duraludon ex comes before Archaludon; the Colorless Hisuian Zoroark ex is listed under Colorless', () => {
+  const cards = [
+    pokemon('793', 'Duraludon', 'Metal', 'Basic'),
+    pokemon('792', 'Archaludon', 'Metal', 'Stage1', 'Duraludon'),
+    pokemon('791', 'Archaludon ex', 'Metal', 'Stage1', 'Duraludon'),
+    pokemon('790', 'Duraludon ex', 'Metal', 'Basic'),
+    pokemon('749', 'Hisuian Zorua', 'Psychic', 'Basic'),
+    pokemon('776', 'Hisuian Zoroark', 'Psychic', 'Stage1', 'Hisuian Zorua'),
+    pokemon('750', 'Hisuian Zoroark ex', 'Colorless', 'Stage1', 'Hisuian Zorua'),
+    pokemon('459', 'Kangaskhan', 'Colorless', 'Basic'),
+  ];
+  assert.deepEqual(names(orderHomebrewSetCards(cards)), [
+    'Hisuian Zoroark ex 750',
+    'Kangaskhan 459',
+    'Duraludon 793',
+    'Duraludon ex 790',
+    'Archaludon 792',
+    'Archaludon ex 791',
+    'Hisuian Zorua 749',
+    'Hisuian Zoroark 776',
+  ]);
+});

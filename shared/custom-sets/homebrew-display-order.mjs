@@ -2,7 +2,7 @@
 // so the order is set here, where every publish passes. Pokémon are grouped by type, then by evolution family
 // (A to Z by the family's root). A family lists whole lines, never printings alternating stage by stage: its regular
 // cards line by line (each line one type, Basic up), then its MEGAs, then its shiny cards the same way. Tera Pokémon
-// and Eevee's evolutions are listed under their own type rather than with their family. Trainers and Energy keep
+// Eevee's evolutions and the Colorless Hisuian Zoroark ex are listed under their own type rather than with their family. Trainers and Energy keep
 // the set.json order.
 
 export const HOMEBREW_DISPLAY_ORDER_SET_IDS = Object.freeze(['customhb']);
@@ -32,8 +32,9 @@ const typeOf = (card) => (Array.isArray(card.types) && card.types[0]) || '';
 const isPokemon = (card) => card?.category === 'Pokemon';
 const isMega = (card) => card.stage === 'MEGAHB' || /^Mega /.test(card.name);
 const numberOf = (card) => Number.parseInt(card.localId, 10) || 0;
-// Tera Pokémon and Eevee's evolutions are each listed alone under their own type.
-const listsAlone = (card) => card.stage === 'TERAHB' || card.evolveFrom === 'Eevee';
+// Tera Pokémon, Eevee's evolutions and these cards (keyed by name, D252) are each listed alone under their own type.
+const LISTED_UNDER_OWN_TYPE = new Set(['Hisuian Zoroark ex']);
+const listsAlone = (card) => card.stage === 'TERAHB' || card.evolveFrom === 'Eevee' || LISTED_UNDER_OWN_TYPE.has(card.name);
 
 function typeRank(type) {
   const rank = TYPE_ORDER.indexOf(type);
