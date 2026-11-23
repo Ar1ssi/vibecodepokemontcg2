@@ -64,6 +64,27 @@ export const cardAbilityText = (card) =>
 
 const textOf = cardAbilityText;
 
+// "You can't use more than 1 Quick Search Ability each turn" (Pidgeot ex, Dudunsparce): every copy
+// shares the limit, where the once-per-turn flag is each Pokémon's own. Meowth ex's wording
+// covers every Ability with "Last-Ditch" in its name. Printed as `each turn` or `during your turn`.
+const ABILITY_NAME_LIMIT =
+  /you can't use more than 1 (?:ability that has ["\u201c]([^"\u201c\u201d]+)["\u201d] in its name|([^.]+?) ability) (?:each|during your) turn/;
+
+/** The flag key every copy of a name-limited Ability shares (`text` is the Ability's own text), or null. */
+export function abilityNameLimitKey(text) {
+  const match = ABILITY_NAME_LIMIT.exec(lower(text));
+  const name = (match?.[1] ?? match?.[2])?.trim();
+  return name ? `abilityName:${name}` : null;
+}
+
+/** `abilityNameLimitKey` for one of a card's Abilities, read the way executeAbility reads its text. */
+export function abilityNameLimitKeyFor(card, abilityIndex = 0) {
+  const ability = card?.abilities?.[abilityIndex];
+  return abilityNameLimitKey(
+    typeof ability === 'string' ? ability : ability?.text || card?.abilityText || card?.text || card?.effect || ''
+  );
+}
+
 // --- position ----------------------------------------------------------
 
 // Whether the ability is printed as a conditional on THIS Pokémon's position, which gates where it

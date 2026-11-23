@@ -17,6 +17,7 @@ import {
   toolCapacity, parseUnlimitedHandEnergyAcceleration, costDiscountRead, applyCostDiscount,
   isHandActivatedAbility,
   isDiscardActivatedAbility,
+  abilityNameLimitKeyFor,
 } from '../rules/ability-executors.mjs';
 import {
   abilityAttackCostDiscount, applyEnergyMultiplier, abilityActivationBlockReason,
@@ -1590,12 +1591,14 @@ export function validateLegality(state, command) {
         // once-per-turn flag, activation wording, Pokémon-source suppression,
         // KO window, Active-Spot requirement and the evolve/bench-played
         // windows all live in abilityActivationBlockReason.
+        const nameLimitKey = abilityNameLimitKeyFor(cardRef.card, payload?.abilityIndex ?? 0);
         const blockReason = abilityActivationBlockReason(cardRef.card, {
           ...abilitySideContext(state, cardRef.playerId || playerId),
           used: Boolean(
             cardRef.card.abilityUsed ||
               player.flags?.abilitiesUsed?.[cardRef.card.name] ||
-              player.flags?.abilitiesUsed?.[cardRef.card.instanceId]
+              player.flags?.abilitiesUsed?.[cardRef.card.instanceId] ||
+              (nameLimitKey && player.flags?.abilitiesUsed?.[nameLimitKey])
           ),
           abilityIndex: payload?.abilityIndex ?? 0,
           zone: cardRef.zoneId,

@@ -5,7 +5,7 @@
 
 import { findCard } from '../state.mjs';
 import { parseAbility, rewriteLegacyPowerWording, automaticEvolveSteps } from '../rules/abilities.mjs';
-import { cardAbilityText } from '../rules/ability-executors.mjs';
+import { abilityNameLimitKeyFor, cardAbilityText } from '../rules/ability-executors.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
 import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { executeSteps, isExecutableStepType } from './executor.mjs';
@@ -95,6 +95,10 @@ export function executeAbility(draft, {
     // instanceId first: two Pokémon sharing a name must not share one used-flag
     // slot, or using one blocks the other's separate ability (I48).
     player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
+    // "You can't use more than 1 Quick Search Ability each turn": a second copy is spent too,
+    // including when this one left play (Dudunsparce).
+    const limitKey = abilityNameLimitKeyFor(card, abilityIndex);
+    if (limitKey) player.flags.abilitiesUsed[limitKey] = true;
   };
 
   const ability = card.abilities?.[abilityIndex];
