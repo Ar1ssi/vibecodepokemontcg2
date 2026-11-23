@@ -134,9 +134,10 @@ function markerKindMatch(card, w) {
   return null;
 }
 
-// "an Item card that has the word "Ball" in its name" (Lopunny Bunny Business).
+// "an Item card that has the word "Ball" in its name" (Lopunny Bunny Business); "an Item that
+// has“Antique” in its name" (Relicanth Antique Search, customhb-890: no "the word", no space).
 export const NAME_WORD_CLAUSE =
-  /\s*(?:that |which )?(?:has|with) the word ["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
+  /\s*(?:that |which )?(?:has|with)\s*(?:the word )?["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
 
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {

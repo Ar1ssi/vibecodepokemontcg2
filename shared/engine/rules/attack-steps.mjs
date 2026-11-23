@@ -1275,6 +1275,11 @@ const TEMPLATES = [
     /^devolve each of your opponent's evolved pokémon (?:by putting|and put) the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'all', to: 'hand' }),
   ],
+  // Archeops Ancient Wing (corpus: White Flare 132; customhb-881): the player picks 1 of the opponent's Evolved Pokémon.
+  [
+    /^devolve 1 of your opponent's evolved pokémon by putting the highest stage evolution card on it into your opponent's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'chooseOpponent', to: 'hand' }),
+  ],
   [
     /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'active', to: 'hand' }),

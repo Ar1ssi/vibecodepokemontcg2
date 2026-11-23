@@ -91,6 +91,9 @@ function pokemonMatcher(phrase) {
     .replace(/\bpokémon-ex\b/, 'pokémon-ex')
     .trim();
   if (text === 'pokémon') return () => true;
+  // Relicanth Fossil Beatdown (customhb-890): "Pokémon that has "Antique" in its name".
+  const nameWord = /^pokémon (?:that has|with) ["“”]([^"“”]+)["“”] in its name$/.exec(text);
+  if (nameWord) return (entry) => lower(entry.name).includes(nameWord[1]);
   const parts = text.split(/\s+and\s+/);
   const kindSets = parts.map((part) => kindsOf(part.replace(/s$/, '')) || kindsOf(part));
   if (kindSets.every(Boolean)) {

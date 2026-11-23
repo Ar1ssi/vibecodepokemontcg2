@@ -25,6 +25,7 @@ import { validateReferences, validateLegality } from './reduce/legality.mjs';
 import { attackCommand } from './reduce/attack.mjs';
 import {
   settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves, settleToolEnergyBenchMoves,
+  settleAttackerEnergyToHand,
   settleKoHandDiscards,
   settleBenchLimits,
   settleKoToolCounters,
@@ -473,6 +474,7 @@ export function applyCommand(state, command, rng = null) {
   // Knock Out effects (Energy moves) resolve before the replacement Active is promoted.
   settleKoEnergyMoves(draft, { events });
   settleToolEnergyBenchMoves(draft);
+  settleAttackerEnergyToHand(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoHandDiscards(draft, { events });
   settleKoToolCounters(draft);

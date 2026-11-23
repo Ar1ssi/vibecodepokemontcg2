@@ -139,6 +139,7 @@ export function applyControlledAttack(draft, { userId, ownerId, targetId, attack
       auto: false,
       activeRng,
       ignoreDefenderEffects: Boolean(immunity.ignoreDefenderEffects),
+      abilityShieldsApplied: true,
       events,
     });
     return dealt;

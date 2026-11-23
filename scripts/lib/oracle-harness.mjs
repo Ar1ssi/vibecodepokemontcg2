@@ -112,6 +112,14 @@ function deckFor(pfx) {
   return out;
 }
 
+const NAMED_ITEM_SEARCH = /\bitem(?: cards?)? (?:that has|that have|with)\s*(?:the word )?["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
+
+/** The quoted name word of an Item search in the holder's Ability text, or null. */
+function namedItemWord(card) {
+  const text = (card?.abilities || []).map((a) => a?.text || '').join(' ');
+  return NAMED_ITEM_SEARCH.exec(text)?.[1]?.trim() || null;
+}
+
 /**
  * Turn 5, p1 to act. Each side: damaged Active with 8 Energy + a Tool, 3 damaged Benched Pokémon
  * with 1 Energy each, a stocked deck, hand, discard and 6 Prizes. `holder()` builds the card under
@@ -182,6 +190,12 @@ export function buildState(holder, holderZone) {
     // its filtered search finds nothing and the row reads as a dropped clause.
     const owner = own ? String(holder().name || '').match(/^(.+?)'s /)?.[1] : null;
     if (owner) z.deck.push(mon(`${owner}'s Deckmate`));
+    // "an Item that has “Antique” in its name" (Relicanth Antique Search, customhb-890): the same
+    // for a name-word Item search the stock deck cannot meet (Great Ball already meets "Ball").
+    const itemWord = own ? namedItemWord(holder()) : null;
+    if (itemWord && !z.deck.some((c) => c.name.toLowerCase().includes(itemWord.toLowerCase()))) {
+      z.deck.push(trainer(`${itemWord} Deckmate`, 'Item'));
+    }
     z.hand.push(
       energy('Fire'),
       trainer('Hand Item', 'Item'),

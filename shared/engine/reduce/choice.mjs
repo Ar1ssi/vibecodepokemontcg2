@@ -31,6 +31,7 @@ import {
   BENCH_LIMIT_EFFECT, resolveBenchLimitTrim,
   PRIZE_BENCH_EFFECT, PRIZE_ATTACH_EFFECT, resumePrizeAttach, resumePrizeToBench,
   PRIZE_TRAINER_EFFECT, resumePrizeTrainer, TOOL_ENERGY_BENCH_EFFECT, moveToolEnergyToBench,
+  ATTACKER_ENERGY_HAND_EFFECT, returnAttackerEnergyToHand,
 } from './knockout.mjs';
 import { resolveCheckup, advanceTurn, endTurnFromEffect } from './turn.mjs';
 import { continueRetreat, isExactRetreatPayment, applyRetreatSwap } from './retreat.mjs';
@@ -545,6 +546,11 @@ export function resolveChoiceCommand({ draft, playerId, activeRng, events, paylo
       events,
     });
     draft.__toolEnergyBench = Array.isArray(token.remaining) ? [...token.remaining] : [];
+  } else if (token.effectType === ATTACKER_ENERGY_HAND_EFFECT) {
+    // Silver Sparkle: the holder's owner picked which Energy card goes back to the attacker's hand.
+    draft.pendingChoice = null;
+    returnAttackerEnergyToHand(draft, { move: token.move, energyId: (payload.selection || [])[0], events });
+    draft.__attackerEnergyToHand = Array.isArray(token.remaining) ? [...token.remaining] : [];
   } else if (token.effectType === 'stadium') {
     const result = executeStadium(draft, {
       playerId: initiatorPlayerId,
