@@ -44,6 +44,7 @@ import {
   requiresBenchSpot,
   powerConditionRestriction,
   isHandActivatedAbility,
+  isDiscardActivatedAbility,
   requiresFirstTurn,
   requiresKoOnOpponentTurn,
   isEvolvePlayedTrigger,
@@ -64,6 +65,8 @@ import {
   isMegaCard,
   isVCard,
   isVmaxCard,
+  isUltraBeastCard,
+  isBasicEnergy,
 } from './card-classify.mjs';
 import { isAttachedAsEnergy, isAttachedAsTool, isBasicPokemon, isPokemon } from '../cards.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
@@ -74,6 +77,7 @@ import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import { legacyPowerStopCondition, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
 import { normalizeStage } from './evolution.mjs';
 import { findCard } from '../state.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase();
@@ -223,6 +227,11 @@ function inPlayConditionMet(text, target, ctx) {
     if (attachedEnergy(target, ctx.sideCards || ctx.inPlayCards).length === 0)
       return false;
   }
+  // Shelgon Energy Guard (sm7.5-43): "If this Pokémon has any basic Energy attached to it".
+  const anyBasic = /if (?:this pok[eé]mon|it) has any basic energy attached/.test(text);
+  if (anyBasic && !attachedEnergy(target, ctx.sideCards || ctx.inPlayCards).some((e) => isBasicEnergy(e))) {
+    return false;
+  }
   const energyCount = text.match(
     /if (?:this pok[eé]mon|it) has (\d+) or more \{([a-z])\} energy attached/
   );
@@ -240,8 +249,17 @@ function inPlayConditionMet(text, target, ctx) {
     anyEnergy ||
     teamEnergy ||
     energyCount ||
+    anyBasic ||
     /if (?:this pok[eé]mon|it) has any (?:special )?energy attached/.test(text);
-  const namedTool = energyCondition
+  // Kecleon Unit Color: "As long as this Pokémon has Unit Energy {G}{R}{W} attached to it" names
+  // an Energy card, compared in symbols.
+  const namedEnergy = energyCondition ? null : text.match(/has ([a-z .'’-]*energy ?(?:\{[a-z]\})+) attached/);
+  if (namedEnergy) {
+    const wanted = namedEnergy[1].trim();
+    const attached = attachedEnergy(target, ctx.sideCards || ctx.inPlayCards);
+    if (!attached.some((c) => lower(symbolizeTypeWords(c.name || '')) === wanted)) return false;
+  }
+  const namedTool = energyCondition || namedEnergy
     ? null
     : text.match(/has (?:a )?([a-z0-9 .'’-]+?) attached/);
   if (namedTool && !/pok[eé]mon tool/.test(namedTool[1])) {
@@ -337,7 +355,15 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
 function namedReductionTargets(text) {
   const plain = "(?:(?!pok[eé]mon)[a-z0-9 .'’-])+?";
   const m = text.match(new RegExp(`\\byour (${plain}(?: and ${plain})*) take \\d+ less damage`));
+  // Stakataka-GX Ultra Wall (sm7-102): "your Ultra Beasts" is a kind, not a printed name.
+  if (m && /^ultra beasts?$/.test(m[1].trim())) return null;
   return m ? m[1].split(' and ').map((n) => n.trim()) : null;
+}
+
+/** "your Ultra Beasts take … less damage": the reduction covers Ultra Beasts only. */
+function reductionKindMet(text, target) {
+  if (/\byour ultra beasts? take \d+ less damage/.test(text)) return isUltraBeastCard(target);
+  return true;
 }
 
 /** True when the holder itself is the only legal target ("this Pokémon"). */
@@ -360,7 +386,8 @@ export function selfNamedText(holder) {
   for (const printed of new Set([name, short])) {
     if (printed.length < 3) continue;
     const escaped = printed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(`(?<![\\w'])${escaped}(?![\\w-])`, 'g'), 'this pokémon');
+    // "your Passimian's attacks" (Passimian Power Huddle, sm5-70) names every copy, not the holder.
+    out = out.replace(new RegExp(`(?<![\\w'])(?<!\\byour )${escaped}(?![\\w-])`, 'g'), 'this pokémon');
   }
   return out;
 }
@@ -543,7 +570,9 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
     const perNamed = /for each ([a-z][a-z' -]*?) in play \(both yours and your opponent's\)/.exec(
       lower(cardAbilityText(holder))
     )?.[1];
-    if (/for each/.test(t) && !perOpponentPrize && !perOwnPrize && !perUniqueEnergy && !perNamed) continue;
+    // Charizard Resolute Flame (sm7.5-3): "for each of their Pokémon-GX and Pokémon-EX in play".
+    const perOpponentGxEx = /for each of (?:their|your opponent's) pok[eé]mon-gx and pok[eé]mon-ex in play/.test(t);
+    if (/for each/.test(t) && !perOpponentPrize && !perOwnPrize && !perUniqueEnergy && !perNamed && !perOpponentGxEx) continue;
     // An activated power's "during your next turn … more damage" is its effect, not a passive.
     if (/^(?:once during your turn|as often as you like)/.test(t)) continue;
     if (!attackerQualifies(t, attacker, holder, ctx)) continue;
@@ -565,6 +594,10 @@ export function abilityDamageBonus(attacker, defender, ctx = {}) {
         (top) => lower(top.name) === perNamed
       );
       total += bonus * named.length;
+      continue;
+    }
+    if (perOpponentGxEx) {
+      total += bonus * sideTops(ctx.opponentSideCards || []).filter((top) => isGxCard(top) || isExCard(top)).length;
       continue;
     }
     if (perOwnPrize) {
@@ -650,6 +683,7 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     // The printed text, not `t`: `t` reads the holder's own name as "this pokémon".
     const named = namedReductionTargets(lower(cardAbilityText(holder)));
     if (named && !named.some((n) => lower(defender?.name).includes(n))) continue;
+    if (!reductionKindMet(t, defender)) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     if (!attackerTypeRequirementMet(t, attacker)) continue;
     const red = reductionForCard(holder, defender, attacker, {
@@ -792,6 +826,7 @@ export function sideContextFor(state, playerId) {
     sideBench: own.bench || [],
     opponentActive: other.active || [],
     opponentBench: other.bench || [],
+    opponentDeckCount: Array.isArray(other.deck) ? other.deck.length : null,
     // Shiftry Seal Off's abilityLock marker is live only inside its window (isAbilitySuppressed).
     turnNumber: state.turn?.number,
     powersOff: powersOffActive(state),
@@ -1076,6 +1111,18 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
       ) {
         return { none: true };
       }
+      // Cherrim Weather Guard (sm5-11): "Your {G} Pokémon have no Weakness."
+      const typedTeam = holderSide === 'defender' && t.match(/your \{([a-z])\} pok[eé]mon have no weakness/);
+      if (typedTeam && attackerTypes(defender).includes(lower(TYPE_LETTER[typedTeam[1]]))) return { none: true };
+      // Solgaleo Full Metal Body (sm7-99): "If this Pokémon has any {M} Energy attached to it, it has no Weakness."
+      if (
+        holderSide === 'defender' &&
+        sameCard(holder, defender) &&
+        /(?:\bit|this pok[eé]mon) has no weakness/.test(t) &&
+        inPlayConditionMet(t, holder, holderCtx)
+      ) {
+        return { none: true };
+      }
 
       const both = t.match(
         /apply weakness for both active pok[eé]mon as [x×](\d)/
@@ -1116,6 +1163,13 @@ export function abilityHpBonus(pokemon, ctx = {}) {
   let total = 0;
   for (const holder of nonStackingOnce(dedupe([pokemon, ...sideInPlay(ctx)]))) {
     const t = cardAbilityText(holder);
+    // Solrock Sunbeam (sm7-62): "The maximum HP of each of your Lunatone in play is 130." —
+    // read as the difference from the printed HP.
+    const setHp = t.match(/the maximum hp of each of your (.+?) in play is (\d+)/);
+    if (setHp && !isAbilitySuppressed(holder, ctx) && lower(pokemon.name).includes(setHp[1].trim())) {
+      total += Math.max(0, Number(setHp[2]) - (Number(pokemon.hp) || 0));
+      continue;
+    }
     if (!t || !parseHpBonus(holder).bonus) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     if (/for each/.test(t)) continue;
@@ -1364,10 +1418,33 @@ export function abilityIgnoresDefenderAbilities(attacker, ctx = {}) {
   );
 }
 
-/** Dragapult Infiltrator (customhb): "This Pokémon's attacks ignore Resistance." */
+/**
+ * Dragapult Infiltrator (customhb): "This Pokémon's attacks ignore Resistance."; Zygarde Earthen
+ * Aura (sm6-71) also ignores Weakness. Mesprit Silent Waves (sm6-42), on any of the attacker's
+ * Pokémon: "If you have Azelf in play, your opponent's Pokémon in play have no Resistance."
+ */
 export function abilityIgnoresResistance(attacker, ctx = {}) {
   if (!isPokemon(attacker)) return false;
-  return /this pok[eé]mon's attacks ignore resistance/.test(cardAbilityText(attacker)) && !isAbilitySuppressed(attacker, ctx);
+  const own = cardAbilityText(attacker);
+  if ((/this pok[eé]mon's attacks ignore resistance/.test(own) || IGNORES_W_AND_R.test(own)) && !isAbilitySuppressed(attacker, ctx)) {
+    return true;
+  }
+  return dedupe(sideInPlay(ctx)).some((holder) => {
+    const t = cardAbilityText(holder);
+    return (
+      /your opponent's pok[eé]mon in play have no resistance/.test(t) &&
+      !isAbilitySuppressed(holder, ctx) &&
+      inPlayConditionMet(t, holder, ctx)
+    );
+  });
+}
+
+const IGNORES_W_AND_R = /damage from this pok[eé]mon's attacks isn't affected by weakness or resistance/;
+
+/** Zygarde Earthen Aura (sm6-71): this Pokémon's attack damage ignores Weakness. */
+export function abilityIgnoresWeakness(attacker, ctx = {}) {
+  if (!isPokemon(attacker)) return false;
+  return IGNORES_W_AND_R.test(cardAbilityText(attacker)) && !isAbilitySuppressed(attacker, ctx);
 }
 
 /**
@@ -1425,6 +1502,49 @@ export function abilityKoConfusesAttacker(card, ctx = {}) {
 }
 
 /**
+ * Honedge Final Hour (sm6-46): "If this Pokémon is your Active Pokémon and is Knocked Out by damage
+ * from an opponent's attack, put 3 damage counters on 1 of your opponent's Pokémon." The count, or
+ * 0; the caller checks the Active Spot and the attack.
+ */
+export function abilityKoCountersOnOpponent(card, ctx = {}) {
+  if (!isPokemon(card)) return 0;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is your active pok[eé]mon and is knocked out by damage from an opponent's attack, put (\d+) damage counters? on 1 of your opponent's pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(match[1]);
+}
+
+/**
+ * Sigilyph-GX Mirror Counter (sm8-98): "If this Pokémon is your Active Pokémon and is damaged by an
+ * attack from your opponent's Pokémon-GX or Pokémon-EX (even if this Pokémon is Knocked Out), put
+ * damage counters on the Attacking Pokémon equal to the damage done to this Pokémon."
+ * `{ gxOrEx }` when the holder has that wording and is live, else null.
+ */
+export function abilityMirrorCounter(card, ctx = {}) {
+  if (!isPokemon(card)) return null;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is your active pok[eé]mon and is damaged by an attack from your opponent's (pok[eé]mon-gx or pok[eé]mon-ex|pok[eé]mon)(?: \(even if this pok[eé]mon is knocked out\))?, put damage counters on the attacking pok[eé]mon equal to the damage done to this pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return null;
+  return { gxOrEx: /gx/.test(match[1]) };
+}
+
+/**
+ * Gyarados Commotion (sm7.5-20): "If this Pokémon is your Active Pokémon and is damaged by an
+ * opponent's attack (even if this Pokémon is Knocked Out), put 2 damage counters on each of your
+ * Benched Pokémon." The count, or 0.
+ */
+export function abilityDamagedOwnBenchCounters(card, ctx = {}) {
+  if (!isPokemon(card)) return 0;
+  const match = cardAbilityText(card).match(
+    /if this pok[eé]mon is your active pok[eé]mon and is damaged by an opponent's attack(?: \(even if this pok[eé]mon is knocked out\))?, put (\d+) damage counters? on each of your benched pok[eé]mon/
+  );
+  if (!match || isAbilitySuppressed(card, ctx)) return 0;
+  return Number(match[1]);
+}
+
+/**
  * Gengar ex Gnawing Curse: damage counters put on a Pokémon when the opponent attaches an Energy
  * from their hand to it. 0 when the holder has no such wording or is suppressed. The caller
  * passes the holder's owner context and checks that the attacher is the other player.
@@ -1446,7 +1566,8 @@ export function abilityExtraTypes(card, ctx = {}) {
   const t = cardAbilityText(card);
   if (!t) return [];
   if (isAbilitySuppressed(card, ctx)) return [];
-  if (!/it is .*type|is both .* type/.test(t)) return [];
+  // Kecleon Unit Color (sm7-122): "… it is a {L}, {P}, and {M} Pokémon."
+  if (!/it is .*type|is both .* type|it is an? \{[a-z]\}[^.]* pok[eé]mon/.test(t)) return [];
   if (!inPlayConditionMet(t, card, ctx)) return [];
   const printed = attackerTypes(card);
   return typeSymbols(t)
@@ -1735,10 +1856,37 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   if (rulesEnabled && zone !== 'active' && requiresActiveSpot(card)) {
     return 'This ability can only be used from the Active Spot.';
   }
-  if (rulesEnabled && isHandActivatedAbility(card) !== (zone === 'hand')) {
+  // Darkrai-GX Restoration: used from the discard pile, with room on the Bench.
+  if (rulesEnabled && isDiscardActivatedAbility(card) !== (zone === 'discard')) {
+    return zone === 'discard'
+      ? "This Pokémon's Ability can't be used from the discard pile."
+      : 'This ability can only be used while this Pokémon is in your discard pile.';
+  }
+  if (rulesEnabled && zone === 'discard' && Array.isArray(ctx.sideBench) && sideTops(ctx.sideBench).length >= 5) {
+    return 'Your Bench is full.';
+  }
+  if (rulesEnabled && zone !== 'discard' && isHandActivatedAbility(card) !== (zone === 'hand')) {
     return zone === 'hand'
       ? 'This ability can only be used while the Pokémon is in play.'
       : 'This ability can only be used from your hand.';
+  }
+  // Minior Falling Star (sm7-83): "if this Pokémon is in your hand and your Bench isn't full".
+  const handText = zone === 'hand' ? lower(cardAbilityText(card)) : '';
+  if (
+    rulesEnabled &&
+    /your bench isn't full/.test(handText) &&
+    Array.isArray(ctx.sideBench) &&
+    sideTops(ctx.sideBench).length >= 5
+  ) {
+    return 'Your Bench is full.';
+  }
+  // Trumbeak Mountain Pass (sm8-165): "If your opponent has no cards in their deck, you can't use this Ability."
+  if (
+    rulesEnabled &&
+    /if your opponent has no cards in their deck, you can't use this ability/.test(lower(cardAbilityText(card))) &&
+    ctx.opponentDeckCount === 0
+  ) {
+    return 'Your opponent has no cards in their deck.';
   }
   if (rulesEnabled && zone !== 'bench' && requiresBenchSpot(card)) {
     return 'This ability can only be used from the Bench.';
@@ -1746,6 +1894,17 @@ export function abilityActivationBlockReason(card, ctx = {}) {
   // Turn 1 is the first player's first turn and turn 2 the second player's (reduce.mjs).
   if (rulesEnabled && requiresFirstTurn(card) && turnNumber > 2) {
     return 'This ability can only be used during your first turn.';
+  }
+  // Wishiwashi Cowardice (sm1-44), Ditto Prism Star Almighty Evolution (sm8-154): "You can't use
+  // this Ability during your first turn or [on] the turn this Pokémon was put into play."
+  const notFirstOrPlayed = /you can't use this ability during your first turn or (?:on )?the turn this pok[eé]mon was put into play/.test(
+    lower(cardAbilityText(card))
+  );
+  if (rulesEnabled && notFirstOrPlayed && turnNumber > 0) {
+    if (turnNumber <= 2) return "You can't use this Ability during your first turn.";
+    if (enteredPlayTurn != null && Number(enteredPlayTurn) === Number(turnNumber)) {
+      return "You can't use this Ability on the turn this Pokémon was put into play.";
+    }
   }
   // "If you have any {R} Mega Evolution Pokémon ex in play, you may use this Ability"
   // (Oricorio ex, I164). Callers without `sideCards` fail open.
@@ -2045,7 +2204,20 @@ export function abilityRetreatLock(active, ctx = {}) {
  * owner's side context, so the locking Ability is read from the opponent's side.
  */
 export function abilityHealLocked(active, ctx = {}) {
-  if (!active || !containsCard(ctx.sideActive, active)) return false;
+  if (!active) return false;
+  // Lunatone Heal Block (sm3-68): "If you have Solrock in play, Pokémon (both yours and your
+  // opponent's) can't be healed." Every Pokémon, from either side's holder.
+  const everyoneLocked = (holder, holderCtx) => {
+    const t = cardAbilityText(holder);
+    return (
+      /pok[eé]mon \(both yours and your opponent's\) can'?t be healed/.test(t) &&
+      !isAbilitySuppressed(holder, holderCtx) &&
+      inPlayConditionMet(t, holder, holderCtx)
+    );
+  };
+  if (dedupe(sideInPlay(ctx)).some((holder) => everyoneLocked(holder, ctx))) return true;
+  if (dedupe(opponentInPlay(ctx)).some((holder) => everyoneLocked(holder, opponentHolderCtx(ctx)))) return true;
+  if (!containsCard(ctx.sideActive, active)) return false;
   return dedupe(opponentInPlay(ctx)).some(
     (holder) =>
       /if this pok[eé]mon is in play, your opponent's active pok[eé]mon can'?t be healed/.test(cardAbilityText(holder)) &&
@@ -2063,6 +2235,19 @@ export function abilitySleepLock(ctx = {}) {
       /while this pok[eé]mon is in play, your active pok[eé]mon can'?t become asleep/.test(cardAbilityText(holder)) &&
       !isAbilitySuppressed(holder, ctx)
   );
+}
+
+/**
+ * How many Benched Pokémon the side in `ctx` may have: 5, or fewer while an opposing Ability
+ * caps it (Sudowoodo Roadblock, sm2-66: "Your opponent can't have more than 4 Benched Pokémon").
+ */
+export function abilityBenchLimit(ctx = {}) {
+  let limit = 5;
+  for (const holder of dedupe(opponentInPlay(ctx))) {
+    const m = cardAbilityText(holder).match(/your opponent can't have more than (\d+) benched pok[eé]mon/);
+    if (m && !isAbilitySuppressed(holder, opponentHolderCtx(ctx))) limit = Math.min(limit, Number(m[1]));
+  }
+  return limit;
 }
 
 /** abilityHealLocked for a Pokémon in `state`: the owner's side context is built from the state. */
@@ -2092,6 +2277,81 @@ function sideTops(cards) {
   return rootsOf(cards).filter(isPokemon).map((root) => topPokemonCard(cards, root));
 }
 
+/**
+ * Toxapex Toxic Spikes (sm1-63): "Whenever your opponent's Active Pokémon retreats, their new
+ * Active Pokémon is Poisoned." The conditions the live holders on `ctx.opponentSideCards` give the
+ * retreating player's new Active, with the holder's name as `source`.
+ */
+export function opponentRetreatConditions(ctx = {}) {
+  const out = [];
+  const holderCtx = { ...ctx, sideCards: ctx.opponentSideCards, opponentSideCards: ctx.sideCards };
+  for (const top of sideTops(ctx.opponentSideCards || [])) {
+    const match = cardAbilityText(top).match(
+      /whenever your opponent's active pok[eé]mon retreats, their new active pok[eé]mon is (asleep|burned|confused|paralyzed|poisoned)/
+    );
+    if (!match || isAbilitySuppressed(top, holderCtx)) continue;
+    out.push({ condition: match[1][0].toUpperCase() + match[1].slice(1), source: top.name });
+  }
+  return out;
+}
+
+const liveText = (card, ctx, re) => (isPokemon(card) && !isAbilitySuppressed(card, ctx) ? cardAbilityText(card).match(re) : null);
+
+/** Komala Comatose (sm2-114): an Energy attached from the hand to this Active Pokémon makes it Asleep. */
+export function abilityAttachMakesSelfAsleep(card, ctx = {}) {
+  return Boolean(
+    liveText(card, ctx, /as long as this pok[eé]mon is your active pok[eé]mon, whenever you attach an energy from your hand to it, it is now asleep/)
+  );
+}
+
+/**
+ * Primarina Harmonics (sm8-67): "Whenever you attach an Energy card from your hand to 1 of your
+ * Pokémon, except with an attack, Ability, or Trainer card, attach up to 2 Energy cards to that
+ * Pokémon instead of 1." The holder's name when any live holder is on `ctx.sideCards`, else null.
+ */
+export function abilityDoubleHandAttach(ctx = {}) {
+  const holder = sideTops(ctx.sideCards || []).find((top) =>
+    liveText(top, ctx, /whenever you attach an energy card from your hand to 1 of your pok[eé]mon, except with an attack, ability, or trainer card, attach up to 2 energy cards to that pok[eé]mon instead of 1/)
+  );
+  return holder ? holder.name : null;
+}
+
+/**
+ * Eevee Energy Evolution (sm1-101): "When you attach a basic Energy card from your hand to this
+ * Pokémon, you may search your deck for a card that evolves from this Pokémon that is the same type
+ * as that Energy card and put it onto this Pokémon."
+ */
+export function abilityEnergyEvolution(card, ctx = {}) {
+  return Boolean(
+    liveText(card, ctx, /when you attach a basic energy card from your hand to this pok[eé]mon, you may search your deck for a card that evolves from this pok[eé]mon that is the same type as that energy card and put it onto this pok[eé]mon/)
+  );
+}
+
+/**
+ * Tapu Lele Charmed Charm (sm8-150): "Whenever you attach a Pokémon Tool card that has "Fairy
+ * Charm" in its name from your hand to this Pokémon during your turn, you may leave your
+ * opponent's Active Pokémon Confused." The named Tool text and the condition, or null.
+ */
+export function abilityToolAttachCondition(card, ctx = {}) {
+  const match = liveText(
+    card,
+    ctx,
+    /whenever you attach a pok[eé]mon tool card that has ["“]([^"”]+)["”] in its name from your hand to this pok[eé]mon during your turn, you may leave your opponent's active pok[eé]mon (asleep|burned|confused|paralyzed|poisoned)/
+  );
+  return match ? { toolName: match[1], condition: match[2][0].toUpperCase() + match[2].slice(1) } : null;
+}
+
+/**
+ * Tyranitar-GX Lost Out (sm8-121): "If your opponent's Pokémon is Knocked Out by damage from this
+ * Pokémon's attacks, put that Pokémon and all cards attached to it in the Lost Zone instead of the
+ * discard pile."
+ */
+export function abilityLostZoneKnockouts(card, ctx = {}) {
+  return Boolean(
+    liveText(card, ctx, /if your opponent's pok[eé]mon is knocked out by damage from this pok[eé]mon's attacks, put that pok[eé]mon and all cards attached to it in the lost zone instead of the discard pile/)
+  );
+}
+
 /** Magnezone Dual Brains: "During your turn, you may play 2 Supporter cards." → 2, else 1. */
 export function abilitySupporterLimit(ctx = {}) {
   const dualBrains = sideTops(ctx.sideCards).some(
@@ -2116,9 +2376,10 @@ export function abilityTurnNotEnd(trainer, ctx = {}) {
     .some((root) => {
       const top = topPokemonCard(ctx.sideCards, root);
       const text = cardAbilityText(top).replace(/[\u2018\u2019]/g, "'");
-      const named = text.match(/your turn does not end when you use ([^.]+?)\./)?.[1];
+      // Metagross Extend (sm7-95) reads "when you play Steven's Resolve".
+      const named = text.match(/your turn does not end when you (?:use|play) ([^.]+?)\./)?.[1];
       if (!named || named.trim() !== name) return false;
-      if (/as long as this pok[eé]mon is in the active spot/.test(text) && !activeIds.has(root.instanceId)) {
+      if (/as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/.test(text) && !activeIds.has(root.instanceId)) {
         return false;
       }
       return !isAbilitySuppressed(top, ctx);
@@ -2345,6 +2606,33 @@ export function abilityAttackHandMinimum(card, ctx = {}) {
 }
 
 /**
+ * Why `attacker` can't attack because of an Ability, or null. Vileplume Disgusting Pollen
+ * (sm3-6), on the other side: "As long as this Pokémon is your Active Pokémon, your opponent's
+ * Basic Pokémon can't attack." Regigigas Seal of Antiquity (sm4-84), on itself: "This Pokémon
+ * can't attack unless Regirock, Regice, and Registeel are on your Bench." `ctx` is the attacking
+ * side's context.
+ */
+export function abilityAttackLockReason(attacker, ctx = {}) {
+  if (!attacker) return null;
+  const own = cardAbilityText(attacker);
+  const unless = own.match(/this pok[eé]mon can't attack unless (.+?) (?:is|are) on your bench/);
+  if (unless && !isAbilitySuppressed(attacker, ctx)) {
+    const names = unless[1].split(/,\s*(?:and\s+)?|\s+and\s+/).map((n) => n.trim()).filter(Boolean);
+    const benched = sideTops(ctx.sideBench || []).map((c) => lower(c.name));
+    const missing = names.filter((n) => !benched.some((b) => b.includes(n)));
+    if (missing.length) return `This Pokémon can't attack unless ${names.join(', ')} are on your Bench.`;
+  }
+  for (const holder of dedupe(opponentInPlay(ctx))) {
+    const t = cardAbilityText(holder);
+    const basics = /your opponent's basic pok[eé]mon can't attack/.test(t);
+    if (!basics || isAbilitySuppressed(holder, opponentHolderCtx(ctx))) continue;
+    if (!holderPositionMet(t, holder, ctx)) continue;
+    if (isBasicPokemon(attacker)) return `${holder.name}'s Ability stops Basic Pokémon attacking.`;
+  }
+  return null;
+}
+
+/**
  * Lugia ex Pressure (customhb): "As long as this Pokémon is in the Active Spot, your opponent's
  * attacks cost {C} more." `ctx` is the attacking side's context; holders sit on the other side.
  */
@@ -2352,7 +2640,8 @@ export function abilityOpponentAttackCostIncrease(ctx = {}) {
   let total = 0;
   for (const holder of dedupe(opponentInPlay(ctx))) {
     const t = cardAbilityText(holder);
-    const m = t.match(/your opponent's attacks cost ((?:\{c\})+) more/);
+    // Goomy Sticky Membrane (sm6-91): "your opponent's Pokémon's attacks cost {C} more".
+    const m = t.match(/your opponent's (?:pok[eé]mon's )?attacks cost ((?:\{c\})+) more/);
     if (!m || isAbilitySuppressed(holder, opponentHolderCtx(ctx))) continue;
     if (!holderPositionMet(t, holder, ctx)) continue;
     total += (m[1].match(/\{c\}/g) || []).length;

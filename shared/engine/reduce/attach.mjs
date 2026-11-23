@@ -22,13 +22,17 @@ import { applyAutomaticEvolveAbility } from '../effects/ability.mjs';
 import {
   isStadiumEnergyAttachHeal, isStadiumStatusPersistsOnEvolve,
 } from '../rules/stadium-effects.mjs';
-import { abilityEnergyAttachCounters, healBlockedByAbility } from '../rules/ability-combat.mjs';
+import {
+  abilityEnergyAttachCounters, healBlockedByAbility, abilityAttachMakesSelfAsleep, abilityDoubleHandAttach,
+  abilityEnergyEvolution, abilityToolAttachCondition,
+} from '../rules/ability-combat.mjs';
+import { pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { requiresTurnEndOnEvolve } from '../rules/evolution.mjs';
 import { shuffleInPlace } from '../rng.mjs';
-import { removeCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
-import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext } from './shared.mjs';
+import { addCondition, removeCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
+import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext, conditionsUpdatedEvent } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
 import { resolveCheckup, advanceTurn } from './turn.mjs';
 import { chaosGymBlocks } from './trainer.mjs';
@@ -166,17 +170,26 @@ function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, eve
     }
   }
 
-  // Ancient Trait α Growth (Primal Kyogre-EX, PRC 149): after the normal hand attach the
-  // player may attach up to 2 more Energy cards from hand to this Pokémon. Only the manual
-  // attach command reaches this hook — Trainer/Ability/attack attaches never do — which is
-  // exactly the printed "(except with an attack, Ability, or Trainer card)" clause.
-  const growth = parseAlphaGrowthAttach(hostTop || host);
-  if (!growth) return;
+  const side = abilitySideContext(draft, playerId);
+  const top = hostTop || host;
   const player = draft.players[playerId];
+  if ((player?.zones?.active || []).includes(host) && abilityAttachMakesSelfAsleep(top, side)) {
+    if (addCondition(host, 'Asleep')) events.push(conditionsUpdatedEvent(host, 'Asleep'));
+  }
+  if (isBasicEnergy(energy) && abilityEnergyEvolution(top, side) && offerEnergyEvolution(draft, { host, top, energy, playerId })) return;
+
+  // Ancient Trait α Growth (Primal Kyogre-EX, PRC 149): after the normal hand attach the
+  // player may attach up to 2 more Energy cards from hand to this Pokémon. Primarina Harmonics
+  // (sm8-67) allows 1 more to any of the player's Pokémon. Only the manual attach command
+  // reaches this hook — Trainer/Ability/attack attaches never do — which is exactly the printed
+  // "(except with an attack, Ability, or Trainer card)" clause.
+  const growth = parseAlphaGrowthAttach(top);
+  const harmonics = growth ? null : abilityDoubleHandAttach(side);
+  if (!growth && !harmonics) return;
   const handEnergy = (player?.zones?.hand || []).filter((c) => isEnergy(c));
   if (handEnergy.length === 0) return;
-  const count = Math.min(growth.count, handEnergy.length);
-  const name = hostTop?.name || host?.name || 'α Growth';
+  const count = Math.min(growth ? growth.count : 1, handEnergy.length);
+  const name = harmonics || hostTop?.name || host?.name || 'α Growth';
   draft.pendingChoice = createPendingChoice({
     player: playerId,
     prompt: `${name}: attach up to ${count} Energy card${count > 1 ? 's' : ''} from your hand?`,
@@ -192,6 +205,60 @@ function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, eve
       hostInstanceId: host.instanceId,
     },
   });
+}
+
+export const ENERGY_EVOLUTION_EFFECT = 'energyEvolution';
+
+/** The deck cards that evolve from `top` and share `energy`'s type (Eevee Energy Evolution). */
+function energyEvolutionOptions(player, top, energy) {
+  const type = String(energy?.energyType || '').toLowerCase();
+  if (!type) return [];
+  return (player?.zones?.deck || []).filter(
+    (c) =>
+      isPokemon(c) &&
+      c.evolvesFrom &&
+      pokemonNamesMatch(c.evolvesFrom, top?.name || '') &&
+      (c.types || []).some((t) => String(t).toLowerCase() === type)
+  );
+}
+
+function offerEnergyEvolution(draft, { host, top, energy, playerId }) {
+  const options = energyEvolutionOptions(draft.players[playerId], top, energy);
+  if (options.length === 0) return false;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    prompt: `${top.name}: search your deck for a card that evolves from it to put onto it?`,
+    source: top.name,
+    options,
+    min: 0,
+    max: 1,
+    cancellable: true,
+    stateVersion: draft.stateVersion,
+    resumeToken: { effectType: ENERGY_EVOLUTION_EFFECT, initiatorPlayerId: playerId, hostInstanceId: host.instanceId },
+  });
+  return true;
+}
+
+/** Resumes Energy Evolution: the picked card evolves the host (it counts as evolving), then the deck is shuffled. */
+export function resumeEnergyEvolution(draft, { selection, resumeToken, activeRng: rng, events }) {
+  draft.pendingChoice = null;
+  const token = resumeToken || {};
+  const player = draft.players[token.initiatorPlayerId];
+  const host = token.hostInstanceId != null ? findCard(draft, token.hostInstanceId)?.card : null;
+  if (!player || !host) return;
+  const deck = player.zones.deck || [];
+  const picked = deck.find((c) => (selection || []).includes(c.instanceId) && isPokemon(c));
+  if (picked) {
+    attachToRoot(player, picked, host, events);
+    const turn = draft.turn?.number;
+    picked.enteredPlayTurn = turn;
+    host.lastEvolvedTurn = turn;
+    if (!isStadiumStatusPersistsOnEvolve(draft.stadium?.card || draft.stadium)) clearConditions(host);
+    player.flags = { ...(player.flags || {}), evolved: { ...(player.flags?.evolved || {}), [host.instanceId]: true } };
+    events.push({ type: 'pokemonEvolved', playerId: token.initiatorPlayerId, instanceId: picked.instanceId, targetInstanceId: host.instanceId });
+  }
+  if (rng) shuffleInPlace(rng, deck);
+  events.push({ type: 'deckShuffled', playerId: token.initiatorPlayerId });
 }
 
 /** Resumes the α Growth offer: attach the chosen hand Energy cards to the host. */
@@ -484,6 +551,18 @@ export function attachCardCommand({ draft, payload, playerId, activeRng, events 
             events,
           });
         }
+      }
+    }
+
+    // Tapu Lele Charmed Charm (sm8-150): a matching Tool from the hand Confuses the opponent's
+    // Active. The "you may" is always to the player's benefit, so it applies without a prompt.
+    if (cardRef.zoneId === 'hand' && isPokemonToolCard(cardRef.card) && hostRef.playerId === playerId && draft.turn?.player === playerId) {
+      const charm = abilityToolAttachCondition(inPlayView(draft, hostRef.card), abilitySideContext(draft, playerId));
+      const opponentActive = charm && String(cardRef.card.name || '').toLowerCase().includes(charm.toolName)
+        ? (Object.values(draft.players).find((p) => p.playerId !== playerId)?.zones?.active || []).find((c) => !c.attachedTo)
+        : null;
+      if (opponentActive && addCondition(opponentActive, charm.condition)) {
+        events.push(conditionsUpdatedEvent(opponentActive, charm.condition));
       }
     }
 

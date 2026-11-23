@@ -12,7 +12,7 @@ import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { pokemonHasType } from '../effects/trainer-steps.mjs';
 import { liveAttackMarkers } from '../rules/attack-markers.mjs';
 import { effectiveHp, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
-import { attachedToolMarkers } from '../rules/tool-combat.mjs';
+import { attachedToolMarkers, toolTypeOverride } from '../rules/tool-combat.mjs';
 import { isGxCard, isVstarCard } from '../rules/card-classify.mjs';
 import { evolvedView } from '../rules/evolved-pokemon.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
@@ -96,6 +96,9 @@ function withTypeChange(state, view, card, zone, ownerId) {
     (m) => m.kind === 'typeOverride'
   );
   if (marker?.type) return { ...view, types: [marker.type] };
+  const stadium = state.stadium?.card || state.stadium || null;
+  const toolType = toolTypeOverride({ ...view, instanceId: card.instanceId }, zone, { blockTools: isStadiumToolNegation(stadium), stadium });
+  if (toolType) return { ...view, types: [toolType[0].toUpperCase() + toolType.slice(1)] };
   const abilities = Array.isArray(view.abilities) ? view.abilities : [];
   if (!abilities.some((a) => MULTITYPE_RE.test(String(a?.text ?? a?.effect ?? '')))) return view;
   const latest = zone.filter((c) => c.attachedTo === card.instanceId && isEnergy(c)).at(-1);
@@ -123,6 +126,11 @@ export function energyProvisionContext(state, playerId, host) {
       // Zygarde Aura Break (customhb): "{Y} Energy attached to your Pokémon also count as {D}
       // Energy, and {D} Energy … also count as {Y} Energy" — [from, to] pairs from live holders.
       energyAlsoCounts: energyAlsoCountsPairs(state, playerId, roots),
+      // Typhlosion Blazing Energy (effects/attack-steps.mjs abilityEnergyTypeThisTurn).
+      allEnergyType:
+        player?.flags?.allEnergyType && player.flags.allEnergyTypeTurn === (state.turn?.number ?? null)
+          ? player.flags.allEnergyType
+          : null,
       ownPrizes: (player?.zones?.prizes || []).length,
       opponentPrizes: (state.players?.[opponentId]?.zones?.prizes || []).length,
       ownStage2InPlay: roots.filter(

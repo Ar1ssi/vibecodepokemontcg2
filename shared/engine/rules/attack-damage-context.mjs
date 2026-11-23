@@ -25,6 +25,7 @@ import {
   isVstarCard,
   isTagTeamCard,
   isUltraBeastCard,
+  isPrismStarCard,
 } from './card-classify.mjs';
 import { priorEvolutionCards } from './evolved-pokemon.mjs';
 import { liveAttackMarkers } from './attack-markers.mjs';
@@ -220,9 +221,22 @@ const pokemonEntry = (bench) => ({ card, view }) => ({
   name: view?.name || card?.name || '',
   bench,
   kinds: ruleBoxKinds(view),
+  types: [...(view?.types || card?.types || [])],
+  hasAbility: abilityKinds(view).length > 0,
   counters: Math.floor((card?.damage || 0) / 10),
   delta: /δ|delta species/i.test(`${view?.name || ''} ${view?.subtypes || ''} ${card?.subtypes || ''}`),
 });
+
+/**
+ * The attack `player` used during their previous turn. reduce/attack.mjs records the current
+ * attack before its damage is read, keeping the one it replaced as `lastAttack.previous`.
+ */
+function lastTurnAttackOf(player, turnNumber) {
+  const last = player?.lastAttack;
+  if (!last) return null;
+  if (last.turnNumber === turnNumber - 2) return last;
+  return last.previous?.turnNumber === turnNumber - 2 ? last.previous : null;
+}
 
 const attackerZone = (player, pokemon) =>
   ['active', 'bench'].map((zoneId) => zoneOf(player, zoneId)).find((cards) => cards.includes(pokemon)) || [];
@@ -412,13 +426,32 @@ export function buildServerAttackContext(
       .filter(Boolean)
       .map((card) => serverEnergyDescriptor(card).type),
     attackerLastTurnAttackName:
-      attacker && own?.lastAttack?.attackerInstanceId === attacker.instanceId && own.lastAttack.turnNumber === turnNumber - 2
-        ? own.lastAttack.attack?.name || ''
+      attacker && lastTurnAttackOf(own, turnNumber)?.attackerInstanceId === attacker.instanceId
+        ? lastTurnAttackOf(own, turnNumber).attack?.name || ''
         : '',
     supporterPlayedThisTurn: Boolean(own?.flags?.supporterPlayed),
     supporterNamesThisTurn: own?.flags?.supporterNamesThisTurn || (own?.flags?.lastSupporterName ? [own.flags.lastSupporterName] : []),
     koLastOpponentTurnVictims: own?.flags?.koedLastOppTurnVictims || [],
     ownHandPokemonCount: zoneOf(own, 'hand').filter(isPokemon).length,
+    ownDeckCount: zoneOf(own, 'deck').length,
+    ownGxUsed: Boolean(own?.oncePerGame?.gxUsed),
+    // Araquanid Bubble Trap / Volbeat Pheromone Catch: the attack this player used last turn.
+    ownLastTurnAttack: lastTurnAttackOf(own, turnNumber)
+      ? {
+          name: lastTurnAttackOf(own, turnNumber).attack?.name || '',
+          attackerName: lastTurnAttackOf(own, turnNumber).attackerName || '',
+        }
+      : null,
+    ownLostZoneEnergyTypes: zoneOf(own, 'lostZone')
+      .filter((card) => isEnergy(card) && !isTrainer(card))
+      .map((card) => serverEnergyDescriptor(card).type),
+    // Jumpluff Lost March: "each of your Pokémon, except {*} (Prism Star) Pokémon, in the Lost Zone".
+    ownLostZonePokemon: zoneOf(own, 'lostZone')
+      .filter(isPokemon)
+      .map((card) => ({ name: card.name || '', prismStar: isPrismStarCard(card) })),
+    // Alolan Meowth Spoil the Fun: turn 2 is the second player's first turn.
+    goingSecondFirstTurn: turnNumber === 2,
+    pleaRefused: state?.attackPleaRefused === true,
     benchDamaged: ownBench.map(({ card }) => (card.damage || 0) > 0),
     ownDiscardNames: zoneOf(own, 'discard').map((card) => card.name || ''),
     ownInPlayAbilityKinds: ownInPlay.map(({ view }) => abilityKinds(view)),
@@ -512,6 +545,13 @@ export function buildServerAttackContext(
   }
   // "…times the amount of Energy attached to all of your opponent's Pokémon" scaling.
   if (opponent) {
+    // Wigglytuff Punishing Slap: "If any of your opponent's Pokémon have any {D} Energy attached".
+    ctx.opponentInPlayEnergyUnits = inPlayPokemon(opponent).flatMap(({ card }) =>
+      energyOn(opponent, card, { stadiumCard, opponent: own })
+    );
+    ctx.opponentInPlayNames = inPlayPokemon(opponent).map(({ card, view }) => view?.name || card?.name || '');
+    ctx.opponentGxUsed = Boolean(opponent.oncePerGame?.gxUsed);
+    ctx.opponentHandPokemonCount = zoneOf(opponent, 'hand').filter(isPokemon).length;
     ctx.opponentAllEnergyCount = inPlayPokemon(opponent).reduce(
       (sum, { card }) => sum + energyOn(opponent, card, { stadiumCard, opponent: own }).length,
       0

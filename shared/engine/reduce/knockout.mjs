@@ -14,11 +14,11 @@ import {
   toolPrizeCountAdjust, attachedToolOnKoEffects, attachedTools, isExCard, isTeraCard,
 } from '../rules/tool-combat.mjs';
 import { parsePrizeModify, cardAbilityText } from '../rules/ability-executors.mjs';
-import { isAbilitySuppressed, sideContextFor } from '../rules/ability-combat.mjs';
+import { isAbilitySuppressed, sideContextFor, abilityBenchLimit } from '../rules/ability-combat.mjs';
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
-  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker,
+  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker, abilityKoCountersOnOpponent,
 } from '../rules/ability-combat.mjs';
 import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
@@ -452,6 +452,8 @@ export function handleKnockout(
     .filter((marker) => prizeFilterMatches(marker.filter, prizeRuleBoxes(victimView)))
     .reduce((sum, marker) => sum + (marker.count || 0), 0);
   prizeCount += markerBonus;
+  // Poipole Knockout Reviver: "your opponent can't take any Prize cards for it".
+  if (activeAttackMarkers(draft, victimPlayerId, victim).some((marker) => marker.kind === 'noPrizesOnKo')) prizeCount = 0;
 
   if (attacker) {
     if (!attacker.flags) attacker.flags = {};
@@ -1442,6 +1444,16 @@ function applyKnockoutHolderAbilities(draft, { victim, victimPlayerId, wasActive
     ];
   }
 
+  // Final Hour: all the counters go on the one Pokémon the holder's owner picks.
+  const koCounters = wasActive && koByOpponentAttack ? abilityKoCountersOnOpponent(holder, ctx) : 0;
+  if (koCounters > 0) {
+    const opponentId = Object.keys(draft.players).find((id) => id !== victimPlayerId);
+    draft.__koToolCounters = [
+      ...(draft.__koToolCounters || []),
+      { playerId: victimPlayerId, targetPlayerId: opponentId, remaining: koCounters, perPick: koCounters, source: holder.name },
+    ];
+  }
+
   // The printed wording says "if this Pokémon is your Active Pokémon", so the Active check is here.
   if (wasActive && koByOpponentAttack && attackerActive && abilityKoConfusesAttacker(holder, ctx)) {
     for (const condition of ['Confused', 'Poisoned']) {
@@ -1492,6 +1504,52 @@ export function settleKoHandDiscards(draft, { events }) {
   else delete draft.__koHandDiscards;
 }
 
+export const BENCH_LIMIT_EFFECT = 'benchLimitTrim';
+
+/**
+ * Sudowoodo Roadblock: "If they have 5 or more Benched Pokémon, they discard Benched Pokémon until
+ * they have 4." The over-limit player picks which go, after any other pending choice.
+ */
+export function settleBenchLimits(draft) {
+  if (draft.pendingChoice) return;
+  for (const [playerId, player] of Object.entries(draft.players || {})) {
+    const bench = (player?.zones?.bench || []).filter((c) => !c.attachedTo);
+    const excess = bench.length - abilityBenchLimit(sideContextFor(draft, playerId));
+    if (excess <= 0) continue;
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: 'Roadblock',
+      prompt: `Your Bench holds too many Pokémon: discard ${excess} Benched Pokémon`,
+      options: bench,
+      min: excess,
+      max: excess,
+      stateVersion: draft.stateVersion || 0,
+      resumeToken: { effectType: BENCH_LIMIT_EFFECT, initiatorPlayerId: playerId, count: excess },
+    });
+    return;
+  }
+}
+
+/** Discards the chosen Benched Pokémon and everything attached to them. */
+export function resolveBenchLimitTrim(draft, { playerId, selection, count, events }) {
+  const player = draft.players?.[playerId];
+  if (!player) return;
+  const bench = player.zones.bench || [];
+  for (const id of [...new Set(selection || [])].slice(0, count)) {
+    const root = bench.find((c) => c.instanceId === id && !c.attachedTo);
+    if (!root) continue;
+    const stack = [root, ...bench.filter((c) => c.attachedTo === id)];
+    for (const card of stack) {
+      bench.splice(bench.indexOf(card), 1);
+      card.attachedTo = null;
+      discardCardToPlayerZone(player, card);
+    }
+    root.damage = 0;
+    clearConditions(root);
+    events.push({ type: 'cardsDiscarded', playerId, reason: 'bench-limit', cards: stack.map((c) => ({ instanceId: c.instanceId, name: c.name })) });
+  }
+}
+
 export const KO_TOOL_COUNTERS_EFFECT = 'koToolCounters';
 
 /**
@@ -1517,7 +1575,9 @@ export function settleKoToolCounters(draft) {
     draft.pendingChoice = createPendingChoice({
       player: entry.playerId,
       source: entry.source,
-      prompt: `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
+      prompt: entry.perPick
+        ? `${entry.source}: put ${entry.perPick} damage counters on 1 of your opponent's Pokémon`
+        : `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
       options,
       min: 1,
       max: 1,
@@ -1541,7 +1601,8 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
   if (!entry) return;
   const ref = findCard(draft, (selection || [])[0]);
   if (ref && ref.playerId === targetPlayerId && (ref.zoneId === 'active' || ref.zoneId === 'bench') && !ref.card.attachedTo) {
-    ref.card.damage = (ref.card.damage || 0) + 10;
+    const placed = Math.min(entry.perPick || 1, entry.remaining);
+    ref.card.damage = (ref.card.damage || 0) + placed * 10;
     events.push({
       type: 'damageCountersPlaced',
       instanceId: ref.card.instanceId,
@@ -1550,7 +1611,7 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
       damage: ref.card.damage,
       source: entry.source,
     });
-    entry.remaining -= 1;
+    entry.remaining -= placed;
   }
   if (!(entry.remaining > 0)) queue.shift();
   if (queue.length > 0) draft.__koToolCounters = queue;
