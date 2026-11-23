@@ -214,7 +214,7 @@ describe('069 hover placement', () => {
       ],
       viewport: VIEWPORT_1080,
     });
-    assert.deepEqual(gutter, { left: 0, top: 0, width: 201, height: 1080 });
+    assert.deepEqual(gutter, { left: 0, top: 0, width: 201, height: 1080, artRight: 1248 });
   });
 
   it('gutterBox with no measurable probe (iframe not loaded) has width 0', () => {
@@ -225,19 +225,29 @@ describe('069 hover placement', () => {
     assert.equal(gutterBox({ boardRect: null, probeRects: [], viewport: VIEWPORT_1080 }).width, 0);
   });
 
-  it('row 9: 201 px band at 1920×1080 → 177×247 centred in the band', () => {
+  it('row 9: 201 px band, 672 px free right of the art at 1920×1080 → 480×671 hugging the art', () => {
     const placement = previewPlacement({
-      gutter: { left: 0, top: 0, width: 201, height: 1080 },
+      gutter: { left: 0, top: 0, width: 201, height: 1080, artRight: 1248 },
       boardRect: BOARD_1080,
       sourceRect: { left: 600, top: 700, width: 100, height: 140 },
+      viewport: VIEWPORT_1080,
+    });
+    assert.deepEqual(placement, { left: 1260, top: 205, width: 480, height: 671, mode: 'band-right' });
+  });
+
+  it('row 9: with no room right of the art the left band holds a card against the art edge', () => {
+    const placement = previewPlacement({
+      gutter: { left: 0, top: 0, width: 201, height: 1080, artRight: 1900 },
+      boardRect: BOARD_1080,
+      sourceRect: null,
       viewport: VIEWPORT_1080,
     });
     assert.deepEqual(placement, { left: 12, top: 416, width: 177, height: 247, mode: 'band' });
   });
 
-  it('row 10: sidebox hidden (436 px band) → 412×576', () => {
+  it('row 10: sidebox hidden (436 px band each side) → 412×576 in the left band', () => {
     const placement = previewPlacement({
-      gutter: { left: 0, top: 0, width: 436, height: 1080 },
+      gutter: { left: 0, top: 0, width: 436, height: 1080, artRight: 1484 },
       boardRect: { left: 0, top: 0, width: 1920, height: 1080 },
       sourceRect: null,
       viewport: VIEWPORT_1080,
@@ -282,25 +292,35 @@ describe('069 hover placement', () => {
     assert.equal(placement.left, 1450 - 12 - 160);
   });
 
-  it('row 12: band mode over a hand card in the band mirrors to the right band', () => {
+  it('row 12: a card in the left band never gets a preview over it; the other side takes it', () => {
     const placement = previewPlacement({
-      gutter: { left: 0, top: 0, width: 201, height: 1080 },
-      boardRect: BOARD_1080,
+      gutter: { left: 0, top: 0, width: 436, height: 1080, artRight: 1484 },
+      boardRect: { left: 0, top: 0, width: 1920, height: 1080 },
       sourceRect: { left: 40, top: 450, width: 100, height: 140 },
       viewport: VIEWPORT_1080,
     });
-    assert.deepEqual(placement, { left: 1450 - 201 + 12, top: 416, width: 177, height: 247, mode: 'band-right' });
+    assert.deepEqual(placement, { left: 1496, top: 252, width: 412, height: 576, mode: 'band-right' });
+  });
+
+  it('row 12: a card in the right-hand space sends the preview left, even though that side is smaller', () => {
+    const placement = previewPlacement({
+      gutter: { left: 0, top: 0, width: 201, height: 1080, artRight: 1248 },
+      boardRect: BOARD_1080,
+      sourceRect: { left: 1300, top: 450, width: 100, height: 140 },
+      viewport: VIEWPORT_1080,
+    });
+    assert.equal(placement.mode, 'band');
   });
 
   it('row 13: a 600 px tall viewport caps the height at 90%', () => {
     const placement = previewPlacement({
-      gutter: { left: 0, top: 0, width: 436, height: 600 },
+      gutter: { left: 0, top: 0, width: 436, height: 600, artRight: 1484 },
       boardRect: { left: 0, top: 0, width: 1450, height: 600 },
       sourceRect: null,
       viewport: { width: 1920, height: 600 },
     });
     assert.deepEqual(placement, {
-      left: Math.round((436 - 540 / CARD_ASPECT) / 2),
+      left: Math.round(436 - 12 - 540 / CARD_ASPECT),
       top: 30,
       width: Math.round(540 / CARD_ASPECT),
       height: 540,
