@@ -94,7 +94,7 @@ describe('069 hover preview DOM — dwell and placement', () => {
     assert.equal(shownSrc(main), 'https://img.test/Pikachu/low.webp', 'board art first; high-res swaps in on load');
   });
 
-  it('places the preview in the band left of the probe', () => {
+  it('places the preview beside the probe, never over the mat art', () => {
     const { main, frame, advance } = setup();
     const doc = frame.window.document;
     const img = addCard(doc, doc.getElementById('bench'), card('Pikachu'));
@@ -115,8 +115,11 @@ describe('069 hover preview DOM — dwell and placement', () => {
     assert.equal(host.style.top, `${expected.top}px`);
     assert.equal(host.style.width, `${expected.width}px`);
     assert.equal(host.style.height, `${expected.height}px`);
-    assert.equal(host.dataset.mode, 'band');
-    assert.ok(expected.left + expected.width <= 201, 'the preview stays left of the mat art');
+    assert.equal(host.dataset.mode, expected.mode);
+    assert.ok(
+      expected.left + expected.width <= 201 || expected.left >= 1248,
+      'the preview stays off the mat art',
+    );
   });
 
   it('the host never takes pointer input and is hidden from assistive tech', () => {
