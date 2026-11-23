@@ -604,6 +604,26 @@ function withIfYouDoHalves(lower, parsed) {
     ];
   }
 
+  // Iono's Kilowattrel Flashing Draw: "You must discard a Basic {L} Energy from this Pokémon in
+  // order to use this Ability." The attached-Energy discard is the cost of the draw that follows.
+  const mustDiscardOwn = lower.match(
+    new RegExp(`you must discard an? (basic )?((?:\\{[a-z]\\}|[a-z]+) )?energy(?: card)? from ${SELF} in order to use this ability`)
+  );
+  if (mustDiscardOwn) {
+    const energyType = mustDiscardOwn[2] ? parseEnergyTypeHint(mustDiscardOwn[2]) : null;
+    steps = [
+      {
+        type: 'discardOwnAttachedEnergy',
+        selfOnly: true,
+        cost: true,
+        ...(mustDiscardOwn[1] ? { basicOnly: true } : {}),
+        ...(energyType ? { energyTypes: [energyType] } : {}),
+        guidance: 'Discard an Energy from this Pokémon (cost).',
+      },
+      ...steps,
+    ];
+  }
+
   // Ampharos Unseen Flash: "put 2 {L} Energy cards from your hand in the Lost Zone. If you do".
   const lostCost = lower.match(/you may put (\d+) \{([a-z])\} energy cards? from your hand in the lost zone\. if you do/);
   if (lostCost) {

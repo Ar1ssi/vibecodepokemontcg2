@@ -1469,6 +1469,15 @@ function returnOwnAttachedEnergy(ctx) {
 // Celadon City Gym: discard an Energy attached to a qualifying Pokémon to cure it.
 // `selfOnly`: an Ability's cost from its own Pokémon (Goodra Gooey Regeneration; `special`:
 // Porygon-Z-GX Troubleshooting).
+// Basic Energy carries its type in the printed name; some printings also set `types` (the same
+// reading as executor.mjs matchesEnergyTypeFilter, which this module cannot import).
+function energyMatchesTypes(card, energyTypes) {
+  if (!Array.isArray(energyTypes) || energyTypes.length === 0) return true;
+  const name = String(card?.name || '').toLowerCase();
+  const types = (Array.isArray(card?.types) ? card.types : []).map((t) => String(t).toLowerCase());
+  return energyTypes.some((type) => types.includes(type) || name.includes(type));
+}
+
 function discardOwnAttachedEnergy(ctx) {
   const { player, step } = ctx;
   const nameFilter = String(step.nameContains || '').toLowerCase();
@@ -1483,7 +1492,13 @@ function discardOwnAttachedEnergy(ctx) {
   );
   const attached = hosts
     .flatMap((root) => attachedCards(player, root.instanceId))
-    .filter((card) => isEnergy(card) && (!step.special || isSpecialEnergy(card)));
+    .filter(
+      (card) =>
+        isEnergy(card) &&
+        (!step.special || isSpecialEnergy(card)) &&
+        (!step.basicOnly || isBasicEnergy(card)) &&
+        energyMatchesTypes(card, step.energyTypes)
+    );
 
   const applyDiscard = (energy) => {
     const host = hosts.find((root) => root.instanceId === energy.attachedTo);
