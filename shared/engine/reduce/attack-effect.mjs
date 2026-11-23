@@ -1205,8 +1205,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
           // Thorns via the trigger reader: a suppressed holder contributes
           // nothing, and an Active-Spot-only wording is inert off the Active
-          // (the defender here is the opponent's Active, so isActive: true).
-          const defenderView = inPlayView(draft, defender);
+          // (the defender here is the opponent's Active, so isActive: true). Every on-damage Ability
+          // here reads the `defenderView` taken before the damage: a Knock Out has already moved the
+          // evolved card to the discard pile, and a fresh read would see only the Basic left behind.
           const thorns = parseOnDamageAbilities(defenderView, {
             ...abilitySideContext(draft, defenderPlayerId),
             isActive: true,
