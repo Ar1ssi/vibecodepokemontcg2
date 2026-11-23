@@ -17,6 +17,7 @@ import {
   defaultStatusKey,
 } from '../general/e2e-options.mjs';
 import { computeActionAffordances } from './action-affordances.mjs';
+import { attachedCardsFor } from './attack-preview-sources.mjs';
 import { glowColorFor } from './card-glow-colors.mjs';
 import { stadiumActivationStatus } from '../../../../shared/engine/rules/stadium-effects.mjs';
 import { rulesState } from '../../../../shared/engine/rules/rules-state.mjs';
@@ -83,6 +84,7 @@ export async function computeCardGlows({
     ? await computeActionAffordances({
         activeCard,
         attachedEnergyCards,
+        attachedCards: attachedCardsFor(activeCard, activeZoneCards),
         benchCards,
         handCards,
         stadiumCard,

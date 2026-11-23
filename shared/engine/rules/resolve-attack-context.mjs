@@ -6,6 +6,12 @@ import {
 import { stadiumCostDiscountFor } from './stadium-effects.mjs';
 import { parseAttackInheritance } from './ability-executors.mjs';
 
+function mergeAttached(energyCards, stamped) {
+  const all = [...(energyCards || [])];
+  for (const c of Array.isArray(stamped) ? stamped : []) if (!all.includes(c)) all.push(c);
+  return all;
+}
+
 /**
  * Gathers attack context for the active Pokémon: energy types, stadium cost
  * modifier, ability-used flag, and prior-attack inheritance. DOM-free — the
@@ -16,6 +22,8 @@ import { parseAttackInheritance } from './ability-executors.mjs';
 export async function resolveAttackContext({
   activeCard,
   attachedEnergyCards,
+  // Every card attached to the Pokémon (Tools included): Mega Signal re-types Energy from a Tool.
+  attachedCards = null,
   ensureCardData,
   stadiumCard,
   abilityUsed,
@@ -23,6 +31,7 @@ export async function resolveAttackContext({
   board = {},
 }) {
   const energyTypes = [];
+  const hostAttached = attachedCards ?? mergeAttached(attachedEnergyCards, activeCard?.attachedCards);
   for (const energyCard of attachedEnergyCards || []) {
     try {
       await ensureCardData(energyCard);
@@ -41,7 +50,7 @@ export async function resolveAttackContext({
           card: energyCard,
           stadiumCard,
           hostPokemon: activeCard,
-          attachedCards: attachedEnergyCards || [],
+          attachedCards: hostAttached,
           board,
         }
       )

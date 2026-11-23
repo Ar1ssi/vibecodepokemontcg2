@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { canPayAttackCost } from '../../../../../shared/engine/rules/attack-engine.mjs';
+import { resolveAttackContext } from '../../../../../shared/engine/rules/resolve-attack-context.mjs';
 import {
   attachedEnergiesFor,
+  attachedCardsFor,
   stampEnergyTypes,
   stadiumCardFor,
   abilityUsedFor,
@@ -54,4 +57,52 @@ test('stamp energy types: untyped basic Energy still prices from its name before
     stampEnergyTypes(mon).map((d) => d.type),
     ['Water']
   );
+});
+
+// Exported log, customhb 757 Mega Absol Z ex: {P}{P}{C} with 3 Basic Darkness Energy and Mega Signal (customhb 491)
+// attached read "unusable" because the preview priced Energy without the Tool in its attached cards.
+const megaSignalBoard = () => {
+  const dark = (id) => ({ instanceId: id, type: 'Energy', supertype: 'Energy', subtypes: ['Basic'], name: 'Basic Darkness Energy' });
+  const signal = {
+    instanceId: 5,
+    type: 'Trainer',
+    supertype: 'Trainer',
+    subtypes: ['Pokémon Tool'],
+    trainerType: 'Tool',
+    name: 'Mega Signal',
+    text: "If a Basic Energy attached to the Mega Evolution Pokémon ex this card is attached to is 1 of that Pokémon's types, it provides both of that Pokémon's types of Energy, but provides only 1 Energy at a time.",
+  };
+  const absolZ = {
+    instanceId: 1,
+    name: 'Mega Absol Z ex',
+    types: ['Psychic', 'Darkness'],
+    attachedCards: [dark(2), dark(3), dark(4), signal],
+  };
+  return absolZ;
+};
+const BLOOD_RED_FEAR = ['Psychic', 'Psychic', 'Colorless'];
+
+test('attached cards: Tools come with the Energy', () => {
+  const card = megaSignalBoard();
+  assert.deepEqual(attachedCardsFor(card, []), card.attachedCards);
+  assert.equal(attachedCardsFor(null, []).length, 0);
+});
+
+test('stamp energy types: Mega Signal on the host lets Darkness Energy pay {P}{P}{C}', () => {
+  assert.equal(canPayAttackCost(stampEnergyTypes(megaSignalBoard()), BLOOD_RED_FEAR), true);
+  const noSignal = megaSignalBoard();
+  noSignal.attachedCards = noSignal.attachedCards.slice(0, 3);
+  assert.equal(canPayAttackCost(stampEnergyTypes(noSignal), BLOOD_RED_FEAR), false);
+});
+
+test('resolveAttackContext: Mega Signal on the host lets Darkness Energy pay {P}{P}{C}', async () => {
+  const card = megaSignalBoard();
+  const { energyTypes } = await resolveAttackContext({
+    activeCard: card,
+    attachedEnergyCards: attachedEnergiesFor(card, []),
+    ensureCardData: async () => {},
+    stadiumCard: null,
+    abilityUsed: () => false,
+  });
+  assert.equal(canPayAttackCost(energyTypes, BLOOD_RED_FEAR), true);
 });

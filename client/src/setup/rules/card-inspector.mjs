@@ -28,6 +28,7 @@ import { resolveAttackContext } from '../../../../shared/engine/rules/resolve-at
 import { specialEnergyBoard } from '../../../../shared/engine/rules/special-energy-parse.mjs';
 import {
   attachedEnergiesFor,
+  attachedCardsFor,
   stampEnergyTypes,
   stadiumCardFor,
   abilityUsedFor,
@@ -531,6 +532,7 @@ async function resolveLiveContext(card, zone = 'active') {
   } = await resolveAttackContext({
     activeCard: card,
     attachedEnergyCards,
+    attachedCards: attachedCardsFor(card, zoneCards),
     ensureCardData,
     stadiumCard,
     extraAttacks,

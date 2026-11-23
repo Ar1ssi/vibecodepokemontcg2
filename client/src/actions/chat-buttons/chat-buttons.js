@@ -710,7 +710,7 @@ export const attack = async (user, emitOrIndex = true, attackIndexOrRng = 0, may
                 card: e,
                 stadiumCard: getStadium()?.card || null,
                 hostPokemon: active,
-                attachedCards: attachedEnergies,
+                attachedCards: activeZone.array.filter((c) => c !== active && c.image?.relative === active.image),
                 board: energyBoard,
               }
             )

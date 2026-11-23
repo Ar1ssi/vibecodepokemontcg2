@@ -143,6 +143,16 @@ test('HB 491 Mega Signal: a Basic Energy of 1 of the Mega ex\'s types provides b
   }
 });
 
+test('HB 491 Mega Signal: 3 Basic Darkness Energy pay Mega Absol Z ex\'s {P}{P}{C} (customhb 757 in the exported log)', () => {
+  const absolZ = mon('Mega Absol Z ex', {
+    types: ['Psychic', 'Darkness'],
+    stage: 'Stage 1',
+    attacks: [{ name: 'Blood-Red Fear', cost: ['Psychic', 'Psychic', 'Colorless'], damage: '100', text: '' }],
+  });
+  const cards = [absolZ, energy('Darkness', absolZ), energy('Darkness', absolZ), energy('Darkness', absolZ), hbTrainer('491', absolZ)];
+  assert.equal(!attack(game({ p1: cards, p2: [mon('Def')] })).error, true);
+});
+
 test('HB 574 Sky Pillar: {N} Pokémon take 20 less damage only from Pokémon with {W}, {F} or {P} Energy', () => {
   const water = mon('Waterish');
   const fire = mon('Fireish');
