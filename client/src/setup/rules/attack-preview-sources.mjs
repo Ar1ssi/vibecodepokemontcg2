@@ -16,6 +16,7 @@ import {
   resolveAttachedEnergyType,
   rewriteEnergyDescriptor,
 } from '../../../../shared/engine/rules/energy-effects.mjs';
+import { abilityNameLimitKeyFor } from '../../../../shared/engine/rules/ability-executors.mjs';
 
 /**
  * @param {object} card the previewed active Pokémon
@@ -84,9 +85,12 @@ export function stadiumCardFor(legacyStadium, authoritativeStadiums = []) {
 export function abilityUsedFor(card, legacyUsed, serverAbilitiesUsed = null) {
   if (legacyUsed || card?.abilityUsed) return true;
   if (!serverAbilitiesUsed || !card) return false;
-  // reduce.mjs useAbility checks both keys.
+  // reduce.mjs useAbility checks these keys, and the shared one of a name-limited Ability
+  // ("You can't use more than 1 Quick Search Ability each turn").
+  const nameLimitKey = abilityNameLimitKeyFor(card);
   return Boolean(
     (card.instanceId != null && serverAbilitiesUsed[card.instanceId]) ||
-      (card.name && serverAbilitiesUsed[card.name])
+      (card.name && serverAbilitiesUsed[card.name]) ||
+      (nameLimitKey && serverAbilitiesUsed[nameLimitKey])
   );
 }

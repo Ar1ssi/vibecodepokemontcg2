@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { canPayAttackCost } from '../../../../../shared/engine/rules/attack-engine.mjs';
 import { resolveAttackContext } from '../../../../../shared/engine/rules/resolve-attack-context.mjs';
+import { abilityNameLimitKeyFor } from '../../../../../shared/engine/rules/ability-executors.mjs';
 import {
   attachedEnergiesFor,
   attachedCardsFor,
@@ -49,6 +50,18 @@ test('ability used: legacy flag, stamped card flag, or server flags by instanceI
   assert.equal(abilityUsedFor(card, false, { Mew: true }), true);
   assert.equal(abilityUsedFor(card, false, { 8: true }), false);
   assert.equal(abilityUsedFor(card, false), false);
+});
+
+test('ability used: a twin Pidgeot ex reads spent once the other used Quick Search (shared name limit)', () => {
+  const text =
+    "Once during your turn, you may search your deck for a card and put it into your hand. Then, shuffle your deck. You can't use more than 1 Quick Search Ability each turn.";
+  const twin = { instanceId: 21, name: 'Pidgeot ex', abilities: [{ name: 'Quick Search', text }] };
+  const sharedKey = abilityNameLimitKeyFor(twin);
+
+  assert.equal(abilityUsedFor(twin, false, { 20: true }), false, 'only its own flag or the shared one counts');
+  assert.equal(abilityUsedFor(twin, false, { 20: true, [sharedKey]: true }), true);
+  const plain = { instanceId: 22, name: 'Kirlia', abilities: [{ name: 'Refinement', text: 'Draw 2 cards.' }] };
+  assert.equal(abilityUsedFor(plain, false, { [sharedKey]: true }), false, 'other Abilities are unaffected');
 });
 
 test('stamp energy types: untyped basic Energy still prices from its name before card data loads', () => {

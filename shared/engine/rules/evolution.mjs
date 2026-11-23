@@ -159,10 +159,17 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
 
   if (typeof fetch === 'function' && typeof fetchCardDetail === 'function') {
     try {
-      const searchName = cleanKey || stage1Name;
-      const list = await fetchTcgdexJson(tcgdexApiUrl(`/cards?name=${encodeURIComponent(searchName)}`));
-      if (Array.isArray(list) && list.length > 0) {
-        const detail = await fetchCardDetail(list[0].id);
+      // The printed name first: the search matches "Dark Dragonair" but not "darkdragonair".
+      // The cleaned name second, for printings whose TCGdex name differs in punctuation or case.
+      for (const searchName of new Set([key.trim(), cleanKey].filter(Boolean))) {
+        const list = await fetchTcgdexJson(tcgdexApiUrl(`/cards?name=${encodeURIComponent(searchName)}`));
+        // The search is a substring match: "corvisquire" lists "Hop's Corvisquire" (evolves from
+        // Hop's Rookidee) first. Only a card named like the Stage 1 may answer for it.
+        const sameName = Array.isArray(list)
+          ? list.find((entry) => entry?.id && pokemonNamesMatch(entry.name, stage1Name))
+          : null;
+        if (!sameName) continue;
+        const detail = await fetchCardDetail(sameName.id);
         const from = detail?.evolveFrom || detail?.evolvesFrom;
         if (from) {
           const base = String(from).toLowerCase();
@@ -170,6 +177,7 @@ export async function resolveStage1EvolvesFrom(stage1Name) {
           if (cleanKey) STAGE1_EVOLVES_FROM.set(cleanKey, base);
           return base;
         }
+        break;
       }
     } catch {
       // Offline or TCGdex miss: the caller treats null as "cannot resolve".
