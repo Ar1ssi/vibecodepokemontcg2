@@ -22,6 +22,11 @@ import {
 } from './card-picker-hitbox.mjs';
 import { confirmPicksOrEmpty, movePicksInOrder } from './card-picker-moves.mjs';
 import { cardArtSrc } from './card-art-src.mjs';
+import { upgradeSlideToHolo } from './slide-holo-upgrade.mjs';
+import { isShowingCardBack } from '../deck-builder/core/card-compare.mjs';
+import { cardBackSrcForUser } from '../deck-constructor/hydrate-holo.js';
+import { ensureCardData } from '/shared/engine/rules/rules-state.mjs';
+import { loadFoilManifest, foilManifestNow } from '../foil/tcgl-foil-store.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
 
 /** @type {object | null} */
@@ -117,30 +122,37 @@ const disableNativeDrag = (node) => {
   });
 };
 
+// A face-down slide shows a sleeve: never look it up and foil it.
+const isCardBackArt = (src) =>
+  ['self', 'opp'].some((user) => isShowingCardBack(src, cardBackSrcForUser(user)));
+
+const buildSlideHolo = (src, effect, card, manifest) => {
+  const wrapper = buildHoloCard(src, effect, {
+    trainer: isTrainerCard(card),
+    cardId: foilCardId(card, manifest),
+    reverse: isReverseHoloCard(card, manifest),
+    manifest,
+  });
+  wrapper.classList.add('mat-holo', 'discard-pile-holo');
+  disableNativeDrag(wrapper);
+  return wrapper;
+};
+
 // Exported for the card-focus view (design 067), which mounts the same holo card outside the carousel.
-export const buildSlideContent = (card) => {
+// `onHolo(wrapper)`: a card whose foil can't be known yet (its rarity or the foil manifest isn't
+// loaded) starts as a plain scan; with this callback it is looked up and swapped for its holo card,
+// and the callback runs once that wrapper is in the slide.
+export const buildSlideContent = (card, { onHolo = null } = {}) => {
   const src = cardArtSrc(card);
   const existingRarity = card?.wrapper?.dataset?.rarity;
   if (existingRarity && src) {
-    const wrapper = buildHoloCard(src, existingRarity, {
-      trainer: isTrainerCard(card),
-      cardId: foilCardId(card),
-      reverse: isReverseHoloCard(card),
-    });
-    wrapper.classList.add('mat-holo', 'discard-pile-holo');
-    disableNativeDrag(wrapper);
+    const wrapper = buildSlideHolo(src, existingRarity, card, foilManifestNow());
     return { node: wrapper, holoWrapper: wrapper };
   }
 
   const effect = resolveFoilEffect(card);
   if (effect && src) {
-    const wrapper = buildHoloCard(src, effect, {
-      trainer: isTrainerCard(card),
-      cardId: foilCardId(card),
-      reverse: isReverseHoloCard(card),
-    });
-    wrapper.classList.add('mat-holo', 'discard-pile-holo');
-    disableNativeDrag(wrapper);
+    const wrapper = buildSlideHolo(src, effect, card, foilManifestNow());
     return { node: wrapper, holoWrapper: wrapper };
   }
 
@@ -149,6 +161,16 @@ export const buildSlideContent = (card) => {
   img.alt = card?.name ?? '';
   img.className = 'discard-pile-card';
   img.draggable = false;
+  if (onHolo && src && !isCardBackArt(src)) {
+    upgradeSlideToHolo(card, img, {
+      loadCardData: ensureCardData,
+      loadManifest: loadFoilManifest,
+      resolveEffect: resolveFoilEffect,
+      build: (foilCard, foilEffect, manifest) => buildSlideHolo(src, foilEffect, foilCard, manifest),
+    }).then((wrapper) => {
+      if (wrapper) onHolo(wrapper);
+    });
+  }
   return { node: img, holoWrapper: null };
 };
 
@@ -829,7 +851,13 @@ const setCandidateList = (state, candidates) => {
     badge.hidden = true;
     slide.appendChild(badge);
 
-    const built = buildSlideContent(card);
+    const built = buildSlideContent(card, {
+      onHolo: (wrapper) => {
+        slide.holoWrapper = wrapper;
+        slide.holoRunning = false;
+        if (state.slides.includes(slide)) syncHoloAnimations(state);
+      },
+    });
     // The decorator may return a replacement node (design 013 wraps the card in a
     // positioned container holding the inspector chrome); holoWrapper is read off the
     // build result, not the replacement, so the sync keeps pointing at the real card.
@@ -1433,15 +1461,20 @@ export const openCardPicker = async ({
   if (!isBrowse) renderSlotCards(state);
 
   if (triggerCard) {
-    const { node, holoWrapper } = buildSlideContent(triggerCard);
-    node.classList.add('card-picker-trigger-card');
-    triggerSlot.appendChild(node);
-    if (holoWrapper) {
-      holoWrapper.classList.add('card-picker-trigger-holo');
+    const showTriggerHolo = (holoWrapper) => {
+      holoWrapper.classList.add('card-picker-trigger-card', 'card-picker-trigger-holo');
       state.triggerHoloWrapper = holoWrapper;
       startHoloAnimation(holoWrapper, MAT_HOLO_OPTIONS);
       if (!isBrowse) syncChooseLayout(state);
-    }
+    };
+    const { node, holoWrapper } = buildSlideContent(triggerCard, {
+      onHolo: (wrapper) => {
+        if (pickerState === state) showTriggerHolo(wrapper);
+      },
+    });
+    node.classList.add('card-picker-trigger-card');
+    triggerSlot.appendChild(node);
+    if (holoWrapper) showTriggerHolo(holoWrapper);
   }
 };
 
