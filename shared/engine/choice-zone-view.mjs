@@ -14,7 +14,13 @@ const toViewCard = (card) => ({
   type: card.type || '',
 });
 
+// The deck goes out sorted, never in pile order: after a search the deck is shuffled, and
+// Mallow-style picks go back on top of the shuffled deck while the player orders them.
+const byNameThenId = (a, b) => a.name.localeCompare(b.name) || a.instanceId - b.instanceId;
+
 const SEARCH_STEP = /search/i;
+// Mallow / Ciphermaniac's Codebreaking: ordering the picks on top is not part of the search.
+const ORDERS_PICKS = /:searchOrder$/;
 const LOOK_STEP = /look/i;
 
 /**
@@ -25,6 +31,7 @@ const LOOK_STEP = /look/i;
  */
 export function isDeckSearchToken(token) {
   if (!token) return false;
+  if (Object.keys(token.context || {}).some((key) => ORDERS_PICKS.test(key))) return false;
   if (Array.isArray(token.searchStages)) return true;
   if (token.queue?.[token.index]?.plan?.action === 'search') return true;
   const type = String(token.steps?.[token.stepIndex]?.type || '');
@@ -34,9 +41,9 @@ export function isDeckSearchToken(token) {
 const holdsAll = (zone, ids) => ids.every((id) => zone.some((card) => card?.instanceId === id));
 
 /**
- * `{ zone: 'deck' | 'discard', cards }` — the pile every option of `choice` comes from, in pile
- * order — or null when the options span piles, are face down, already are the whole pile, or
- * come from a deck the chooser is not searching.
+ * `{ zone: 'deck' | 'discard', cards }` — the pile every option of `choice` comes from (a
+ * discard pile in pile order, a deck sorted by name) — or null when the options span piles, are
+ * face down, already are the whole pile, or come from a deck the chooser is not searching.
  *
  * @param {object} state GameState
  * @param {object} choice PendingChoice
@@ -51,7 +58,7 @@ export function choiceZoneView(state, choice) {
 
   const deck = chooser.zones?.deck || [];
   if (deck.length > ids.length && holdsAll(deck, ids) && isDeckSearchToken(choice.resumeToken)) {
-    return { zone: 'deck', cards: deck.map(toViewCard) };
+    return { zone: 'deck', cards: deck.map(toViewCard).sort(byNameThenId) };
   }
 
   for (const player of Object.values(state.players)) {

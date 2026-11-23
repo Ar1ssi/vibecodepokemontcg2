@@ -1,7 +1,7 @@
 // The card picker's VALID / ALL tabs: a deck search and a discard pick carry their whole pile;
 // a top-N look does not, and the opponent never gets it.
 // Card text: out/pkmn-trainer-cards.json rows Nest Ball (Paldean Fates 084),
-// Pokégear 3.0 (Black Bolt 084), Night Stretcher (Ascended Heroes 196).
+// Pokégear 3.0 (Black Bolt 084), Night Stretcher (Ascended Heroes 196), Mallow (Guardians Rising 145).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameState, createPlayerZones } from '../state.mjs';
@@ -15,6 +15,7 @@ const TEXT = {
   'Pokégear 3.0':
     'Look at the top 7 cards of your deck. You may reveal a Supporter card you find there and put it into your hand. Shuffle the other cards back into your deck.',
   'Night Stretcher': 'Put a Pokémon or a Basic Energy card from your discard pile into your hand.',
+  Mallow: 'Search your deck for 2 cards, shuffle your deck, then put those cards on top of it in any order.',
 };
 
 const item = (instanceId, name) =>
@@ -48,7 +49,8 @@ test('Nest Ball: the searcher sees the whole deck under ALL; the opponent sees n
   const choice = viewFor(res.state, 'p1').pendingChoice;
   assert.deepEqual(choice.options.map((o) => o.instanceId).sort(), [20, 22]);
   assert.equal(choice.zoneView.zone, 'deck');
-  assert.deepEqual(choice.zoneView.cards.map((c) => c.instanceId).sort(), [20, 21, 22, 23]);
+  // Sorted by name, never in pile order (the deck is shuffled after a search).
+  assert.deepEqual(choice.zoneView.cards.map((c) => c.name), ['Arven', 'Bulbasaur', 'Charmander', 'Iono']);
   assert.deepEqual(Object.keys(choice.zoneView.cards[0]).sort(), ['instanceId', 'name', 'src', 'type']);
 
   const forOpponent = viewFor(res.state, 'p2').pendingChoice;
@@ -111,4 +113,27 @@ test('isDeckSearchToken: search steps, attack search stages and Special Energy s
   assert.equal(isDeckSearchToken({ queue: [{ plan: { action: 'search' } }], index: 0 }), true);
   assert.equal(isDeckSearchToken({ effectType: 'attackMillPick' }), false);
   assert.equal(isDeckSearchToken(null), false);
+});
+
+test('Mallow: ordering the picks on top of the shuffled deck shows no deck at all', () => {
+  const state = game();
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 900, name: 'Mallow', supertype: 'Trainer', type: 'Supporter', subtypes: ['Supporter'], text: TEXT.Mallow })
+  );
+  for (let i = 0; i < 8; i += 1) state.players.p1.zones.deck.push(basic(10 + i, `Card ${7 - i}`));
+
+  const search = play(state, 900);
+  assert.equal(search.error, null);
+  // Any 2 cards: the options already are the whole deck.
+  assert.equal(viewFor(search.state, 'p1').pendingChoice.zoneView, undefined);
+
+  const order = applyCommand(search.state, {
+    type: 'resolveChoice',
+    payload: { choiceId: search.state.pendingChoice.choiceId, selection: [12, 15] },
+    playerId: 'p1',
+  });
+  assert.equal(order.error, null);
+  const orderChoice = viewFor(order.state, 'p1').pendingChoice;
+  assert.match(orderChoice.prompt, /from the top of your deck/);
+  assert.equal(orderChoice.zoneView, undefined);
 });

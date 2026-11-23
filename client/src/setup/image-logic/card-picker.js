@@ -102,7 +102,7 @@ export const pickCardPickerIndices = (indices) => {
   if (!pickerState || pickerState.mode === 'browse') return false;
   for (const i of indices) {
     const card = pickerState.cards[i];
-    if (!card) return false;
+    if (!card || !isPickable(pickerState, card)) return false;
     assignCardToSlot(pickerState, card, pickerState.multiSelect ? -1 : 0);
   }
   confirmPicker(pickerState);
@@ -716,6 +716,7 @@ const toggleSelection = (state) => {
   if (!state.multiSelect) return;
   const card = state.cards[state.index];
   const existingIdx = state.slotAssignments.indexOf(card);
+  if (existingIdx < 0 && !isPickable(state, card)) return;
   if (existingIdx >= 0) {
     state.slotAssignments[existingIdx] = null;
   } else {
@@ -754,7 +755,10 @@ const confirmPicker = async (state) => {
     // selection passes `undefined` through instead of silently adopting the
     // currently-focused card. Required pickers keep the focus fallback.
     const explicit = state.slotAssignments[0] ?? state.slotCard ?? null;
-    picks = [explicit != null || state.minCount > 0 ? explicit ?? cards[index] : undefined];
+    // Under the ALL tab the focused card may be one that can't be picked: never adopt it.
+    const focused = isPickable(state, cards[index]) ? cards[index] : null;
+    if (explicit == null && state.minCount > 0 && !focused) return;
+    picks = [explicit != null || state.minCount > 0 ? explicit ?? focused : undefined];
   }
 
   if (!confirmPicksOrEmpty(picks, (message) => window.confirm(message))) return;
@@ -1033,7 +1037,7 @@ const attachSwipe = (state) => {
         const slide = state.slides[state.index];
         const cardNode =
           slide?.querySelector('.discard-pile-card, .mat-holo') ?? slide;
-        if (cardNode) beginCardDrag(event, cardNode);
+        if (cardNode && isPickable(state, state.cards[state.index])) beginCardDrag(event, cardNode);
         return;
       }
       if (Math.abs(dx) > Math.abs(dy) * 1.15) {
