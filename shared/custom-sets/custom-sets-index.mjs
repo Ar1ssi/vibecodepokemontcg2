@@ -15,7 +15,7 @@ const JSON_FILES = new Set(['set.json', 'foil.json']);
 
 export const MAX_INDEX_BYTES = 4 << 20;
 export const MAX_PUBLISHED_SETS = 50;
-export const MAX_FILES_PER_SET = 4000;
+export const MAX_FILES_PER_SET = 8000;
 export const MAX_BLOB_BYTES = 16 << 20;
 export const MAX_SET_BYTES = 512 << 20;
 // What the site may have to cache on its disk at worst (Render's free disk is small; real sets are ~100 MB).

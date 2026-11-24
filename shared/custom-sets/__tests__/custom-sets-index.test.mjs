@@ -89,7 +89,7 @@ test('a set without set.json, or with no files, is refused', () => {
   delete json.sets.customhbw.files['set.json'];
   assert.deepEqual(validateCustomSetsIndex(json).errors, ['sets.customhbw.files: set.json is missing']);
   json.sets.customhbw.files = {};
-  assert.deepEqual(validateCustomSetsIndex(json).errors, ['sets.customhbw.files: 1 to 4000 files']);
+  assert.deepEqual(validateCustomSetsIndex(json).errors, ['sets.customhbw.files: 1 to 8000 files']);
 });
 
 test('more than the published-set cap is refused', () => {
