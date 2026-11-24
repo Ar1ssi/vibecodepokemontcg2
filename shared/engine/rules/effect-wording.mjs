@@ -39,6 +39,8 @@ const REWRITES = [
   [/\bactive (?:slot|position)\b/gi, 'Active Spot'],
   // Hand-typed misspellings in the homebrew set (customhb): "cant", "tires to attak", "hads".
   [/\bcant\b/gi, "can't"],
+  // Shieldon Rock Tomb (customcheck-004): "Your opponent's Acitve Pokémon".
+  [/\bacitve\b/gi, 'Active'],
   [/\btires to attak\b/gi, 'tries to attack'],
   [/\bfor each hads\b/gi, 'for each heads'],
   // Alolan Golem Electromagnetic Catapult: "This Pokémon does 70 damage to the Defending Pokémon
@@ -135,6 +137,12 @@ const REWRITES = [
     "$1 can't $2 during your opponent's next turn",
   ],
   [/\b(this pok[ée]mon) can't attack next turn\b/gi, "$1 can't attack during your next turn"],
+  // Shieldon Rock Tomb (customcheck-004): "… can't retreat until the start of your next turn" holds
+  // through your opponent's next turn, the printed "during your opponent's next turn".
+  [
+    /\b((?:your opponent's active pok[ée]mon|the defending pok[ée]mon|they)) can't (attack|retreat) until the start of your next turn\b/gi,
+    "$1 can't $2 during your opponent's next turn",
+  ],
   [/\b(\d+)hp\b/gi, '$1 HP'],
   [/\bpokemon\b/g, 'pokémon'],
   [/\bPokemon\b/g, 'Pokémon'],

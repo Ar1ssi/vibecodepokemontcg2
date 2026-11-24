@@ -42,6 +42,9 @@ export function normalizeUnit(unit, selfName = '') {
   let out = lower(symbolizeTypeWords(String(unit ?? '')))
     .replace(/[’‘]/g, "'")
     .replace(/pokemon/g, 'pokémon')
+    .replace(/[“”]/g, '"')
+    // Shieldon Shield Bash: "damage counter on itself" is "on this Pokémon".
+    .replace(/\b(on|attached to) itself\b/g, '$1 this pokémon')
     // Empoleon / Grumpig: "Pokémon in play (both yours and your opponent's), excluding Grumpig".
     .replace(/ \(both yours and your opponent's\)/, '')
     // Jumpluff Lost March: "except {*} (Prism Star) Pokémon" — keep it past the "(" split below.
@@ -91,6 +94,9 @@ function pokemonMatcher(phrase) {
     .replace(/\bpokémon-ex\b/, 'pokémon-ex')
     .trim();
   if (text === 'pokémon') return () => true;
+  // Relicanth Fossil Beatdown: 'Pokémon that has "Antique" in its name'.
+  const inName = /^pokémon that (?:has|have) "(.+?)" in (?:its|their) name$/.exec(text);
+  if (inName) return (entry) => lower(entry.name).includes(inName[1]);
   const parts = text.split(/\s+and\s+/);
   const kindSets = parts.map((part) => kindsOf(part.replace(/s$/, '')) || kindsOf(part));
   if (kindSets.every(Boolean)) {
@@ -283,6 +289,12 @@ function energyAcrossCount(unit, ctx) {
 
 // ── damage counters and conditions ───────────────────────────────────────────
 
+// Carracosta Shell Smash (customcheck-014): this Pokémon's earlier uses of the attack (reduce/attack.mjs).
+function usesCount(unit, ctx) {
+  if (!/^times? you have used this attack$/.test(unit) || !Number.isFinite(ctx.earlierUses)) return null;
+  return { count: ctx.earlierUses, label: 'earlier uses of this attack' };
+}
+
 function counterCount(unit, ctx) {
   const counters = (damage) => Math.max(0, Math.floor((Number(damage) || 0) / 10));
   let m;
@@ -388,6 +400,7 @@ export function countUnit(unit, ctx = {}) {
     attachedCount(text, ctx) ??
     energyAcrossCount(text, ctx) ??
     counterCount(text, ctx) ??
+    usesCount(text, ctx) ??
     inPlayCount(text, ctx)
   );
 }

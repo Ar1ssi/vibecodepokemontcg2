@@ -190,6 +190,20 @@ function probeBoard(holder, zone, { bare, partners, stacked }) {
     if (oppKinds[i]) c.subtypes = oppKinds[i];
   });
   state.players.p2.zones.prizes.splice(0, 2);
+  // A Special Energy on the holder, for "if this Pokémon has any Special Energy attached" (Tyrantrum
+  // Tyrannically Gutsy): the basics every probe Pokémon carries do not meet it.
+  if (!bare && holderCard) {
+    z[zone].push(
+      createCard({
+        instanceId: 9400,
+        name: 'Probe Special Energy',
+        supertype: 'Energy',
+        subtypes: ['Special'],
+        type: 'Energy',
+        attachedTo: holderCard.instanceId,
+      })
+    );
+  }
   if (bare && holderCard) {
     holderCard.damage = 0;
     for (const zoneName of ['active', 'bench']) {
@@ -271,6 +285,9 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       const card = viewOf(p1.sideCards, root);
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
+      // Bastiodon Primal Fortress (customcheck-003): "…from your opponent's Pokémon ex" needs an ex attacker.
+      const exAttacker = { ...p2Active, name: 'Probe Pokémon ex', subtypes: ['Basic', 'ex'] };
+      ask(`damageReduction:ex:${card.name}`, () => abilityDamageReduction(card, exAttacker, ctx));
       ask(`damagePrevention:${card.name}`, () => abilityDamagePrevention(card, p2Active, ctx));
       // WotC after-W/R modifiers; Unown D/M/N name the attacker's type.
       for (const type of [null, 'Darkness', 'Metal', 'Colorless']) {

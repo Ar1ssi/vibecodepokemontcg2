@@ -640,7 +640,8 @@ function flipAndResolveAttack(draft, ctx) {
   });
   // Alolan Graveler Rolling Tackle (customhb): "This attack does 20 more damage each time it is
   // used" counts this Pokémon's uses of the attack while it stays in play (cleared off the board).
-  if (ctx.attacker && attack?.name && /\beach time it is used\b/i.test(attack.text || '')) {
+  // Carracosta Shell Smash (customcheck-014): "for each time you have used this attack" counts the same way.
+  if (ctx.attacker && attack?.name && /\beach time (?:it is used|you have used this attack)\b/i.test(attack.text || '')) {
     ctx.attacker.attackUses = { ...(ctx.attacker.attackUses || {}), [attack.name]: (ctx.attacker.attackUses?.[attack.name] || 0) + 1 };
   }
   // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).

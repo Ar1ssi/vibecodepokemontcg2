@@ -185,7 +185,8 @@ const MEANINGFUL = new Set([
 /** Printed sentences whose mechanic has no matching state tag. */
 export function attackMismatches(text, tags) {
   const mismatches = [];
-  for (const sentence of normalizeAttackText(text).split(/(?<=\.)\s+/)) {
+  // Hand-typed "Acitve" (customcheck-004 Rock Tomb) hid its lock from the sentence checks below.
+  for (const sentence of normalizeAttackText(text).replace(/\bacitve\b/g, 'active').split(/(?<=\.)\s+/)) {
     for (const [mech, re, expect] of MECH) {
       if (!re.test(sentence)) continue;
       if (!(tags || []).some((t) => expect.test(t)))
