@@ -13,8 +13,9 @@ export const CUSTOM_SETS_IMAGE_ROOT = '/src/assets/custom-sets';
 // since several helpers split a card id at its dash.
 export const CUSTOM_SET_ID_RE = /^custom[a-z0-9]{2,5}$/;
 export const CUSTOM_SET_CODE_RE = /^[A-Z0-9]{2,5}$/;
-export const CUSTOM_CARD_ID_RE = /^(custom[a-z0-9]{2,5})-([0-9]{3})$/;
-const LOCAL_ID_RE = /^[0-9]{3}$/;
+// Card numbers are three digits up to 999 ("001"), then four without a leading zero ("1000").
+export const CUSTOM_CARD_ID_RE = /^(custom[a-z0-9]{2,5})-([0-9]{3}|[1-9][0-9]{3})$/;
+const LOCAL_ID_RE = /^(?:[0-9]{3}|[1-9][0-9]{3})$/;
 
 export const ENERGY_TYPES = Object.freeze([
   'Grass',
@@ -48,10 +49,10 @@ const MAX_NAME = 60;
 const MAX_ATTACKS = 4;
 const MAX_ABILITIES = 2;
 const MAX_COST = 5;
-export const MAX_CARDS = 999;
-// A set.json is a few hundred KB at most; anything bigger is a mistake, not a set (the server skips it, the bucket
-// index refuses it).
-export const MAX_SET_JSON_BYTES = 4 << 20;
+export const MAX_CARDS = 5000;
+// A set.json is about 1.8 KB a card, so ~9 MB at MAX_CARDS; anything bigger is a mistake, not a set (the server skips
+// it, the bucket index refuses it).
+export const MAX_SET_JSON_BYTES = 16 << 20;
 // Socket.IO broadcast when the server reloads changed set folders: `{ version, sets: [setId] }`.
 export const CUSTOM_SETS_CHANGED_EVENT = 'customSetsChanged';
 
@@ -180,7 +181,7 @@ function checkCard(card, setId, where, errors, seenLocalIds) {
     return;
   }
   if (typeof card.localId !== 'string' || !LOCAL_ID_RE.test(card.localId)) {
-    errors.push(`${where}.localId: three digits, like "001"`);
+    errors.push(`${where}.localId: three digits, like "001", or four from "1000"`);
     return;
   }
   if (seenLocalIds.has(card.localId)) errors.push(`${where}.localId: ${card.localId} is used twice`);

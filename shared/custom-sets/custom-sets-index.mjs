@@ -9,17 +9,17 @@ export const CUSTOM_SETS_INDEX_FORMAT = 'ptcg-sim.custom-sets-index';
 export const CUSTOM_SETS_INDEX_VERSION = 1;
 
 // The files of a set folder that are published; anything else there (ENGINE-CHECK.md, editor leftovers) stays local.
-export const PUBLISHED_FILE_RE = /^(set\.json|foil\.json|CHANGELOG\.md|[0-9]{3}\/(high|low)\.webp|foil\/[0-9]{3}-[a-z]{2,8}\.webp)$/;
+export const PUBLISHED_FILE_RE = /^(set\.json|foil\.json|CHANGELOG\.md|(?:[0-9]{3}|[1-9][0-9]{3})\/(high|low)\.webp|foil\/(?:[0-9]{3}|[1-9][0-9]{3})-[a-z]{2,8}\.webp)$/;
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const JSON_FILES = new Set(['set.json', 'foil.json']);
 
-export const MAX_INDEX_BYTES = 4 << 20;
+export const MAX_INDEX_BYTES = 8 << 20;
 export const MAX_PUBLISHED_SETS = 50;
-export const MAX_FILES_PER_SET = 8000;
+export const MAX_FILES_PER_SET = 24000;
 export const MAX_BLOB_BYTES = 16 << 20;
-export const MAX_SET_BYTES = 512 << 20;
+export const MAX_SET_BYTES = 2 * 1024 ** 3;
 // What the site may have to cache on its disk at worst (Render's free disk is small; real sets are ~100 MB).
-export const MAX_PUBLISHED_BYTES = 2 * 1024 ** 3;
+export const MAX_PUBLISHED_BYTES = 4 * 1024 ** 3;
 
 const isPlainObject = (value) =>
   value !== null && typeof value === 'object' && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
