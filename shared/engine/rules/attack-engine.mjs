@@ -161,7 +161,11 @@ export function computeAttackDamage(attacker, defender, attack, options = {}) {
   const stadiumForBonus = stadium?.card || stadium || null;
   const stadiumBonus =
     stadiumForBonus && !ignoreAttackerBoosts
-      ? stadiumAttackDamageBonusFor(stadiumForBonus, attacker, defender, { defenderIsActive })
+      ? stadiumAttackDamageBonusFor(stadiumForBonus, attacker, defender, {
+          defenderIsActive,
+          attackerZoneCards,
+          attackerTrailingPrizes,
+        })
       : 0;
 
   // Step 2d: Attack markers placed on earlier turns. A next-turn bonus needs damage to add to.

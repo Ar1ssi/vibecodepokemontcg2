@@ -15,7 +15,7 @@ import { priorEvolutionCards, topPokemonCard } from './evolved-pokemon.mjs';
 import { isPokemon } from '../cards.mjs';
 import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
-import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './card-classify.mjs';
+import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard, isUltraBeastCard, isBasicEnergy } from './card-classify.mjs';
 import { isDeltaSpecies, resolveAttachedEnergyType } from './energy-effects.mjs';
 import { getSpecialEnergyHpBonus, stadiumBlanksSpecialEnergy } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
@@ -2109,15 +2109,46 @@ function isLegacyPokemonEx(card) {
   return /[\s-]EX$/.test(String(card.name || ''));
 }
 
+// Martial Arts Dojo (customhb 959): "The attacks of non-Ultra Beast Pokémon that have any Basic {F}
+// Energy attached to them (both yours and your opponent's) do 10 more damage to the opponent's
+// Active Pokémon (before applying Weakness and Resistance). If the attacking player has more Prize
+// cards remaining than their opponent, those attacks do 40 more damage instead."
+const ENERGY_GATED_ATTACK_BONUS =
+  /^the attacks of (non-ultra beast )?pok[eé]mon that have any (basic )?\{([a-z])\} energy attached to them \(both yours and your opponent'?s\) do (\d+) more damage to the opponent'?s active pok[eé]mon(?: \(before applying weakness and resistance\))?\.(?: if the attacking player has more prize cards remaining than their opponent, those attacks do (\d+) more damage instead\.)?$/;
+
+function energyGatedAttackBonus(match, attacker, attackerZoneCards, defenderIsActive, attackerTrailingPrizes) {
+  const [, nonUltraBeast, basicOnly, symbol, base, trailing] = match;
+  if (!defenderIsActive || (nonUltraBeast && isUltraBeastCard(attacker))) return 0;
+  const wanted = SUBJECT_TYPE_WORDS[symbol];
+  const hasEnergy = (attackerZoneCards || []).some(
+    (c) =>
+      isAttachedToHost(c, attacker) &&
+      /energy/i.test(String(c.supertype || c.category || c.type || '')) &&
+      (!basicOnly || isBasicEnergy(c)) &&
+      lower(resolveAttachedEnergyType(c)) === wanted
+  );
+  if (!hasEnergy) return 0;
+  return Number(trailing && attackerTrailingPrizes ? trailing : base);
+}
+
 /**
  * "The attacks of each {F} Pokémon in play (both yours and your opponent's) do 20 more damage to
  * the Defending Pokémon-EX" / "… to the opponent's Active Pokémon (before applying Weakness and
  * Resistance)" (Fighting Stadium, Postwick, Practice Studio). The bonus before W/R, or 0.
  */
-export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { defenderIsActive = true } = {}) {
+export function stadiumAttackDamageBonusFor(
+  stadiumCard,
+  attacker,
+  defender,
+  { defenderIsActive = true, attackerZoneCards = [], attackerTrailingPrizes = false } = {}
+) {
   const bonus = parseStadiumAttackDamageBonus(stadiumCard);
   if (bonus <= 0 || !attacker) return 0;
   const t = textOf(stadiumCard);
+  const energyGated = t.match(ENERGY_GATED_ATTACK_BONUS);
+  if (energyGated) {
+    return energyGatedAttackBonus(energyGated, attacker, attackerZoneCards, defenderIsActive, attackerTrailingPrizes);
+  }
   const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+do\s+\d+\s+more damage to (?:the )?([^(.]*)/);
   if (!m) return 0;
   const matches = stadiumSubjectPredicate(m[1]);
