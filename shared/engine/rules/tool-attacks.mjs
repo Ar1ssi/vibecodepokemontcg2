@@ -239,7 +239,7 @@ const normalizedPokemonName = (name) =>
  * holder that gets it; "The Pokémon this card is attached to …" grants it to any holder.
  */
 export function toolGrantsAttackTo(tool, holder) {
-  const named = /the ([^.]+?) this card is attached to can (?:also )?use the attack on this card/i.exec(cardTextOf(tool))?.[1];
+  const named = /the ([^.]+?) this card is attached to can (?:also )?use the attack on this card/i.exec(cardPrintedText(tool))?.[1];
   if (!named || /^pok[ée]mon$/i.test(named.trim())) return true;
   return normalizedPokemonName(holder?.name) === normalizedPokemonName(named);
 }
