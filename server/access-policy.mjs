@@ -4,6 +4,8 @@
 // polling transport. A WebSocket upgrade carries no such check, so this is not an access
 // control (the server has no cookie or session to protect; seats are held by tokens).
 
+import { isDeployHost } from './env-settings.mjs';
+
 /** The password the admin UI takes on a developer's machine when none is set. */
 export const DEV_ADMIN_PASSWORD = 'defaultPassword';
 /** Where the hosted Socket.IO admin UI runs; it connects to this server from there. */
@@ -11,17 +13,17 @@ export const ADMIN_UI_ORIGIN = 'https://admin.socket.io';
 
 /**
  * Whether the Socket.IO admin UI is served, and with which password.
- * A production server never falls back to the well-known development password: without a
- * password of its own, the admin UI stays off.
+ * A deployed server (`isDeployHost`: Render, or NODE_ENV=production) never falls back to the
+ * well-known development password: without a password of its own, the admin UI stays off.
+ * A host that sets neither is a developer's machine.
  * @param {Record<string, string | undefined>} env the process environment
  * @returns {{ enabled: true, password: string, mode: 'production' | 'development' }
  *   | { enabled: false, warning: string }}
  */
 export function planAdminUi(env) {
   const password = typeof env?.ADMIN_PASSWORD === 'string' ? env.ADMIN_PASSWORD : '';
-  const production = env?.NODE_ENV === 'production';
   const isSet = password.trim() !== '';
-  if (!production) {
+  if (!isDeployHost(env)) {
     return { enabled: true, password: isSet ? password : DEV_ADMIN_PASSWORD, mode: 'development' };
   }
   if (isSet && password !== DEV_ADMIN_PASSWORD) {

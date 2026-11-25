@@ -89,11 +89,12 @@ test('resolveCustomSetsUrl: explicit, off, derived from the foil bucket, or noth
   assert.match(bad.error, /^CUSTOM_SETS_URL must be an http\(s\) URL/);
 });
 
-test('nothing published yet (index 404) is a quiet empty state', async () => {
+test('nothing published yet (index 404) is an empty state, logged once so a wrong URL shows', async () => {
   const { remote, lines } = setup();
   assert.equal(await remote.refresh(), null);
+  assert.equal(await remote.refresh(), null);
   assert.equal(remote.has('customhbw'), false);
-  assert.deepEqual(lines, []);
+  assert.deepEqual(lines, [`custom sets remote: no index.json at ${BASE} (404); no custom sets published`]);
 });
 
 test('a published set is mirrored once; an unchanged index costs one conditional request', async () => {

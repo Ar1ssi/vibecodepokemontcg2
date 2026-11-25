@@ -228,7 +228,6 @@ export function pendingDamagePrevention(state, defenderPlayer, attackerCard = nu
   let out = { preventAll: false, reduce: 0 };
   for (const e of liveEffects(state, defenderPlayer)) {
     if (e.kind === 'damage-reduce') out.reduce += e.value || 0;
-    if (e.kind === 'damage-prevent-all') out.preventAll = true;
     if (e.kind === 'damage-prevent-basic') {
       const name = lower(attackerCard?.name || '');
       const stage = lower(attackerCard?.stage || 'basic');

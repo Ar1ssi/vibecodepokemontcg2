@@ -19,7 +19,7 @@ export const processAction = (user, emit, action, parameters) => {
     document.getElementById('spectatorModeCheckbox').checked &&
     systemState.isTwoPlayer
   );
-  if (!systemState.isUndoInProgress && emit && notSpectator) {
+  if (emit && notSpectator) {
     // Design 074 D7: a solo room's player owns both sides, so neither side's action is
     // requested from a peer; each names its seat for the server instead.
     const ownsAction = user === 'self' || systemState.solo;
@@ -83,22 +83,6 @@ export const processAction = (user, emit, action, parameters) => {
         parameters: parameters,
       };
       socket.emit('requestAction', data);
-    }
-
-    if (!systemState.isTwoPlayer || ownsAction) {
-      //for storing spectator/export data (use a copy to avoid mutating selfActionData)
-      const exportParameters = [...parameters];
-      if (exportParameters[0]) {
-        if (exportParameters[0] === 'self') {
-          exportParameters[0] = 'opp';
-        } else if (exportParameters[0] === 'opp') {
-          exportParameters[0] = 'self';
-        }
-      }
-      const data = createAction(action, user, exportParameters, { emit });
-      if (action !== 'exchangeData' && action !== 'loadDeckData') {
-        systemState.exportActionData.push(data);
-      }
     }
 
     if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function') {

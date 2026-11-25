@@ -71,6 +71,11 @@ test('flipCoin stores and replays the same face', () => {
   assert.equal(bundle.wake, coin1);
 });
 
+test('flipCoin replays a boolean coin recorded in the bundle instead of re-flipping it', () => {
+  assert.equal(flipCoin({ burn: true }, 'burn'), 'heads');
+  assert.equal(flipCoin({ burn: false }, 'burn'), 'tails');
+});
+
 test('deckDataEquals matches identical arrays of deck card tuples', () => {
   const a = [['Pikachu', 'src1'], ['Raichu', 'src2']];
   const b = [['Pikachu', 'src1'], ['Raichu', 'src2']];
@@ -138,7 +143,6 @@ test('mirror animation call sites pass isCatchingUp (the flag peer-log catch-up 
   for (const rel of [
     '../../../actions/zones/shuffle-zone.js',
     '../../../actions/move-card-bundle/move-card.js',
-    '../../rules/rules-bridge.js',
     '../../netcode/advisory-animations.js',
   ]) {
     const source = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
@@ -150,7 +154,7 @@ test('mirror animation call sites pass isCatchingUp (the flag peer-log catch-up 
   }
 });
 
-test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => {
+test('drawOpeningHand relays through processAction as a lifecycle action', () => {
   const handPath = fileURLToPath(
     new URL('../../../actions/zones/hand-actions.js', import.meta.url)
   );
@@ -160,67 +164,6 @@ test('drawOpeningHand emits when rules-bridge deals after the coin flip', () => 
   const body = handSrc.slice(start, next === -1 ? undefined : next);
   assert.match(body, /processAction\(user, emit, 'drawOpeningHand'/);
   assert.match(body, /emit = false/);
-
-  const bridgePath = fileURLToPath(
-    new URL('../../rules/rules-bridge.js', import.meta.url)
-  );
-  const bridgeSrc = readFileSync(bridgePath, 'utf8');
-  assert.match(
-    bridgeSrc,
-    /drawOpeningHand\('self', 'self', true\)/
-  );
-});
-
-test('switchAbility relays active/bench swaps via moveCardBundle', () => {
-  const path = fileURLToPath(
-    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  const start = src.indexOf('export const switchAbility');
-  assert.ok(start >= 0, 'switchAbility export');
-  const next = src.indexOf('\nexport const ', start + 1);
-  const body = src.slice(start, next === -1 ? undefined : next);
-  assert.match(body, /moveCardBundle\(/);
-  assert.equal(
-    [...body.matchAll(/(?<![\w])moveCard\(/g)].length,
-    0,
-    'switchAbility must not call raw moveCard (local-only, never emitted)'
-  );
-});
-
-test('trainer-execution must not call raw moveCard (local-only, never emitted)', () => {
-  const path = fileURLToPath(
-    new URL('../../rules/trainer-execution.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  const rawMoveMatches = [...src.matchAll(/(?<![\w])moveCard\(/g)];
-  assert.equal(
-    rawMoveMatches.length,
-    0,
-    'trainer-execution must not call raw moveCard directly — all moves must use moveCardBundle'
-  );
-});
-
-
-test('undoAsync executes sequentially rather than Promise.all concurrent race', () => {
-  const path = fileURLToPath(
-    new URL('../../../actions/general/undo.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  assert.equal(
-    src.includes('Promise.all'),
-    false,
-    'undoAsync must not use Promise.all for action replay'
-  );
-  assert.match(src, /for \(const data of replay\)/);
-});
-
-test('server events whitelist includes resetCounter', () => {
-  const path = fileURLToPath(
-    new URL('../../../../../server/server.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  assert.match(src, /'resetCounter'/);
 });
 
 test('abilityKey differentiates duplicate cards when cardId or syncInstance differ', async () => {
@@ -238,34 +181,7 @@ test('abilityKey differentiates duplicate cards when cardId or syncInstance diff
   assert.equal(abilityKey(cardD), 'sync:self_11');
 });
 
-test('attachAbility, energyRedirectAbility, and moveDamageAbility do not use raw moveCard', () => {
-  const path = fileURLToPath(
-    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  for (const fnName of ['export const attachAbility', 'export const energyRedirectAbility', 'export const moveDamageAbility']) {
-    const start = src.indexOf(fnName);
-    assert.ok(start >= 0, `${fnName} export`);
-    const next = src.indexOf('\nexport const ', start + 1);
-    const body = src.slice(start, next === -1 ? undefined : next);
-    assert.match(body, /moveCardBundle\(/, `${fnName} must use moveCardBundle`);
-    assert.equal(
-      [...body.matchAll(/(?<![\w])moveCard\(/g)].length,
-      0,
-      `${fnName} must not call raw moveCard (local-only, never emitted)`
-    );
-  }
-});
-
-test('discardEnergyScaling uses rngBundle.energyDiscarded on replay', () => {
-  const path = fileURLToPath(
-    new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
-  );
-  const src = readFileSync(path, 'utf8');
-  assert.match(src, /typeof rngBundle\.energyDiscarded === 'number'/);
-});
-
-test('I30: retreat broadcasts the resolved bench index instead of an empty parameter list', () => {
+test('retreat names the dragged bench card by its server instanceId, and the server picks otherwise', () => {
   const path = fileURLToPath(
     new URL('../../../actions/chat-buttons/chat-buttons.js', import.meta.url)
   );
@@ -274,12 +190,9 @@ test('I30: retreat broadcasts the resolved bench index instead of an empty param
   assert.ok(start >= 0, 'retreat export');
   const next = src.indexOf('\nexport const ', start + 1);
   const body = src.slice(start, next === -1 ? undefined : next);
-  assert.match(
-    body,
-    /processAction\(user, emit, 'retreat', \[resolvedBenchIdx\]\)/,
-    "retreat's final processAction call must send the chosen bench index, or the peer's " +
-      'replay always defaults to the first bench Pokémon (I30)'
-  );
+  assert.match(body, /readCardInstanceId\(targetBenchImage\)/);
+  assert.match(body, /sendCommand\(\s*'retreat'/);
+  assert.equal(body.includes('processAction'), false, 'retreat sends no legacy relay');
 });
 
 test('rotateCard broadcasts newRotation in action payload', () => {

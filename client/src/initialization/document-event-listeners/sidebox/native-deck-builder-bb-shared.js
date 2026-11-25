@@ -16,6 +16,7 @@ import {
 } from '../../../setup/deck-builder/core/build-battle/build-battle-view.mjs';
 import { boxArt } from '../../../setup/deck-builder/core/build-battle/unboxing.mjs';
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
+import { cardImage } from './native-deck-builder-shared-logic.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 import { mountTabletopUnboxing } from './tabletop/tabletop-scene.js';
 
@@ -32,15 +33,6 @@ const POOL_GROUPS = [
   ['Energy', 'Energy'],
 ];
 
-// Reading `window.localStorage` itself throws when site data is blocked.
-export const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
-
 export const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -48,8 +40,7 @@ export const el = (tag, className, text) => {
   return node;
 };
 
-export const cardImage = (card, size = 'small') =>
-  card?.images?.[size] || card?.images?.small || card?.image || '';
+export { cardImage };
 
 export const unlimitedEnergyCards = () =>
   BASIC_ENERGY_LABELS.map((label) => {

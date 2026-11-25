@@ -3,7 +3,7 @@
 // server-authoritative game never fills; this plans the same choices over the authoritative
 // card registry (apply-view.js `getCardRegistry`). DOM-free.
 
-const PLAY_ZONES = new Set(['active', 'bench']);
+import { PLAY_ZONES } from './view-card-vocabulary.mjs';
 
 /** The registry's side for a `mouseClick.cardUser`: your own seat, or (solo) the far one. */
 export const registrySideOf = (cardUser) => (cardUser === 'opp' ? 'them' : 'you');
@@ -19,7 +19,7 @@ export function attachCandidateIds(records, { cardUser }) {
   const side = registrySideOf(cardUser);
   const ids = [];
   for (const record of records ?? []) {
-    if (!record || record.side !== side || !PLAY_ZONES.has(record.zone)) continue;
+    if (!record || record.side !== side || !PLAY_ZONES.includes(record.zone)) continue;
     if (record.card?.attachedTo != null) continue;
     ids.push(record.instanceId);
   }
@@ -32,4 +32,4 @@ export function attachCandidateIds(records, { cardUser }) {
  * @param {{ zone: string, card?: { attachedTo?: number|null } }|null} record
  */
 export const canStartAttach = (record) =>
-  Boolean(record) && (!PLAY_ZONES.has(record.zone) || record.card?.attachedTo != null);
+  Boolean(record) && (!PLAY_ZONES.includes(record.zone) || record.card?.attachedTo != null);

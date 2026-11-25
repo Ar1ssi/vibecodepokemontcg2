@@ -1,6 +1,9 @@
+import { LOG_API_PREFIX, CLIENT_HEADER } from '../../../shared/log/log-schema.mjs';
+import { patchMethod } from '../../../shared/log/patch-method.mjs';
+
 const URL_MAX = 300;
 const SLOW_MS = 1500;
-const OWN_TRAFFIC = /\/socket\.io\/|\/api\/log\//;
+const OWN_TRAFFIC = new RegExp(`/socket\\.io/|${LOG_API_PREFIX}`);
 
 function requestParts(input, win) {
   const raw = typeof input === 'string' ? input : (input?.url ?? String(input));
@@ -17,9 +20,7 @@ function requestParts(input, win) {
 }
 
 function wrapFetch(win, log, clientId) {
-  const original = win.fetch;
-  if (typeof original !== 'function') return () => {};
-  const wrapper = function fetchWithLog(input, init) {
+  return patchMethod(win, 'fetch', (original) => function fetchWithLog(input, init) {
     let url = '';
     let method = 'GET';
     let args = [input, init];
@@ -31,7 +32,7 @@ function wrapFetch(win, log, clientId) {
       const isRequest = typeof input !== 'string' && !(input instanceof URL);
       if (parts.sameOrigin && !isRequest) {
         const headers = new Headers(init?.headers);
-        headers.set('x-ptcg-client', clientId);
+        headers.set(CLIENT_HEADER, clientId);
         args = [input, { ...init, headers }];
       }
     } catch {
@@ -58,11 +59,7 @@ function wrapFetch(win, log, clientId) {
         throw error;
       },
     );
-  };
-  win.fetch = wrapper;
-  return () => {
-    if (win.fetch === wrapper) win.fetch = original;
-  };
+  });
 }
 
 function observeResources(win, log) {

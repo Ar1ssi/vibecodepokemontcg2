@@ -11,10 +11,6 @@ import {
   hashZoneMap,
   SYNC_HASH_ZONES,
 } from '../../../../shared/engine/zones/zone-hash.mjs';
-import {
-  getAuthoritativeZoneArray,
-  getAuthoritativeStadiumArray,
-} from './apply-view.js';
 
 export const SYNC_CHECK_INTERVAL_MS = 30000;
 
@@ -27,27 +23,6 @@ export const SYNC_CHECK_INTERVAL_MS = 30000;
 const PLAYER_ZONES = SYNC_HASH_ZONES.filter(
   (zoneId) => zoneId !== 'stadium' && zoneId !== 'deck'
 );
-
-/**
- * Zone accessor matching legacy `getZone`'s `(user, zoneId) => { array }`
- * shape, but sourced from the authoritative renderer's own last-applied view
- * (design 002 I24) instead of legacy's `zoneArrays`, which are never
- * populated under server-authoritative rendering (I15). This heartbeat only
- * ever runs while `serverAuthoritative` is on, so the view source is always
- * live by the time it fires.
- *
- * @param {string} user 'self' | 'opp'
- * @param {string} zoneId
- * @returns {{ array: object[] }}
- */
-export function viewBackedGetZone(user, zoneId) {
-  const side = user === 'self' ? 'you' : 'them';
-  const array =
-    zoneId === 'stadium'
-      ? getAuthoritativeStadiumArray()
-      : getAuthoritativeZoneArray(side, zoneId);
-  return { array };
-}
 
 /**
  * Builds the per-zone hash map for one side ('self' or 'opp'), the same

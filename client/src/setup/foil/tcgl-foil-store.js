@@ -19,11 +19,15 @@ const getJson = (fetchImpl, url) =>
 // file is missing or malformed is skipped with a warning; it never takes the TCG Live foil down with it.
 const mergeCustomSets = (fetchImpl, parsed, sets) =>
   Promise.all(
-    (Array.isArray(sets) ? sets : []).map(({ setId, url } = {}) =>
-      getJson(fetchImpl, url)
-        .then((json) => mergeCustomFoil(parsed, parseCustomFoil(setId, json)))
-        .catch((error) => console.warn(`custom set foil ${setId} skipped: ${error.message}`))
-    )
+    (Array.isArray(sets) ? sets : []).map(async (entry) => {
+      // The config is remote JSON: an entry may be null or not an object.
+      const { setId, url } = entry && typeof entry === 'object' ? entry : {};
+      try {
+        mergeCustomFoil(parsed, parseCustomFoil(setId, await getJson(fetchImpl, url)));
+      } catch (error) {
+        console.warn(`custom set foil ${setId} skipped: ${error.message}`);
+      }
+    })
   );
 
 /** @returns {Promise<object|null>} the parsed manifest, or null when it or the texture host is unavailable. */

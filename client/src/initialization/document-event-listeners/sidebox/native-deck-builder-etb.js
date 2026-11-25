@@ -1,4 +1,5 @@
 import { createRng } from '../../../../../shared/engine/rng.mjs';
+import { browserStorage } from './native-deck-builder-storage.js';
 import { BUILD_BATTLE_BOXES } from '../../../setup/deck-builder/core/build-battle/box-catalog.mjs';
 import {
   loadSetData,
@@ -47,6 +48,7 @@ import {
 import { buildModernBasicEnergy } from '../../../setup/deck-builder/core/modern-energy.mjs';
 import { loadCoinCatalog } from '../../../setup/deck-builder/core/coins.mjs';
 import { loadSleeveCatalog } from '../../../setup/deck-builder/core/sleeves.mjs';
+import { cardImage } from './native-deck-builder-shared-logic.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 
@@ -66,24 +68,12 @@ const POOL_GROUPS = [
   ['Trainer', 'Trainers'],
 ];
 
-// Reading `window.localStorage` itself throws when site data is blocked.
-const browserStorage = () => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-};
-
 const el = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
 };
-
-const cardImage = (card, size = 'small') =>
-  card?.images?.[size] || card?.images?.small || card?.image || '';
 
 const LOADING_TEXT = 'Loading the card data…';
 const LOAD_FAILED_TEXT = 'The card data could not be loaded. Reload the page to try again.';

@@ -43,16 +43,9 @@ import {
   thumbnailUrl,
   windowLabel,
 } from '../../../setup/deck-builder/core/deck-suggest/view.mjs';
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
 const RECOMPUTE_DELAY_MS = 150;
-
-const escapeHtml = (value = '') =>
-  String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 
 const SECTIONS = [
   { bucket: 'missingCore', title: 'Missing staples', blurb: 'Almost every list like yours plays these.' },
@@ -341,7 +334,8 @@ export const initializeNativeDeckBuilderSuggest = ({
     setStatus(`Added ${datasetCard.name}.`);
     // Accept the card that actually landed: a name-search fallback can pick a sibling print.
     const landedIdx = resolveDeckCard(card, index);
-    setPrefs(acceptKey(prefsNow(), landedIdx === null ? datasetCard.key : prefKeyOf(landedIdx, index)));
+    const acceptedKey = landedIdx === null ? datasetCard.key : prefKeyOf(landedIdx, index);
+    setPrefs(acceptKey(prefsNow(), acceptedKey));
     onAddCard(card);
   };
 

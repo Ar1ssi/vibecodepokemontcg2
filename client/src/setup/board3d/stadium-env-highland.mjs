@@ -639,7 +639,7 @@ void main() {
     float body = 1.0 - smoothstep(0.92, 1.0, length(rel * vec2(1.0, 1.25)) + 0.12 * (fbm3(p / 60.0) - 0.5));
     float lit = smoothstep(-0.2, 0.4, dot(normalize(rel + 1e-3), normalize(uSun.xy)));
     vec3 far = mix(vec3(0.07, 0.085, 0.11), vec3(0.16, 0.19, 0.24), lit);
-    far = mix(far, vec3(0.45, 0.52, 0.6), smoothstep(0.38, 0.18, length(rel)) * 0.8);
+    far = mix(far, vec3(0.45, 0.52, 0.6), (1.0 - smoothstep(0.18, 0.38, length(rel))) * 0.8);
     col = mix(col, far, body * 0.9);
   }
   col += flashLight(vec3(p, top), n) * 1.6 + skyPulse(n) * 1.3;

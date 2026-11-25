@@ -71,16 +71,6 @@ export function createBatcher({ limits = LIMITS } = {}) {
     force() {
       forced = true;
     },
-    unacked(ring, maxBytes) {
-      const lines = [];
-      let bytes = 0;
-      for (const entry of ring.since(ackedSeq)) {
-        bytes += entry.line.length;
-        if (bytes > maxBytes) break;
-        lines.push(entry.line);
-      }
-      return lines;
-    },
     /**
      * The NEWEST unacked lines whose JSON-array form fits `maxChars` (each line is a string that
      * gets escaped again inside a JSON body, so it is measured the way it will be sent). Used

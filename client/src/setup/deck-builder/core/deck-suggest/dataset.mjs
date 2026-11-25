@@ -33,6 +33,10 @@ export function validateDataset(dataset) {
   }
   if (!dataset.printIndex || typeof dataset.printIndex !== 'object') return { ok: false, reason: 'missing printIndex' };
   if (!dataset.lists.length) return { ok: false, reason: 'no decklists' };
+  const badEvent = dataset.events.findIndex(
+    (event) => !event || typeof event.name !== 'string' || !Number.isFinite(Date.parse(event.date))
+  );
+  if (badEvent >= 0) return { ok: false, reason: `event ${badEvent} is malformed` };
   const cardCount = dataset.cards.length;
   const badCard = dataset.cards.findIndex(
     (card) => !card || typeof card.key !== 'string' || typeof card.name !== 'string' || typeof card.print !== 'string'
@@ -97,34 +101,42 @@ export function indexDataset(dataset) {
   return { dataset, listCounts, listWeights, globalInclusion, byName, keyIndex };
 }
 
-let pending = null;
+const pendingByUrl = new Map();
+
+async function fetchAndIndex(fetchJson, url) {
+  let dataset;
+  try {
+    dataset = await fetchJson(url);
+  } catch (error) {
+    return { ok: false, reason: `could not load tournament data (${error?.message || 'network error'})` };
+  }
+  const check = validateDataset(dataset);
+  if (!check.ok) return { ok: false, reason: `tournament data is invalid: ${check.reason}` };
+  try {
+    return { ok: true, index: indexDataset(dataset) };
+  } catch (error) {
+    return { ok: false, reason: `tournament data could not be indexed (${error?.message || 'unknown error'})` };
+  }
+}
 
 /**
- * Fetches, validates and indexes the dataset once per page. `fetchJson(url)` is injected (the
- * browser passes a fetch wrapper). A failure is returned, not thrown, and not memoized, so the
+ * Fetches, validates and indexes the dataset once per page and url. `fetchJson(url)` is injected
+ * (the browser passes a fetch wrapper). A failure is returned, not thrown, and not memoized, so the
  * panel can offer a retry.
  * @returns {Promise<{ ok: true, index } | { ok: false, reason: string }>}
  */
 export function loadMetaDataset(fetchJson, url = DATASET_URL) {
-  if (pending) return pending;
-  pending = (async () => {
-    let dataset;
-    try {
-      dataset = await fetchJson(url);
-    } catch (error) {
-      return { ok: false, reason: `could not load tournament data (${error?.message || 'network error'})` };
-    }
-    const check = validateDataset(dataset);
-    if (!check.ok) return { ok: false, reason: `tournament data is invalid: ${check.reason}` };
-    return { ok: true, index: indexDataset(dataset) };
-  })().then((result) => {
-    if (!result.ok) pending = null;
+  const memoized = pendingByUrl.get(url);
+  if (memoized) return memoized;
+  const loading = fetchAndIndex(fetchJson, url).then((result) => {
+    if (!result.ok) pendingByUrl.delete(url);
     return result;
   });
-  return pending;
+  pendingByUrl.set(url, loading);
+  return loading;
 }
 
-/** Test seam: forget the memoized load. */
+/** Test seam: forget the memoized loads. */
 export function resetMetaDatasetCache() {
-  pending = null;
+  pendingByUrl.clear();
 }

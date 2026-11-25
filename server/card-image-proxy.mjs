@@ -1,7 +1,13 @@
 // GET /api/card-image?url= (design 074 D8): card art for WebGL textures from hosts that do not
 // send CORS headers. Same validation shape as /api/mat-image, plus a body cap and an in-memory LRU.
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { BodyTooLargeError, createFailureLog, readCapped } from './upstream-limits.mjs';
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+const NOT_FOUND_TTL_MS = HOUR_MS;
+// Never svg or html: the bytes are served from this origin, where a script inside them would run.
+const IMAGE_TYPES = new Set(['image/webp', 'image/png', 'image/jpeg']);
 const MAX_REDIRECTS = 3;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 const CACHE_CONTROL = 'public, max-age=86400';
@@ -35,38 +41,14 @@ function assertAllowed(url, allowedHosts) {
   }
 }
 
-async function readCapped(response, maxBytes) {
-  const declared = Number(response.headers?.get?.('content-length'));
-  if (Number.isFinite(declared) && declared > maxBytes) throw new ProxyError(413, 'image too large');
-  const reader = response.body?.getReader?.();
-  if (!reader) {
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > maxBytes) throw new ProxyError(413, 'image too large');
-    return buffer;
-  }
-  const chunks = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel().catch(() => {});
-      throw new ProxyError(413, 'image too large');
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, total);
-}
-
-function createLru(maxEntries, now) {
+function createLru(maxEntries, now, ttlMs) {
   const entries = new Map();
   return {
     get(key) {
       const entry = entries.get(key);
       if (!entry) return null;
       entries.delete(key);
-      if (now() - entry.storedAt > DAY_MS) return null;
+      if (now() - entry.storedAt > ttlMs) return null;
       entries.set(key, entry);
       return entry;
     },
@@ -82,12 +64,14 @@ function sendImage(res, { body, contentType }) {
   res.setHeader('Content-Type', contentType);
   res.setHeader('Cache-Control', CACHE_CONTROL);
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.status(200).send(body);
 }
 
 /**
  * @param {{ fetchImpl?: typeof fetch, allowedHosts: Set<string>, now?: () => number,
- *           maxEntries?: number, maxBodyBytes?: number, timeoutMs?: number }} options
+ *           maxEntries?: number, maxBodyBytes?: number, timeoutMs?: number,
+ *           log?: (line: string) => void }} options
  * @returns {(req: import('express').Request, res: import('express').Response) => Promise<void>}
  */
 export function createCardImageHandler({
@@ -97,9 +81,12 @@ export function createCardImageHandler({
   maxEntries = 100,
   maxBodyBytes = 6 * 1024 * 1024,
   timeoutMs = 10_000,
+  log = () => {},
 } = {}) {
   if (!(allowedHosts instanceof Set)) throw new TypeError('createCardImageHandler needs an allowedHosts Set');
-  const cache = createLru(maxEntries, now);
+  const cache = createLru(maxEntries, now, DAY_MS);
+  const misses = createLru(maxEntries, now, NOT_FOUND_TTL_MS);
+  const outage = createFailureLog(log);
 
   async function fetchImage(target, signal) {
     let url = target;
@@ -120,9 +107,16 @@ export function createCardImageHandler({
         assertAllowed(url, allowedHosts);
         continue;
       }
+      if (upstream.status === 404) {
+        misses.set(target.href, {});
+        throw new ProxyError(404, 'image not found');
+      }
       if (!upstream.ok) throw new ProxyError(502, 'upstream error');
-      const contentType = upstream.headers?.get?.('content-type') || '';
-      if (!/^image\//i.test(contentType)) throw new ProxyError(502, 'upstream is not an image');
+      const contentType = String(upstream.headers?.get?.('content-type') || '')
+        .split(';')[0]
+        .trim()
+        .toLowerCase();
+      if (!IMAGE_TYPES.has(contentType)) throw new ProxyError(502, 'upstream is not an image');
       return { contentType, body: await readCapped(upstream, maxBodyBytes) };
     }
     throw new ProxyError(502, 'too many redirects');
@@ -134,6 +128,7 @@ export function createCardImageHandler({
     try {
       const target = parseTarget(req.query?.url);
       assertAllowed(target, allowedHosts);
+      if (misses.get(target.href)) throw new ProxyError(404, 'image not found');
       const cached = cache.get(target.href);
       if (cached) {
         sendImage(res, cached);
@@ -141,13 +136,17 @@ export function createCardImageHandler({
       }
       const image = await fetchImage(target, controller.signal);
       cache.set(target.href, image);
+      outage.recovered('card image: upstream answering again');
       sendImage(res, image);
     } catch (error) {
       if (error instanceof ProxyError) {
         res.status(error.status).send(error.message);
+      } else if (error instanceof BodyTooLargeError) {
+        res.status(413).send('image too large');
       } else if (isAbort(error)) {
         res.status(504).send('upstream timeout');
       } else {
+        outage.failed('fetch', `card image: upstream fetch failed (${error?.message ?? error})`);
         res.status(502).send('fetch failed');
       }
     } finally {

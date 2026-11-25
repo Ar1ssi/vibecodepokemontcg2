@@ -15,6 +15,10 @@ import { takePrizesByIndex } from './prizes-actions.js';
 
 const DEFAULT_SLEEVE = 'https://ptcgsim.online/src/assets/cardback.png';
 const STAGGER_MS = 70;
+// The last pick lingers this long so the player sees it land before the fan resolves.
+const CONFIRM_DELAY_MS = 220;
+// Where a sleeve flies from when its prize card has no node on the mat (bottom-left corner).
+const fallbackOrigin = (viewport) => ({ left: 40, top: viewport.height - 180, width: 70, height: 98 });
 
 /** @type {{
  *  user: string,
@@ -49,14 +53,13 @@ const buildSleeveHost = (dest, sleeveSrc) => {
 // Design 045: the sleeves fly up and drop back on design 042's arc (WAAPI).
 // Flying up holds the start pose through its delay and then lets go, so the
 // selected-card CSS still applies; dropping back holds its end until teardown.
-const flyHost = (host, pose, { duration, delay = 0, fill }) => {
+const flyHost = (host, pose, { duration, delay = 0, fill, height }) => {
   if (typeof host.animate !== 'function') return Promise.resolve();
-  const H = parseFloat(host.style.height) || 100;
   const frames = sampleKeyframes(
     pose,
     (p) => ({
       transform:
-        `translate(${p.x}px, ${p.y}px) perspective(${H * 4}px) rotate(${p.rotate}deg) ` +
+        `translate(${p.x}px, ${p.y}px) perspective(${height * 4}px) rotate(${p.rotate}deg) ` +
         `rotateX(${p.tiltX}deg) scale(${p.scale})`,
     }),
     36
@@ -74,13 +77,14 @@ const flyUp = (entry, delay) =>
     duration: FAN_UP_MS,
     delay,
     fill: 'backwards',
+    height: entry.dest.height,
   });
 
 const flyBack = (entry) =>
   flyHost(
     entry.host,
     fanFlightPose({ from: entry.origin, to: entry.dest, fromTurn: entry.turn, reverse: true, seed: flightSeed() }),
-    { duration: FAN_BACK_MS, fill: 'forwards' }
+    { duration: FAN_BACK_MS, fill: 'forwards', height: entry.dest.height }
   );
 
 const unhideSources = (cards) => {
@@ -158,7 +162,7 @@ const selectEntry = (card, host) => {
 const toggleSelect = (card, host) => {
   if (!pending?.ready || pending.resolving) return;
   if (selectEntry(card, host)) {
-    globalThis.setTimeout(confirmSelection, 220);
+    globalThis.setTimeout(confirmSelection, CONFIRM_DELAY_MS);
   }
 };
 
@@ -216,7 +220,7 @@ const openPrizeFan = ({ user, cards, needed, onChosen }) => {
     const originEl = cardNode(card);
     const origin = originEl
       ? viewportRectOf(originEl)
-      : { left: 40, top: viewport.height - 180, width: 70, height: 98 };
+      : fallbackOrigin(viewport);
     const turn = originEl ? frameTurnOf(card.image) : 0;
     hideForFlight(card);
     const host = buildSleeveHost(dests[i], sleeveSrc);

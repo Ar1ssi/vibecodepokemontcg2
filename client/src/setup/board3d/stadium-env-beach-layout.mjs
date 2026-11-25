@@ -4,11 +4,10 @@
 // Design 084 (the visual audit): three or four palms in two sizes, kept out from under the chat panel
 // (frameWeight); the rocks larger lumpy clusters, as the card's; at most one parasol.
 import { TERRAIN_SPACING_PX } from './stadium-environment-glsl.mjs';
-import { RISE_LEAN, clumpAround, frameWeight, patchy } from './stadium-env-spots.mjs';
+import { isRect } from './stadium-environment-layout.mjs';
+import { RISE_LEAN, clumpAround, frameWeight, patchy, smoothstep } from './stadium-env-spots.mjs';
 import { measureAsset } from './stadium-kit-assets.mjs';
 import { tableBounds } from './table-uv.mjs';
-
-const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 
 /** Surfing Beach: the mean waterline meets the far edge this share of the width from the left... */
 export const SHORE_FAR_EDGE_SHARE = 0.42;
@@ -82,10 +81,6 @@ export function shoreFrame(shore, x, y) {
 
 /** px the waterline wanders toward the sea at most (stadium-env-beach.mjs shoreWobble: 24 × 0.5 + 4). */
 const SHORE_WANDER_PX = 16;
-const smoothstep = (a, b, v) => {
-  const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
 
 /**
  * The highest the sand can stand at (x, y), px: the field bake's beachHeight (stadium-env-beach.mjs

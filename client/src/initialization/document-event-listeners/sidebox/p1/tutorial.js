@@ -13,11 +13,12 @@ export const initializeTutorialButton = () => {
                 allowfullscreen
             ></iframe>
         `;
-    videoContainer.addEventListener('click', (event) => {
-      if (event.target === videoContainer) {
-        videoContainer.style.display = 'none';
-        videoContainer.innerHTML = '';
-      }
-    });
+  });
+
+  videoContainer.addEventListener('click', (event) => {
+    if (event.target === videoContainer) {
+      videoContainer.style.display = 'none';
+      videoContainer.innerHTML = '';
+    }
   });
 };

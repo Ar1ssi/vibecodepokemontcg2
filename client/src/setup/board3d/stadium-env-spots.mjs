@@ -1,7 +1,7 @@
 // Design 077 (prototype): what the later Stadium boards' layouts start from: the table, every card
 // footprint, the scene, the world scale and the opponent's hand, with the clearance tests a board's
 // props pass. Pure: no three.js, no DOM.
-import { environmentFootprints, sceneBounds } from './stadium-environment-layout.mjs';
+import { environmentFootprints, sceneBounds, union } from './stadium-environment-layout.mjs';
 import { tableBounds } from './table-uv.mjs';
 
 /** Least gap between any prop, seen from above, and a card or the opponent's hand. */
@@ -21,10 +21,12 @@ export const hash = (x, y, salt) => {
 
 export const distanceToRect = (x, y, r) => Math.hypot(Math.max(r.x - x, 0, x - r.x - r.w), Math.max(r.y - y, 0, y - r.y - r.h));
 
-export const union = (rects) => {
-  const x = Math.min(...rects.map((r) => r.x));
-  const y = Math.min(...rects.map((r) => r.y));
-  return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
+export { union };
+
+/** smoothstep as GLSL names it, but safe with from > to: then it falls from 1 to 0. */
+export const smoothstep = (from, to, x) => {
+  const t = Math.min(1, Math.max(0, (x - from) / (to - from)));
+  return t * t * (3 - 2 * t);
 };
 
 /** The opponent's hand where the board fans it, past the far edge: the cards' width either side of the middle. */
@@ -37,7 +39,7 @@ export const oppHandRect = (layout, core) => {
 };
 
 /**
- * The table frame a board is laid out in. Null without a table or a footprint.
+ * The table frame a board is laid out in. Null without a table, a footprint or a card scale.
  * `core` is the box round every card footprint; `u` the world scale (a card's width over 100 px);
  * `clear(x, y, r, gap)` is true where a disc of radius r stays `gap` px off every card and the
  * opponent's hand; `inScene(x, y, inset)` where a point lies inside the scene.
@@ -53,6 +55,7 @@ export function boardContext(layout, key) {
   const core = union(cards);
   const scene = sceneBounds(layout, key);
   const u = (layout.self.cardBox?.active?.w ?? 100) / 100;
+  if (!(u > 0)) return null;
   const hand = oppHandRect(layout, core);
   const obstacles = hand ? [...cards, hand] : cards;
   return {

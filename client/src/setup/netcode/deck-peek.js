@@ -11,7 +11,7 @@ import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../chatbox/append-message.js';
 import { determineUsername } from '../general/determine-username.js';
 import { openCardPicker } from '../image-logic/card-picker.js';
-import { isAuthoritativeDispatchActive } from './authoritative-dispatch.js';
+import { isAuthoritativeDispatchActive, refuseWithoutRoom } from './authoritative-dispatch.js';
 import { emitCmd } from './cmd-emitter.js';
 import { buildDeckPeekPickerRequest } from './deck-peek-request.mjs';
 import { soloCommandSeat } from './solo-seat.mjs';
@@ -26,7 +26,8 @@ function requestPeek(request) {
       .timeout(PEEK_TIMEOUT_MS)
       .emit('peekDeck', { roomId: systemState.roomId, ...request }, (err, reply) => {
         if (err) resolve({ ok: false, reason: 'The server did not answer.' });
-        else resolve(reply && typeof reply === 'object' ? reply : { ok: false, reason: 'Bad reply.' });
+        else if (reply && typeof reply === 'object' && (!reply.ok || Array.isArray(reply.cards))) resolve(reply);
+        else resolve({ ok: false, reason: 'Bad reply.' });
       });
   });
 }
@@ -55,6 +56,7 @@ async function takeIntoHand(instanceIds, seat) {
  * @returns {boolean} true when handled here (the legacy look must not run)
  */
 export function peekServerDeck({ user, count, top }) {
+  if (refuseWithoutRoom({ action: 'peekDeck' })) return true;
   if (!isAuthoritativeDispatchActive() || !systemState.isTwoPlayer) return false;
 
   // Design 074 D7: a solo room asks as the seat whose deck it is, so that deck is 'you'.
@@ -82,6 +84,9 @@ export function peekServerDeck({ user, count, top }) {
     });
     if (!request) return;
     openCardPicker(request).catch((err) => console.error('[deck-peek] picker failed:', err));
+  }).catch((err) => {
+    console.error('[deck-peek] look failed:', err);
+    announce("Can't look at the deck: something went wrong.");
   });
   return true;
 }

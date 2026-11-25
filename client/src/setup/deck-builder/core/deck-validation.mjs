@@ -10,6 +10,7 @@
 // Do not merge the two.
 
 import { isBasicPokemon } from '../../../../../shared/engine/cards.mjs';
+import { deckVariants } from './deck-variants.mjs';
 import {
   isAceSpecCard,
   isBasicEnergy,
@@ -66,11 +67,9 @@ export function isPocketCard(card = {}) {
 export function detectDeckFormat(deck = {}) {
   let pocketCount = 0;
   let tcgCount = 0;
-  for (const group of Object.values(deck)) {
-    for (const variant of group?.cards || []) {
-      if (isPocketCard(variant?.data)) pocketCount += variant.count || 0;
-      else tcgCount += variant.count || 0;
-    }
+  for (const variant of deckVariants(deck)) {
+    if (isPocketCard(variant?.data)) pocketCount += variant.count || 0;
+    else tcgCount += variant.count || 0;
   }
   return pocketCount > tcgCount ? DECK_FORMATS.POCKET : DECK_FORMATS.TCG;
 }

@@ -4,6 +4,7 @@ import { BLACK_BOLT_WHITE_FLARE_ORDER } from './black-bolt-white-flare-order.gen
 import { tcgdexApiBase } from '../../../../../shared/tcgdex/tcgdex-url.mjs';
 import { withCardArt } from '../../../../../shared/tcgdex/card-art.mjs';
 import { fetchCustomSetManifest, isCustomSetId } from '../../../../../shared/tcgdex/custom-sets.mjs';
+import { compareReleaseDateNewestFirst } from './release-date-order.mjs';
 
 const TCGDEX_BASE = tcgdexApiBase();
     
@@ -112,9 +113,64 @@ const TCGDEX_BASE = tcgdexApiBase();
     // (basic + special + rarer variants) printed in a Standard-legal set.
     export const ENERGY_SET_ID = '__energy__';
     const ENERGY_SET_LOGO = 'src/assets/energy/colorless.png';
-    let energySummaryCache = null;
-    
-    
+
+    // Caches a loader's promise per key and forgets it on rejection, so a failed request is retried.
+    function memoizeUntilFailure(load) {
+      const cache = new Map();
+      return (key) => {
+        if (cache.has(key)) return cache.get(key);
+        const promise = load(key).catch((error) => {
+          cache.delete(key);
+          throw error;
+        });
+        cache.set(key, promise);
+        return promise;
+      };
+    }
+
+    // Newest release first; an unknown date sorts last.
+    const compareNewestFirst = (a, b) => compareReleaseDateNewestFirst(a.releaseDate, b.releaseDate);
+
+    const imagedCards = (record) => (record.cards || []).filter((card) => card.image);
+
+    // A card the grid can show: it has an id, a name and art.
+    const isDisplayableCard = (card) => Boolean(card?.id && card?.name && card.image);
+
+    // The tile Browse Sets draws for one set; a fetcher overrides `setId` for a rewritten or limited set.
+    function setTileOf(record, { setId = record.id, seriesId, cardCount, category }) {
+      return {
+        setId,
+        name: record.name,
+        seriesId,
+        releaseDate: record.releaseDate || '',
+        logo: normalizeAssetUrl(record.logo),
+        symbol: normalizeAssetUrl(record.symbol),
+        cardCount,
+        category,
+      };
+    }
+
+    const energyTabEntry = ({ setId, cardCount, category }) => ({
+      setId,
+      name: 'Energy',
+      seriesId: '',
+      releaseDate: '',
+      logo: ENERGY_SET_LOGO,
+      symbol: '',
+      cardCount,
+      category,
+    });
+
+    // The Energy tab is additive: a lookup failure shouldn't break the rest of the browser.
+    async function appendEnergyTab(sets, { setId, category, loadCards }) {
+      try {
+        const energyCards = await loadCards();
+        if (energyCards.length > 0) sets.push(energyTabEntry({ setId, cardCount: energyCards.length, category }));
+      } catch {
+        // Left out; the sets above still show.
+      }
+    }
+
     function normalizeAssetUrl(url = '') {
       const value = String(url || '').trim();
       if (!value) return '';
@@ -157,24 +213,22 @@ const TCGDEX_BASE = tcgdexApiBase();
     // A custom set's record names each card's category itself: the cached lists above predate it.
     const supertypeOfCategory = (category) =>
       category === 'Pokemon' ? 'Pokémon' : CATEGORY_TO_SUPERTYPE[category] || null;
-    let cardSupertypeIndexPromise = null;
-    function fetchCardSupertypeIndex() {
-      if (cardSupertypeIndexPromise) return cardSupertypeIndexPromise;
-      cardSupertypeIndexPromise = Promise.all(
-        Object.keys(CATEGORY_TO_SUPERTYPE).map(async (category) => {
-          const url = new URL(`${TCGDEX_BASE}/cards`);
-          url.searchParams.set('category', category);
-          const rows = await fetchJson(url.toString());
-          return rows.map((row) => [row.id, CATEGORY_TO_SUPERTYPE[category]]);
+    // The /cards?category=X list, one request per category per session. The Energy tab reads the same list.
+    const fetchCategoryCards = memoizeUntilFailure((category) => {
+      const url = new URL(`${TCGDEX_BASE}/cards`);
+      url.searchParams.set('category', category);
+      return fetchJson(url.toString());
+    });
+
+    const fetchCardSupertypeIndex = memoizeUntilFailure(async () => {
+      const groups = await Promise.all(
+        Object.entries(CATEGORY_TO_SUPERTYPE).map(async ([category, supertype]) => {
+          const rows = await fetchCategoryCards(category);
+          return rows.map((row) => [row.id, supertype]);
         })
-      )
-        .then((groups) => new Map(groups.flat()))
-        .catch((error) => {
-          cardSupertypeIndexPromise = null;
-          throw error;
-        });
-      return cardSupertypeIndexPromise;
-    }
+      );
+      return new Map(groups.flat());
+    });
 
     // Every Pokémon/Trainer/Energy card id in one flat filter — used to narrow
     // a Browse Sets card grid to one supertype (deck builder's summary-bar
@@ -233,16 +287,7 @@ const TCGDEX_BASE = tcgdexApiBase();
     };
     export const GENERATIONS = [9, 8, 7, 6, 5, 4, 3, 2, 1];
 
-    const seriesRecordCache = new Map();
-    async function fetchSeriesRecord(seriesId) {
-      if (seriesRecordCache.has(seriesId)) return seriesRecordCache.get(seriesId);
-      const promise = fetchJson(`${TCGDEX_BASE}/series/${seriesId}`).catch((error) => {
-        seriesRecordCache.delete(seriesId);
-        throw error;
-      });
-      seriesRecordCache.set(seriesId, promise);
-      return promise;
-    }
+    const fetchSeriesRecord = memoizeUntilFailure((seriesId) => fetchJson(`${TCGDEX_BASE}/series/${seriesId}`));
 
     const generationSetStubsCache = new Map(); // generation -> Promise<{setId, series}[]>
 
@@ -292,16 +337,7 @@ const TCGDEX_BASE = tcgdexApiBase();
         setStubs.map(async ({ setId, series }) => {
           try {
             const record = await fetchSetRecord(setId, series);
-            return {
-              setId: record.id,
-              name: record.name,
-              seriesId: series,
-              releaseDate: record.releaseDate || '',
-              logo: normalizeAssetUrl(record.logo),
-              symbol: normalizeAssetUrl(record.symbol),
-              cardCount: (record.cards || []).filter((c) => c.image).length,
-              category: 'generation',
-            };
+            return setTileOf(record, { seriesId: series, cardCount: imagedCards(record).length, category: 'generation' });
           } catch {
             return null;
           }
@@ -311,25 +347,13 @@ const TCGDEX_BASE = tcgdexApiBase();
       const sets = entries
         .filter(Boolean)
         .filter((entry) => entry.cardCount > 0)
-        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+        .sort(compareNewestFirst);
 
-      try {
-        const energyCards = await fetchGenerationEnergyCards(generation);
-        if (energyCards.length > 0) {
-          sets.push({
-            setId: generationEnergySetId(generation),
-            name: 'Energy',
-            seriesId: '',
-            releaseDate: '',
-            logo: ENERGY_SET_LOGO,
-            symbol: '',
-            cardCount: energyCards.length,
-            category: 'generation',
-          });
-        }
-      } catch {
-        // Energy tab is additive — a lookup failure shouldn't break the rest of the browser.
-      }
+      await appendEnergyTab(sets, {
+        setId: generationEnergySetId(generation),
+        category: 'generation',
+        loadCards: () => fetchGenerationEnergyCards(generation),
+      });
 
       return sets;
     }
@@ -349,22 +373,13 @@ const TCGDEX_BASE = tcgdexApiBase();
       const allSets = perGeneration.flat();
       const sets = allSets
         .filter((set) => !GENERATION_ENERGY_SET_ID_RE.test(set.setId))
-        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+        .sort(compareNewestFirst);
 
       const energyCardCount = allSets
         .filter((set) => GENERATION_ENERGY_SET_ID_RE.test(set.setId))
         .reduce((total, set) => total + set.cardCount, 0);
       if (energyCardCount > 0) {
-        sets.push({
-          setId: HOMEBREW_ENERGY_SET_ID,
-          name: 'Energy',
-          seriesId: '',
-          releaseDate: '',
-          logo: ENERGY_SET_LOGO,
-          symbol: '',
-          cardCount: energyCardCount,
-          category: 'generation',
-        });
+        sets.push(energyTabEntry({ setId: HOMEBREW_ENERGY_SET_ID, cardCount: energyCardCount, category: 'generation' }));
       }
       return sets;
     }
@@ -454,17 +469,13 @@ const TCGDEX_BASE = tcgdexApiBase();
         format.sets.map(async ([setId, series, lastNumber]) => {
           try {
             const record = await fetchSetRecord(setId, series);
-            const imaged = (record.cards || []).filter((c) => c.image);
-            return {
+            const imaged = imagedCards(record);
+            return setTileOf(record, {
               setId: lastNumber ? formatLimitedSetId(formatId, record.id) : record.id,
-              name: record.name,
               seriesId: series,
-              releaseDate: record.releaseDate || '',
-              logo: normalizeAssetUrl(record.logo),
-              symbol: normalizeAssetUrl(record.symbol),
               cardCount: (lastNumber ? withinLastNumber(imaged, lastNumber) : imaged).length,
               category: 'generation',
-            };
+            });
           } catch {
             return null;
           }
@@ -472,7 +483,7 @@ const TCGDEX_BASE = tcgdexApiBase();
       );
       return entries
         .filter((entry) => entry && entry.cardCount > 0)
-        .sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+        .sort(compareNewestFirst);
     }
 
     // Custom sets (design 075): the sets installed in this repo (client/src/assets/custom-sets),
@@ -496,7 +507,7 @@ const TCGDEX_BASE = tcgdexApiBase();
           cardCount: set.cardCount,
           category,
         }))
-        .sort((a, b) => String(b.releaseDate).localeCompare(String(a.releaseDate)) || a.name.localeCompare(b.name));
+        .sort((a, b) => compareNewestFirst(a, b) || a.name.localeCompare(b.name));
     }
 
     // Every Energy card across the Homebrew generations, A to Z.
@@ -514,16 +525,12 @@ const TCGDEX_BASE = tcgdexApiBase();
             // The Other tab's 151 carries extra cards, so it gets its own id and
             // cache slot; the Generation 9 tab keeps the plain sv03.5 set.
             const isOther151 = entry.setId === SET_151_ID && entry.category === 'other';
-            return {
+            return setTileOf(record, {
               setId: isOther151 ? OTHER_151_SET_ID : record.id,
-              name: record.name,
               seriesId: entry.series,
-              releaseDate: record.releaseDate || '',
-              logo: normalizeAssetUrl(record.logo),
-              symbol: normalizeAssetUrl(record.symbol),
-              cardCount: (record.cards || []).filter((c) => c.image).length + (isOther151 ? SET_151_ADDITIONS.length : 0),
+              cardCount: imagedCards(record).length + (isOther151 ? SET_151_ADDITIONS.length : 0),
               category: entry.category || 'standard',
-            };
+            });
           } catch {
             return null;
           }
@@ -535,40 +542,15 @@ const TCGDEX_BASE = tcgdexApiBase();
         .filter((entry) => entry.cardCount > 0);
       const combinedEntries = await Promise.all([buildBlackBoltWhiteFlareEntry(), buildGen12Entry()]);
       sets.push(...combinedEntries.filter(Boolean));
-      sets.sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+      sets.sort(compareNewestFirst);
 
-      try {
-        const energyCards = await fetchLegalEnergyCards();
-        if (energyCards.length > 0) {
-          sets.push({
-            setId: ENERGY_SET_ID,
-            name: 'Energy',
-            seriesId: '',
-            releaseDate: '',
-            logo: ENERGY_SET_LOGO,
-            symbol: '',
-            cardCount: energyCards.length,
-            category: 'standard',
-          });
-        }
-      } catch {
-        // Energy tab is additive — a lookup failure shouldn't break the rest of the browser.
-      }
+      await appendEnergyTab(sets, { setId: ENERGY_SET_ID, category: 'standard', loadCards: fetchLegalEnergyCards });
 
       return sets;
     }
 
     // Every Energy card (id + localId + name) across all TCGdex sets.
-    async function fetchEnergyCardSummaries() {
-      if (energySummaryCache) return energySummaryCache;
-      const url = new URL(`${TCGDEX_BASE}/cards`);
-      url.searchParams.set('category', 'Energy');
-      energySummaryCache = fetchJson(url.toString()).catch((error) => {
-        energySummaryCache = null;
-        throw error;
-      });
-      return energySummaryCache;
-    }
+    const fetchEnergyCardSummaries = () => fetchCategoryCards('Energy');
 
     // The Mega Evolution Energy (MEE) support product — the modern-standard basic
     // energy reprint for the current era — has no `image` in TCGdex at all (its
@@ -627,12 +609,11 @@ const TCGDEX_BASE = tcgdexApiBase();
         [...refsBySetId.entries()].map(async ([setId, { series, ids }]) => {
           try {
             const record = await fetchSetRecord(setId, series);
-            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
             const cardsById = new Map((record.cards || []).map((card) => [card.id, card]));
             return ids
               .map((id) => cardsById.get(id))
-              .filter((card) => card?.id && card?.name && card.image)
-              .map((card) => normalizeSetCard(card, set, 'Energy'));
+              .filter(isDisplayableCard)
+              .map((card) => normalizeSetCard(card, record, 'Energy'));
           } catch {
             return [];
           }
@@ -661,12 +642,11 @@ const TCGDEX_BASE = tcgdexApiBase();
         [...summariesBySetId.values()].map(async ({ entry, summaries: setSummaries }) => {
           try {
             const record = await fetchSetRecord(entry.setId, entry.series);
-            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
             const cardsById = new Map((record.cards || []).map((card) => [card.id, card]));
             return setSummaries
               .map((summary) => cardsById.get(summary.id))
-              .filter((card) => card?.id && card?.name && card.image)
-              .map((card) => normalizeSetCard(card, set, 'Energy'));
+              .filter(isDisplayableCard)
+              .map((card) => normalizeSetCard(card, record, 'Energy'));
           } catch {
             return [];
           }
@@ -876,10 +856,9 @@ const TCGDEX_BASE = tcgdexApiBase();
         SET_151_ADDITIONS.map(async (ref) => {
           try {
             const record = await fetchSetRecord(ref.setId, ref.series || 'sv');
-            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
             const card = (record.cards || []).find((c) => c.id === ref.id);
-            if (!card?.name || !card.image) return;
-            extras.set(ref.id, normalizeSetCard(card, set, 'Pokémon'));
+            if (!isDisplayableCard(card)) return;
+            extras.set(ref.id, normalizeSetCard(card, record, 'Pokémon'));
           } catch {
             // Additions are additive: a failed lookup leaves the rest of 151 intact.
           }
@@ -899,27 +878,40 @@ const TCGDEX_BASE = tcgdexApiBase();
       return [...base.flatMap(withFollowers), ...rares];
     }
 
-    export const GEN_1_2_SET_ID = '__other_gen12__';
-    const GEN_1_2_SET_IDS = ['base1', 'base3', 'base4', 'neo1']; // Base Set, Fossil, Base Set 2, Neo Genesis
-
-    // One Other-tab set holding the four Gen 1-2 core sets. Card order is baked into the
-    // generated order file (Pokémon by Pokédex number, then Trainers, then Energy).
-    async function buildGen12Entry() {
+    // An Other-tab set combining several TCGdex sets; it takes the newest release date among them and
+    // is left out when any of them fails to load.
+    async function buildCombinedOtherEntry({ setId, name, seriesId, logo, sets, cardCount }) {
       try {
-        const records = await Promise.all(GEN_1_2_SET_IDS.map((id) => fetchSetRecord(id, id.startsWith('neo') ? 'neo' : 'base')));
+        const records = await Promise.all(sets.map(([id, series]) => fetchSetRecord(id, series)));
         return {
-          setId: GEN_1_2_SET_ID,
-          name: '1 + 2 dex',
-          seriesId: 'base',
-          releaseDate: records.map((r) => r.releaseDate || '').sort().pop() || '',
-          logo: '',
+          setId,
+          name,
+          seriesId,
+          releaseDate: records.map((record) => record.releaseDate || '').sort().pop() || '',
+          logo,
           symbol: '',
-          cardCount: GEN_1_2_ORDER.length + GEN_1_2_HOLO_ENERGY.length + GEN_1_REVERSE_HOLO_ENERGY.ids.length,
+          cardCount: cardCount(records),
           category: 'other',
         };
       } catch {
         return null;
       }
+    }
+
+    export const GEN_1_2_SET_ID = '__other_gen12__';
+    const GEN_1_2_SET_IDS = ['base1', 'base3', 'base4', 'neo1']; // Base Set, Fossil, Base Set 2, Neo Genesis
+
+    // One Other-tab set holding the four Gen 1-2 core sets. Card order is baked into the
+    // generated order file (Pokémon by Pokédex number, then Trainers, then Energy).
+    function buildGen12Entry() {
+      return buildCombinedOtherEntry({
+        setId: GEN_1_2_SET_ID,
+        name: '1 + 2 dex',
+        seriesId: 'base',
+        logo: '',
+        sets: GEN_1_2_SET_IDS.map((id) => [id, id.startsWith('neo') ? 'neo' : 'base']),
+        cardCount: () => GEN_1_2_ORDER.length + GEN_1_2_HOLO_ENERGY.length + GEN_1_REVERSE_HOLO_ENERGY.ids.length,
+      });
     }
 
     // Gen 1 Energy with a real Reverse Holo print: Legendary Collection's Full Heal and
@@ -931,11 +923,10 @@ const TCGDEX_BASE = tcgdexApiBase();
       try {
         const { setId, series, ids } = GEN_1_REVERSE_HOLO_ENERGY;
         const record = await fetchSetRecord(setId, series);
-        const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
         return ids
           .map((id) => (record.cards || []).find((c) => c.id === id))
-          .filter((card) => card?.name && card.image)
-          .map((card) => buildReverseHoloEnergyCard(normalizeSetCard(card, set, 'Energy')));
+          .filter(isDisplayableCard)
+          .map((card) => buildReverseHoloEnergyCard(normalizeSetCard(card, record, 'Energy')));
       } catch {
         return [];
       }
@@ -962,10 +953,9 @@ const TCGDEX_BASE = tcgdexApiBase();
         GEN_1_2_HOLO_ENERGY.map(async ({ setId, series, id, label }) => {
           try {
             const record = await fetchSetRecord(setId, series);
-            const set = { id: record.id, name: record.name, releaseDate: record.releaseDate || '' };
             const card = (record.cards || []).find((c) => c.id === id);
-            if (!card?.name || !card.image) return null;
-            const holo = buildReverseHoloEnergyCard(normalizeSetCard(card, set, 'Energy'));
+            if (!isDisplayableCard(card)) return null;
+            const holo = buildReverseHoloEnergyCard(normalizeSetCard(card, record, 'Energy'));
             return { ...holo, localId: `${card.localId} · ${label}` };
           } catch {
             return null;
@@ -994,22 +984,15 @@ const TCGDEX_BASE = tcgdexApiBase();
 
     // One Other-tab set holding both Unova sets (they stay separate in the Standard
     // tab). Card order is baked into the generated order file, Unova Pokédex first.
-    async function buildBlackBoltWhiteFlareEntry() {
-      try {
-        const records = await Promise.all(BBWF_SET_IDS.map((id) => fetchSetRecord(id, 'sv')));
-        return {
-          setId: BLACK_BOLT_WHITE_FLARE_SET_ID,
-          name: 'Black Bolt & White Flare',
-          seriesId: 'sv',
-          releaseDate: records.map((r) => r.releaseDate || '').sort().pop() || '',
-          logo: BBWF_LOGO,
-          symbol: '',
-          cardCount: records.reduce((sum, r) => sum + (r.cards || []).filter((c) => c.image).length, 0),
-          category: 'other',
-        };
-      } catch {
-        return null;
-      }
+    function buildBlackBoltWhiteFlareEntry() {
+      return buildCombinedOtherEntry({
+        setId: BLACK_BOLT_WHITE_FLARE_SET_ID,
+        name: 'Black Bolt & White Flare',
+        seriesId: 'sv',
+        logo: BBWF_LOGO,
+        sets: BBWF_SET_IDS.map((id) => [id, 'sv']),
+        cardCount: (records) => records.reduce((sum, record) => sum + imagedCards(record).length, 0),
+      });
     }
 
     async function fetchBlackBoltWhiteFlareCards() {
@@ -1037,14 +1020,9 @@ const TCGDEX_BASE = tcgdexApiBase();
       // shouldn't block browsing the set's cards.
       const supertypeIndexPromise = fetchCardSupertypeIndex().catch(() => null);
       const record = await fetchSetRecord(setId);
-      const set = {
-        id: record.id,
-        name: record.name,
-        releaseDate: record.releaseDate || '',
-      };
       const cards = (record.cards || [])
-        .filter((card) => card?.id && card?.name && card.image)
-        .map((card) => normalizeSetCard(card, set, supertypeOfCategory(card.category) || undefined));
+        .filter(isDisplayableCard)
+        .map((card) => normalizeSetCard(card, record, supertypeOfCategory(card.category) || undefined));
 
       const supertypeIndex = await supertypeIndexPromise;
       if (supertypeIndex) {

@@ -1,7 +1,7 @@
 # Area: rules engine (pure, DOM-free modules under shared/engine)
 <!-- Cap 60 lines. Moved out of MAP.md on 2026-10-15 (design 073 batch 3) to keep MAP under cap;
      one line per module, wording unchanged. Beginner guide with a per-card fix recipe: docs/rules-engine-beginner-guide.md.
-     DOM-coupled glue (rules-bridge.js, trainer-execution.js, chat-buttons.js) stays in MAP.md § DOM-coupled. -->
+     DOM-coupled glue (rules-bridge.js, chat-buttons.js; both entry-point shells since design 090) stays in MAP.md § DOM-coupled. -->
 Purpose: the headless rules layer — legality, damage, abilities, Trainers, Tools, Stadiums, attack text parsing. Ratcheted by `pnpm audit:oracle|abilities|trainers|attacks`.
 Owner code: shared/engine/rules/, shared/engine/effects/ (plus server/game/turn-order-transport.mjs for the opening coin)
 ## Legality and damage

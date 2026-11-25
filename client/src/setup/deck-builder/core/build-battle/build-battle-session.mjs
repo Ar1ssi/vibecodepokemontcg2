@@ -3,6 +3,7 @@
 // means the session lives in memory only.
 
 import { isBasicEnergy } from '../../../../../../shared/engine/rules/card-classify.mjs';
+import { deckVariants } from '../deck-variants.mjs';
 import { BASIC_ENERGY_LABELS, getBuildBattleBox } from './box-catalog.mjs';
 import { PACK_MODELS } from './pack-models.mjs';
 import { createUnboxing, finishedUnboxing, parseUnboxing } from './unboxing.mjs';
@@ -99,13 +100,11 @@ export function parseUnsavedDeck(value) {
  */
 export function deckCardCounts(deck = {}) {
   const counts = new Map();
-  for (const group of Object.values(deck || {})) {
-    for (const entry of group?.cards || []) {
-      const id = entry?.data?.id;
-      const count = Number(entry?.count) || 0;
-      if (!id || count <= 0) continue;
-      counts.set(id, (counts.get(id) || 0) + count);
-    }
+  for (const entry of deckVariants(deck)) {
+    const id = entry?.data?.id;
+    const count = Number(entry?.count) || 0;
+    if (!id || count <= 0) continue;
+    counts.set(id, (counts.get(id) || 0) + count);
   }
   return [...counts.entries()];
 }
@@ -289,14 +288,12 @@ export function randomSeed(cryptoImpl = globalThis.crypto) {
 
 function countDeckById(deck) {
   const counts = new Map();
-  for (const group of Object.values(deck || {})) {
-    for (const variant of group?.cards || []) {
-      const card = variant?.data || {};
-      if (isBasicEnergy(card)) continue;
-      const entry = counts.get(card.id) || { name: card.name, count: 0 };
-      entry.count += Number(variant?.count || 0);
-      counts.set(card.id, entry);
-    }
+  for (const variant of deckVariants(deck)) {
+    const card = variant?.data || {};
+    if (isBasicEnergy(card)) continue;
+    const entry = counts.get(card.id) || { name: card.name, count: 0 };
+    entry.count += Number(variant?.count || 0);
+    counts.set(card.id, entry);
   }
   return counts;
 }

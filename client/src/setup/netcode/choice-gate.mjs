@@ -15,6 +15,7 @@ export const CHOICE_BACKSTOP_MS = 9000;
  * @param {() => number} deps.now
  * @param {(ms: number) => Promise<void>} deps.sleep
  * @param {number} [deps.backstopMs]
+ * @param {(error: unknown) => void} [deps.onError] told of a waiter that threw; the gate opens regardless
  * @returns {() => Promise<void>}
  */
 export function createChoiceGate({
@@ -24,6 +25,7 @@ export function createChoiceGate({
   now,
   sleep,
   backstopMs = CHOICE_BACKSTOP_MS,
+  onError,
 }) {
   return async function whenChoiceMayOpen() {
     const deadline = now() + backstopMs;
@@ -31,7 +33,9 @@ export function createChoiceGate({
       const left = deadline - now();
       if (!(left > 0)) return Promise.resolve();
       // A waiter that throws must not keep the choice from opening.
-      const settled = Promise.resolve().then(step).catch(() => {});
+      const settled = Promise.resolve()
+        .then(step)
+        .catch((error) => onError?.(error));
       return Promise.race([settled, sleep(left)]);
     };
     await bounded(queueIdle);

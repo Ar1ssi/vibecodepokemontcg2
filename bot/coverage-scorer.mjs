@@ -19,6 +19,9 @@
 //
 // Deterministic given a seed: the RNG only breaks ties inside one count tier.
 
+import { optionKey } from './heuristic-scorer.mjs';
+import { pickRandom } from './pick-random.mjs';
+
 const TURN_ENDING_KINDS = new Set(['attack', 'pass', 'end']);
 
 /**
@@ -51,11 +54,6 @@ export function coverageKey(option, observation) {
   }
 }
 
-function pickRandom(list, rng) {
-  if (list.length === 1) return list[0];
-  return list[Math.floor(rng() * list.length) % list.length];
-}
-
 // Least-exercised first; ties broken by the seeded RNG so a run stays reproducible.
 function leastExercised(options, counts, observation, rng) {
   let best = Infinity;
@@ -82,9 +80,7 @@ export function createCoverageScorer({ rng = Math.random } = {}) {
       // already shown to be inert this turn (see heuristic-scorer.mjs optionKey).
       const tried = new Set(observation?.triedThisTurn || []);
       const options = allOptions.filter(
-        (option) =>
-          !(option.kind === 'playTrainer' &&
-            tried.has(`playTrainer:${(observation?.self?.hand || [])[option.handIndex]?.name || option.handIndex}`))
+        (option) => !(option.kind === 'playTrainer' && tried.has(optionKey(option, observation)))
       );
       if (!options.length) return null;
 

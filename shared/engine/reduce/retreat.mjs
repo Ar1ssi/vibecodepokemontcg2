@@ -6,6 +6,7 @@
 
 import { discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, getRetreatCostCount } from '../cards.mjs';
+import { flipCoin } from '../rng.mjs';
 import { expandEnergyEntries, canPayAttackCost } from '../rules/attack-engine.mjs';
 import { combinedToolRetreatCost, toolRetreatEnergyToHand } from '../rules/tool-combat.mjs';
 import { teamNoRetreatCostForActive } from '../rules/ability-executors.mjs';
@@ -73,7 +74,6 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   // Cost is N less" wording and the opponent-side increases (A10). The position
   // lists let "as long as this Pokémon is on your Bench / your Active Pokémon"
   // holders be read (Dodrio Retreat Aid, Dark Muk Sticky Goo).
-  const opponent = opponentPlayer;
   cost += abilityRetreatCost(inPlayView(state, card), {
     ...abilitySideContext(state, playerId),
     zone: zoneId,
@@ -311,7 +311,7 @@ export function retreatCommand({ draft, playerId, payload, events, activeRng }) 
   const mirage = stadiumRetreatCoin(draft.stadium?.card || draft.stadium);
   if (mirage) {
     const activeMon = (player?.zones?.active || []).find((c) => !c.attachedTo);
-    const face = activeRng.next() < 0.5 ? 'heads' : 'tails';
+    const face = flipCoin(activeRng);
     events.push({ type: 'coinFlipped', playerId, face, source: mirage.source });
     if (face === 'tails') {
       if (activeMon) activeMon.cannotRetreatUntilTurn = draft.turn.number;

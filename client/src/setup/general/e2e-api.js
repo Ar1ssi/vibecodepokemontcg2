@@ -135,7 +135,7 @@ function attachedCardsFor(user, zoneId, card) {
   return cards.filter((other) => other.image && other.image.relative === card.image);
 }
 
-// Design 004 slice 4: the third overlay kind (§ risk gate) — trainer-execution.js's
+// Design 004 slice 4: the third overlay kind (§ risk gate) — mat-picker.js's
 // openMatPick highlights in-play Pokémon on the mat itself instead of opening a modal,
 // styling their live `card.image` DOM node with a yellow outline and resolving on a
 // document-level click on that node (see openMatPick, client/src/setup/rules/
@@ -234,7 +234,7 @@ export function installE2eApi() {
     stepLog: [],
     // Design 002/003 slice 3.12 flip-gate harness: count of 'cmdRejected' events this
     // client has received, and the most recent 'rules-game-ended' detail (server's
-    // authoritative gameEnded under the flag; local evaluateWinCondition off the flag).
+    // authoritative gameEnded).
     cmdRejectedCount: 0,
     lastCmdRejected: null,
     cmdLog: [],
@@ -278,8 +278,8 @@ export function installE2eApi() {
     // real client action path — never throws, always resolves to { ok, error }. Every
     // branch below reuses the exact call the live UI makes for that move (see design 004
     // § slice 3): playBasic/attach/evolve/playTrainer all go through moveCardBundle with
-    // action 'move' — despite the name, every UI call site (drag.js, click-events.js,
-    // trainer-execution.js) passes the literal string 'move' regardless of whether the
+    // action 'move' — despite the name, every UI call site (drag.js, click-events.js)
+    // passes the literal string 'move' regardless of whether the
     // move is a plain play, an attach, or an evolution; move-card.js itself classifies
     // attach vs. evolve from whether `targetIndex` resolves to an existing card in the
     // destination zone, not from the action string. Playing a Trainer is hand → 'board'
@@ -393,9 +393,6 @@ export function installE2eApi() {
           candidates: matCandidates.map((c, index) => ({ index, name: c.name })),
         };
       }
-      if (document.getElementById('rulesCoinEffectOverlay')) {
-        return { type: 'coinEffect', open: true };
-      }
       if (document.getElementById('rulesCoinCallOverlay')) {
         return { type: 'coinCall', open: true };
       }
@@ -403,7 +400,7 @@ export function installE2eApi() {
       return isChoiceWaitingOnEffects() ? { open: false, awaitingEffects: true } : { open: false };
     },
     // Design 004 slice 4: resolves whichever modal picker() reported. `face` answers
-    // coinEffect/coinCall (see callCoin); `indices` answers cardPicker/matPick — matPick
+    // coinCall (see callCoin); `indices` answers cardPicker/matPick — matPick
     // only ever resolves its first index since openMatPick takes one click and closes.
     pick(indices = [], face = 'heads') {
       const netcodeChoice = netcodeChoiceOptions();
@@ -423,9 +420,6 @@ export function installE2eApi() {
         if (!target) return false;
         target.img.click();
         return true;
-      }
-      if (document.getElementById('rulesCoinEffectOverlay')) {
-        return this.callCoin(face);
       }
       if (document.getElementById('rulesCoinCallOverlay')) {
         return this.callCoin(face);
@@ -618,14 +612,9 @@ export function installE2eApi() {
         overlay: !!document.getElementById('rulesCoinCallOverlay'),
       };
     },
-    // Design 004 slice 4: extended to the mid-effect coin-flip overlay
-    // (`#rulesCoinEffectOverlay`, e.g. Team Rocket's Mars — see openCoinFlipOverlay in
-    // trainer-execution.js), which uses `data-face` buttons rather than the turn-order
-    // call overlay's `data-coin-call` — the two overlays never coexist.
     callCoin(face = 'heads') {
       const btn = document.querySelector(
-        `#rulesCoinCallOverlay button[data-coin-call="${face}"], ` +
-          `#rulesCoinEffectOverlay button[data-face="${face}"]`
+        `#rulesCoinCallOverlay button[data-coin-call="${face}"]`
       );
       if (btn) btn.click();
       return !!btn;

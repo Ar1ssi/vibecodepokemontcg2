@@ -1,7 +1,7 @@
 // Drives the batcher over the app socket (design 088 §5). Nothing here may throw or log its own traffic.
 import { createBatcher } from '../../../shared/log/batcher.mjs';
 import { createClockSync } from '../../../shared/log/clock-sync.mjs';
-import { LIMITS } from '../../../shared/log/log-schema.mjs';
+import { LIMITS, LOG_EVENTS, LOG_ROUTES, isCaptureLevel } from '../../../shared/log/log-schema.mjs';
 
 const TICK_MS = 250;
 const FLUSH_WAIT_MS = 1500;
@@ -37,7 +37,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
 
   const ping = swallow(() => {
     socket.timeout(ACK_TIMEOUT_MS).emit(
-      'log:ping',
+      LOG_EVENTS.ping,
       { t0: now() },
       swallow((err, res) => {
         if (!err && res) clock.sample({ t0: res.t0, t1: now(), serverT: res.serverT });
@@ -63,7 +63,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
     const batch = batcher.take(ring, now());
     if (!batch) return;
     socket.timeout(BATCH_TIMEOUT_MS).emit(
-      'log:batch',
+      LOG_EVENTS.batch,
       { loadId, lines: batch.lines, offset: clock.offset(), rtt: clock.rtt() },
       swallow((err, ack) => {
         if (err) batcher.failed('timeout', now());
@@ -81,7 +81,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
 
   const hello = swallow(() => {
     socket.timeout(ACK_TIMEOUT_MS).emit(
-      'log:hello',
+      LOG_EVENTS.hello,
       {
         v: 1,
         clientId,
@@ -111,7 +111,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
   });
 
   const onLevel = swallow(({ level, by } = {}) => {
-    if (level !== 'debug' && level !== 'trace') return;
+    if (!isCaptureLevel(level)) return;
     log.setLevel(level);
     log.info('log', 'level', { level, by: by ?? null });
   });
@@ -127,7 +127,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
     // send the newest lines that fit (an older gap is reported by the export).
     const lines = batcher.unackedNewest(ring, LIMITS.beaconBodyChars);
     if (lines.length === 0) return;
-    nav.sendBeacon?.('/api/log/beacon', JSON.stringify({ clientId, loadId, lines, offset: clock.offset(), rtt: clock.rtt() }));
+    nav.sendBeacon?.(LOG_ROUTES.beacon, JSON.stringify({ clientId, loadId, lines, offset: clock.offset(), rtt: clock.rtt() }));
   });
 
   const unsubscribe = onEntry(swallow((e) => batcher.note({ seq: e.seq, lvl: e.lvl }, now())));
@@ -140,7 +140,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
 
   socket.on('connect', hello);
   socket.on('disconnect', onDisconnect);
-  socket.on('log:level', onLevel);
+  socket.on(LOG_EVENTS.level, onLevel);
   doc.addEventListener('visibilitychange', onVisibility);
   win.addEventListener('pagehide', onPageHide);
   if (socket.connected) hello();
@@ -180,7 +180,7 @@ export function startShipping({ socket, log, ring, onEntry, clientId, loadId, wi
       unsubscribe?.();
       socket.off?.('connect', hello);
       socket.off?.('disconnect', onDisconnect);
-      socket.off?.('log:level', onLevel);
+      socket.off?.(LOG_EVENTS.level, onLevel);
       doc.removeEventListener('visibilitychange', onVisibility);
       win.removeEventListener('pagehide', onPageHide);
       settleWaiting(false);

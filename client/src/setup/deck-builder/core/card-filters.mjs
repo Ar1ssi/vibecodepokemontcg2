@@ -127,25 +127,11 @@ export const FILTER_RARITIES = [
   'Promo',
 ];
 
-export const FILTER_RETREAT_COSTS = ['0', '1', '2', '3', '4', '5'];
+// The last retreat pip means "5 or more", not exactly 5.
+const RETREAT_FIVE_OR_MORE = '5';
+export const FILTER_RETREAT_COSTS = ['0', '1', '2', '3', '4', RETREAT_FIVE_OR_MORE];
 
 export const HP_RANGE = { min: 0, max: 400, step: 10 };
-
-const ARRAY_GROUPS = [
-  'supertypes',
-  'energyTypes',
-  'trainerTypes',
-  'energyKinds',
-  'stages',
-  'mechanics',
-  'rarities',
-  'sets',
-  'regulationMarks',
-  'weaknessTypes',
-  'retreatCosts',
-];
-
-const BOOLEAN_GROUPS = ['hasAbility', 'inDeck'];
 
 /** The empty filter state. Array groups toggle members; the rest are scalars. */
 export function createEmptyFilters() {
@@ -169,24 +155,23 @@ export function createEmptyFilters() {
   };
 }
 
+// Group kinds come from the empty state's shape, so a new group is one edit there.
+const ARRAY_GROUPS = Object.entries(createEmptyFilters())
+  .filter(([, value]) => Array.isArray(value))
+  .map(([group]) => group);
+const BOOLEAN_GROUPS = Object.entries(createEmptyFilters())
+  .filter(([, value]) => typeof value === 'boolean')
+  .map(([group]) => group);
+
 function withDefaults(filters) {
   return { ...createEmptyFilters(), ...(filters || {}) };
 }
 
 const hasHpRange = (filters) => filters.hpMin != null || filters.hpMax != null;
 
+/** One count per chip the drawer shows, so the badge and the chip list cannot disagree. */
 export function countActiveFilters(filters = {}) {
-  const state = withDefaults(filters);
-  let count = 0;
-  for (const group of ARRAY_GROUPS) {
-    count += Array.isArray(state[group]) ? state[group].length : 0;
-  }
-  if (state.format) count += 1;
-  if (hasHpRange(state)) count += 1;
-  for (const group of BOOLEAN_GROUPS) {
-    if (state[group] === true) count += 1;
-  }
-  return count;
+  return describeActiveFilters(filters).length;
 }
 
 export function hasActiveFilters(filters = {}) {
@@ -303,7 +288,7 @@ function matchesEnergyKind(card, kind) {
 function matchesRetreat(card, cost) {
   const retreat = Number(card?.retreat);
   if (!isPokemon(card) || !Number.isFinite(retreat)) return false;
-  return cost === '5' ? retreat >= 5 : retreat === Number(cost);
+  return cost === RETREAT_FIVE_OR_MORE ? retreat >= 5 : retreat === Number(cost);
 }
 
 function matchesHp(card, filters) {
@@ -395,6 +380,24 @@ const SERVER_ENERGY_TYPE = { Basic: 'Normal', Special: 'Special' };
 const SERVER_SUFFIX = { ex: 'ex', EX: 'EX', GX: 'GX' };
 
 /**
+ * Every param buildTcgdexFilterParams can emit, loosest narrowing first: the order
+ * the query-length guard drops them in when a query outgrows the proxy limit.
+ */
+export const TCGDEX_FILTER_PARAM_DROP_ORDER = [
+  'rarity',
+  'suffix',
+  'retreat',
+  'regulationMark',
+  'trainerType',
+  'energyType',
+  'hp',
+  'stage',
+  'types',
+  ...FILTER_FORMATS.map((format) => `legal.${format}`),
+  'category',
+];
+
+/**
  * The subset of the filters TCGdex can apply on `/cards` (verified live,
  * design 050), as query params. TCGdex narrows; `applyCardFilters` stays the
  * truth, so a param only has to be no stricter than its client filter.
@@ -419,7 +422,7 @@ export function buildTcgdexFilterParams(filters = {}) {
     if (rarities.has('Holo Rare')) rarities.add('Rare');
     params.rarity = join([...rarities]);
   }
-  if (state.retreatCosts.length === 1 && state.retreatCosts[0] !== '5') {
+  if (state.retreatCosts.length === 1 && state.retreatCosts[0] !== RETREAT_FIVE_OR_MORE) {
     params.retreat = state.retreatCosts[0];
   }
   // The proxy accepts one value per key, so the range goes out as its lower
@@ -449,6 +452,13 @@ export function deriveSetOptions(cards = []) {
     .sort((a, b) => b.releaseDate.localeCompare(a.releaseDate) || a.label.localeCompare(b.label))
     .map(({ value, label }) => ({ value, label }));
 }
+
+const energyIconOptions = (types) =>
+  types.map((value) => ({
+    value,
+    label: capitalize(value),
+    icon: `/src/assets/energy/tokens/${value}.png`,
+  }));
 
 /**
  * The drawer sections, as data. `kind` picks the control: pills, energy
@@ -489,11 +499,7 @@ export const BUILDER_FILTER_GROUPS = [
     label: 'Pokémon type',
     kind: 'icons',
     span: 2,
-    options: FILTER_ENERGY_TYPES.map((value) => ({
-      value,
-      label: capitalize(value),
-      icon: `/src/assets/energy/tokens/${value}.png`,
-    })),
+    options: energyIconOptions(FILTER_ENERGY_TYPES),
   },
   { key: 'stages', label: 'Stage', kind: 'pills', options: STAGE_OPTIONS },
   { key: 'mechanics', label: 'Special', kind: 'pills', options: MECHANIC_OPTIONS },
@@ -522,7 +528,7 @@ export const BUILDER_FILTER_GROUPS = [
     kind: 'pips',
     options: FILTER_RETREAT_COSTS.map((value) => ({
       value,
-      label: value === '5' ? '5+' : value,
+      label: value === RETREAT_FIVE_OR_MORE ? '5+' : value,
     })),
   },
   {
@@ -530,11 +536,7 @@ export const BUILDER_FILTER_GROUPS = [
     label: 'Weakness',
     kind: 'icons',
     span: 2,
-    options: FILTER_ENERGY_TYPES.filter((value) => value !== 'colorless').map((value) => ({
-      value,
-      label: capitalize(value),
-      icon: `/src/assets/energy/tokens/${value}.png`,
-    })),
+    options: energyIconOptions(FILTER_ENERGY_TYPES.filter((value) => value !== 'colorless')),
   },
   {
     key: 'rarities',
@@ -590,7 +592,7 @@ export function describeActiveFilters(filters = {}, context = {}) {
       }
       continue;
     }
-    for (const value of state[group.key] || []) {
+    for (const value of Array.isArray(state[group.key]) ? state[group.key] : []) {
       const prefix = GROUP_CHIP_PREFIX[group.key] || '';
       chips.push({
         group: group.key,

@@ -32,8 +32,12 @@ const PW = PACK.width;
 const LIFT_MM = 0.6;
 const TRAIL_HALF_MM = 3.8;
 const TRAIL_SAMPLES = 48;
-// The halo's half extents round the cut (mm), as wide as the pack and a bit, flat as an eye.
+// The halo's half extents round the cut (mm) before `haloScale`: about 1.9 pack widths across,
+// flat as an eye.
 const HALO_HALF = { x: 0.95 * PW, y: 0.42 * PW };
+// A glint's front (uFront, in u) parked off the pack: past the far end, or before the start.
+const GLINT_PAST_END = 1.2;
+const GLINT_BEFORE_START = -0.2;
 const BEAM_LENGTH_MM = 1800;
 // The beam's quad reaches this many beam half-heights from its middle: room for its fringes and
 // bloom to fade out before the quad's edge.
@@ -296,7 +300,7 @@ export function createTearFx({ model, shape }) {
     track(lightMaterial(RIBBON_FRAGMENT, cutUniforms(color, fringe, head), RIBBON_VERTEX));
   const trail = add(new Mesh(ribbon, cutMaterial(HOT_COLOR, 0.9, 1.6)), 2);
   const glint = add(new Mesh(ribbon, cutMaterial(GLINT_COLOR, 0.25, 0)), 3);
-  glint.material.uniforms.uFront.value = 1.2;
+  glint.material.uniforms.uFront.value = GLINT_PAST_END;
 
   const hint = spot([0.86, 0.95, 1], 12, 1);
   hint.position.set(path[0].x + 1.5, path[0].y, path[0].z + 0.2);
@@ -351,7 +355,7 @@ export function createTearFx({ model, shape }) {
       halo.scale.set(HALO_HALF.x * light.haloScale, HALO_HALF.y * light.haloScale * light.haloSquash, 1);
       show(beam, light.beam);
       beam.scale.y = light.beamMm * BEAM_SPAN;
-      glint.material.uniforms.uFront.value = glint.material.uniforms.uSide.value > 0 ? 1.2 : -0.2;
+      glint.material.uniforms.uFront.value = glint.material.uniforms.uSide.value > 0 ? GLINT_PAST_END : GLINT_BEFORE_START;
       show(glint, light.glint);
       show(trail, light.cut);
       show(head, light.cut * 0.4);

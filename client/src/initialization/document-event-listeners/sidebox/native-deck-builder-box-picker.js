@@ -5,13 +5,7 @@ import {
   filterBoxes,
   loadBoxCatalog,
 } from '../../../setup/deck-builder/core/customize-stage/boxes.mjs';
-
-const escapeHtml = (value = '') => String(value)
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#39;');
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
 /**
  * Deck box picker for the Customize tab (design 071): a gallery of TCG Live's deck boxes by their

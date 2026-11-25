@@ -4,6 +4,7 @@ import { cleanActionData } from '../../../../setup/general/clean-action-data.js'
 import { processAction } from '../../../../setup/general/process-action.js';
 import { restoreOwnDeck } from '../../../../setup/deck-constructor/own-deck.mjs';
 import { handleSpectatorButtons } from '../../../../setup/spectator/handle-spectator-buttons.js';
+import { leaveSoloRoom } from '../../../../setup/netcode/solo-room.js';
 import {
   removeSyncIntervals,
   resetNetcodeForRoomChange,
@@ -76,6 +77,8 @@ export const chooseUsername = (roomId) => {
  */
 export const joinRoomById = (roomId, { spectate }) => {
   if (!roomId) return;
+  // The page may have joined its solo room by itself (design 090); an explicit join replaces it.
+  leaveSoloRoom();
   // The checkbox is the "am I spectating" state many handlers read.
   document.getElementById('spectatorModeCheckbox').checked = spectate;
   document.getElementById('roomIdInput').value = roomId;
@@ -90,6 +93,10 @@ export const joinRoomById = (roomId, { spectate }) => {
   );
 };
 
+// reset(user, clean, build, invalidMessage, emit): no "reset" log line, deck rebuilt from the
+// stored deck data, and no "invalid deck" message when there is none.
+const clearBoard = (user) => reset(user, true, true, false, true);
+
 /** Puts the Multiplayer tab back in the lobby and restores this player's solo board. */
 const returnToLobby = () => {
   const connectedRoom = document.getElementById('connectedRoom');
@@ -98,7 +105,6 @@ const returnToLobby = () => {
   const p2Chatbox = document.getElementById('p2Chatbox');
   lobby.style.display = 'block';
   p2ExplanationBox.style.display = 'block';
-  document.getElementById('importState').style.display = 'inline';
   document.getElementById('flipBoardButton').style.display = 'inline-block';
   connectedRoom.style.display = 'none';
   clearSeatToken(systemState.roomId);
@@ -109,13 +115,13 @@ const returnToLobby = () => {
   systemState.opponentSocketId = '';
   cleanActionData('self');
   cleanActionData('opp');
-  reset('opp', true, true, false, true);
+  clearBoard('opp');
 
   // Put back the deck this player loaded (spectating or the room may have
   // replaced the self slot).
   restoreOwnDeck(systemState);
 
-  reset('self', true, true, false, true);
+  clearBoard('self');
   p2Chatbox.innerHTML = '';
   systemState.coachingMode = false;
   handleSpectatorButtons();
@@ -143,29 +149,27 @@ const returnToLobby = () => {
 export const initializeRoomButtons = () => {
   const roomIdInput = document.getElementById('roomIdInput');
 
-  const copyButton = document.getElementById('copyButton');
-  copyButton.addEventListener('click', () => {
-    navigator.clipboard.writeText(roomIdInput.value);
-
-    copyButton.classList.add('copied');
-    setTimeout(() => {
-      copyButton.classList.remove('copied');
-    }, 1000);
-  });
-
-  const roomHeaderCopyButton = document.getElementById('roomHeaderCopyButton');
-  roomHeaderCopyButton.addEventListener('click', () => {
-    navigator.clipboard.writeText(roomIdInput.value).then(() => {
-      roomHeaderCopyButton.classList.add('copied');
-      setTimeout(() => {
-        roomHeaderCopyButton.classList.remove('copied');
-      }, 1000);
+  // Shows the "copied" flash only once the clipboard accepted the id.
+  const copyRoomIdOnClick = (button) => {
+    button.addEventListener('click', () => {
+      navigator.clipboard
+        .writeText(roomIdInput.value)
+        .then(() => {
+          button.classList.add('copied');
+          setTimeout(() => button.classList.remove('copied'), 1000);
+        })
+        .catch((error) => console.warn('Could not copy the room id:', error));
     });
-  });
+  };
+  copyRoomIdOnClick(document.getElementById('copyButton'));
+  copyRoomIdOnClick(document.getElementById('roomHeaderCopyButton'));
 
   const generateIdButton = document.getElementById('generateIdButton');
   generateIdButton.addEventListener('click', () => {
-    roomIdInput.value = socket.id.toString() + '0';
+    if (!socket.id) return;
+    // Socket.IO already puts each socket in a room named by its own id; the suffix keeps the
+    // game room distinct from it.
+    roomIdInput.value = `${socket.id}0`;
   });
 
   const joinRoomButton = document.getElementById('joinRoomButton');
@@ -195,10 +199,8 @@ export const initializeRoomButtons = () => {
         : systemState.p2SelfUsername;
       const data = {
         roomId: systemState.roomId,
-        username: username,
-        isSpectator:
-          document.getElementById('spectatorModeCheckbox').checked &&
-          systemState.isTwoPlayer,
+        username,
+        isSpectator,
       };
       socket.emit('leaveRoom', data);
       returnToLobby();

@@ -21,21 +21,14 @@ import {
 import { suppressHoverPreview } from '../image-logic/hover-preview-bus.mjs';
 import { stackViewModelFor } from './card-inspector.mjs';
 import { buildStackInfoPanel } from './stack-view-panel.mjs';
+import { el, OVERLAY_CLOSE_EVENTS } from './overlay-chrome.mjs';
 import { closeStatusPopup, isStatusPopupOpen, openStatusPopup } from './status-popup.mjs';
 
-const CLOSE_EVENTS = ['rules-turn-began', 'rules-session-reset'];
 
 /** @type {null | object} */
 let viewState = null;
 
 export const isStackViewOpen = () => viewState !== null;
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 // One round sprite button (shadow_32, circle_32 stroke round a circle_26 face, #333333 icon).
 const roundButton = (className, label, onClick) => {
@@ -119,8 +112,8 @@ export function openStackView({
   zone = 'active',
   statuses = { positive: [], negative: [] },
 } = {}) {
-  suppressHoverPreview('modal');
   if (viewState || !card) return false;
+  suppressHoverPreview('modal');
   const state = { cards: cards?.length ? cards : [card], index: 0, holoWrapper: null };
   try {
     const root = el('div', 'tcgl-stack');
@@ -144,7 +137,7 @@ export function openStackView({
     viewState = state;
     showCard(state, 0);
     document.body.appendChild(root);
-    CLOSE_EVENTS.forEach((name) => document.addEventListener(name, closeImmediately));
+    OVERLAY_CLOSE_EVENTS.forEach((name) => document.addEventListener(name, closeImmediately));
     document.addEventListener('keydown', onKeydown, true);
     uiCue('big-card-in');
     return true;
@@ -162,7 +155,7 @@ export function closeStackView() {
   if (!state) return;
   viewState = null;
   closeStatusPopup();
-  CLOSE_EVENTS.forEach((name) => document.removeEventListener(name, closeImmediately));
+  OVERLAY_CLOSE_EVENTS.forEach((name) => document.removeEventListener(name, closeImmediately));
   document.removeEventListener('keydown', onKeydown, true);
   if (state.holoWrapper) stopHoloAnimation(state.holoWrapper);
   state.root?.remove();

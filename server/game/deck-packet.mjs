@@ -8,7 +8,8 @@ import { DECK_FORMAT_TCG, isDeckFormat } from '../../shared/engine/formats.mjs';
 /**
  * Extracts deckData array from legacy action parameters.
  * - exchangeData: parameters are [username, deckData, cardBack, coachingMode, callback, matId, format, deckBoxId]
- * - loadDeckData: parameters are [deckData, format, deckBoxId] (or legacy [user, deckData])
+ * - loadDeckData: parameters are [deckData, format, deckBoxId] (or legacy [user, deckData],
+ *   which names no format)
  * (deckBoxId, design 073, is display-only and never read here.)
  * @param {string} action
  * @param {any[]} parameters

@@ -79,7 +79,7 @@ import {
 } from '/shared/engine/zones/active-pokemon.mjs';
 import { pokemonHasLockedEnergy } from '/shared/engine/rules/energy-effects.mjs';
 import { blocksItemPlay } from '/shared/engine/rules/ability-executors.mjs';
-import { planSpecialEnergyTriggers } from '/shared/engine/rules/special-energy-parse.mjs';
+import { planSpecialEnergyDiscardRedirect } from './special-energy-discard-redirect.mjs';
 import { draw } from '../zones/deck-actions.js';
 import { addDamageCounter } from '../counters/damage-counter.js';
 import {
@@ -108,6 +108,7 @@ const enforceBenchLimit = async (user) => {
   if (!rulesState.enabled) return;
   const bench = getZone(user, 'bench');
   const limit = benchLimitFor(user);
+  // Lazy: move-card-bundle.js imports moveCard back from this module.
   const { moveCardBundle } = await import('./move-card-bundle.js');
   while (countBenchPokemon(bench) > limit) {
     let idx = -1;
@@ -127,6 +128,29 @@ const enforceBenchLimit = async (user) => {
       false
     );
   }
+};
+
+// A card reference is a card object, a cardId / syncInstance string, or a zone index.
+// Anything else (false, undefined, a negative or unmatched index) resolves to no card.
+const resolveCardRef = (zone, ref) => {
+  if (typeof ref === 'object' && ref !== null) {
+    return { card: ref, idx: zone.array.indexOf(ref) };
+  }
+  if (typeof ref === 'string' && isNaN(Number(ref))) {
+    const idx = zone.array.findIndex(
+      (c) => c.cardId === ref || String(c.syncInstance) === ref
+    );
+    return { card: idx >= 0 ? zone.array[idx] : undefined, idx };
+  }
+  if (typeof ref === 'number' && ref >= 0) {
+    return { card: zone.array[ref], idx: ref };
+  }
+  return { card: undefined, idx: ref };
+};
+
+const enforceBenchLimitForBothPlayers = async (user) => {
+  await enforceBenchLimit(user);
+  await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
 };
 
 export const moveCard = async (
@@ -151,42 +175,19 @@ export const moveCard = async (
 
   // convert the string into the actual arrays/html elements
   const oZone = getZone(user, oZoneId);
-  let destZoneId = dZoneId;
-  let dZone = getZone(user, destZoneId);
+  let dZone = getZone(user, dZoneId);
+  // dZoneId is the one destination id: every later step (cover, sort, holo, public flag, the
+  // returned destZoneId) reads it, so a redirect below must reassign it together with dZone.
+  const refuse = () => ({ destZoneId: dZoneId, ok: false });
 
-  // define the card that's being targeted
-  let targetCard;
-  let targetIdx = targetIndex;
-  if (typeof targetIdx === 'object' && targetIdx !== null) {
-    targetCard = targetIdx;
-    targetIdx = dZone.array.indexOf(targetCard);
-  } else if (typeof targetIdx === 'string' && isNaN(Number(targetIdx))) {
-    targetIdx = dZone.array.findIndex(
-      (c) => c.cardId === targetIdx || String(c.syncInstance) === targetIdx
-    );
-    if (targetIdx >= 0) targetCard = dZone.array[targetIdx];
-  } else if (typeof targetIdx === 'number' && targetIdx >= 0) {
-    targetCard = dZone.array[targetIdx];
-  }
+  // define the card that's being targeted, and the card that's being moved
+  let { card: targetCard, idx: resolvedTargetIndex } = resolveCardRef(
+    dZone,
+    targetIndex
+  );
+  const { card: movingCard } = resolveCardRef(oZone, index);
 
-  // define the card that's being moved
-  let moveIdx = index;
-  let movingCard;
-  if (typeof moveIdx === 'object' && moveIdx !== null) {
-    movingCard = moveIdx;
-    moveIdx = oZone.array.indexOf(movingCard);
-  } else if (typeof moveIdx === 'string' && isNaN(Number(moveIdx))) {
-    moveIdx = oZone.array.findIndex(
-      (c) => c.cardId === moveIdx || String(c.syncInstance) === moveIdx
-    );
-    if (moveIdx >= 0) movingCard = oZone.array[moveIdx];
-  } else if (typeof moveIdx === 'number' && moveIdx >= 0) {
-    movingCard = oZone.array[moveIdx];
-  }
-  index = moveIdx;
-  targetIndex = targetIdx;
-
-  if (!movingCard) return { destZoneId, ok: false };
+  if (!movingCard) return refuse();
 
   // ── structural: only Pokémon occupy Active/Bench slots ──
   // Items, Supporters and Stadiums are played, never placed on or attached to a
@@ -208,7 +209,7 @@ export const moveCard = async (
           ? 'Pokémon Tools must be attached to a Pokémon.'
           : "Item and Supporter cards can't be placed on the Bench.";
       appendMessage(user, `⛔ ${movingCard.name}: ${reason}`, 'announcement', false);
-      return { destZoneId, ok: false };
+      return refuse();
     }
     if (targetCard && !isPokemonCard && !isEnergyCard && !isToolCard) {
       appendMessage(
@@ -217,7 +218,7 @@ export const moveCard = async (
         'announcement',
         false
       );
-      return { destZoneId, ok: false };
+      return refuse();
     }
   }
 
@@ -226,7 +227,6 @@ export const moveCard = async (
     await ensureCardData(movingCard);
     if (isStadiumCard(movingCard)) {
       dZoneId = 'stadium';
-      destZoneId = 'stadium';
       dZone = getZone(user, 'stadium');
     }
   }
@@ -237,7 +237,6 @@ export const moveCard = async (
     if (!isStadiumCard(movingCard)) {
       if (oZoneId === 'hand') {
         dZoneId = 'board';
-        destZoneId = 'board';
         dZone = getZone(user, 'board');
       } else {
         appendMessage(
@@ -246,7 +245,7 @@ export const moveCard = async (
           'announcement',
           false
         );
-        return { destZoneId, ok: false };
+        return refuse();
       }
     }
   }
@@ -269,7 +268,7 @@ export const moveCard = async (
       const itemGate = canPerformAction({ user, action: 'playItem' });
       if (!itemGate.allowed) {
         appendMessage(user, `⛔ ${itemGate.reason}`, 'announcement', false);
-        return;
+        return refuse();
       }
       const oppPlayer = user === 'self' ? 'opp' : 'self';
       const oppActive = getZone(oppPlayer, 'active').array[0];
@@ -282,7 +281,7 @@ export const moveCard = async (
             'announcement',
             false
           );
-          return { destZoneId, ok: false };
+          return refuse();
         }
       }
     }
@@ -315,7 +314,7 @@ export const moveCard = async (
           'announcement',
           false
         );
-        return;
+        return refuse();
       }
     }
     const gate = supporterPlayGate({
@@ -331,7 +330,7 @@ export const moveCard = async (
         'announcement',
         false
       );
-      return { destZoneId, ok: false };
+      return refuse();
     }
     if (isSupporter) markSupporterPlayed(user, movingCard.name);
   }
@@ -358,8 +357,7 @@ export const moveCard = async (
             initiator
           );
           if (parseStadiumBenchLimit(displaced.card)) {
-            await enforceBenchLimit(user);
-            await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
+            await enforceBenchLimitForBothPlayers(user);
           }
         }
         appendMessage(
@@ -396,7 +394,7 @@ export const moveCard = async (
     const gate = canAddToBench(countBenchPokemon(bench), limit);
     if (!gate.allowed) {
       appendMessage(user, `⛔ ${gate.reason}`, 'announcement', false);
-      return { destZoneId, ok: false };
+      return refuse();
     }
   }
 
@@ -416,7 +414,7 @@ export const moveCard = async (
     const playCheck = await canPlayPokemonFromHand(movingCard);
     if (!playCheck.allowed) {
       appendMessage(user, `⛔ ${playCheck.reason}`, 'announcement', false);
-      return { destZoneId, ok: false };
+      return refuse();
     }
   }
 
@@ -434,7 +432,7 @@ export const moveCard = async (
     const evolveGate = canPerformAction({ user, action: 'evolve' });
     if (!evolveGate.allowed) {
       appendMessage(user, `⛔ ${evolveGate.reason}`, 'announcement', false);
-      return;
+      return refuse();
     }
     const wasPlayedThisTurn =
       targetCard.enteredPlayTurn === rulesState.turnNumber;
@@ -450,7 +448,7 @@ export const moveCard = async (
     );
     if (!evoCheck.allowed) {
       appendMessage(user, `⛔ ${evoCheck.reason}`, 'announcement', false);
-      return { destZoneId, ok: false };
+      return refuse();
     }
   }
 
@@ -465,7 +463,7 @@ export const moveCard = async (
     const attachGate = canPerformAction({ user, action: 'attachEnergy', targetZoneId: dZoneId });
     if (!attachGate.allowed) {
       appendMessage(user, `⛔ ${attachGate.reason}`, 'announcement', false);
-      return;
+      return refuse();
     }
   }
 
@@ -491,65 +489,46 @@ export const moveCard = async (
       'announcement',
       false
     );
-    return { destZoneId, ok: false };
+    return refuse();
   }
 
   // ── rules: special-energy on-discard triggers ───────────────────────────
-  // Energy effects that replace the discard: Recycle Energy ("put it into your
-  // hand instead"), Nitro Fire Energy (return on an attack discard), Boomerang /
-  // Burning Energy (reattach to the host after attacking). Plans come from the
-  // shared parser; skip on mirror replay because the originator rewrites
-  // destZoneId and relays the actual destination so both clients land the
-  // energy in the same zone.
-  if (
-    rulesState.enabled &&
-    !syncReplay &&
-    isEnergy(movingCard) &&
-    destZoneId === 'discard' &&
-    ['active', 'bench'].includes(oZoneId) &&
-    movingCard.image?.relative
-  ) {
-    const hostPokemon = oZone.array.find(
-      (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative
-    );
-    const discardPlans = planSpecialEnergyTriggers(movingCard, {
-      stadium: getStadium(),
-      trigger: 'discard',
-      host: hostPokemon,
+  // Energy text that replaces the discard: Recycle Energy ("put it into your hand
+  // instead"), Nitro Fire Energy (return on an attack discard), Boomerang / Burning
+  // Energy (reattach to the host after attacking). Skipped on mirror replay: the
+  // originator relays the actual destination (and, for a reattach, the host) so both
+  // clients land the energy in the same place.
+  let reattachedToHost = false;
+  if (rulesState.enabled && !syncReplay) {
+    const redirect = planSpecialEnergyDiscardRedirect({
+      movingCard,
+      oZoneId,
+      dZoneId,
       zoneArray: oZone.array,
-      attackExecuting: !!rulesState.attackExecuting,
+      stadium: getStadium(),
+      attackExecuting: rulesState.attackExecuting,
     });
-    if (discardPlans.some((p) => p.action === 'returnToHand')) {
-      destZoneId = 'hand';
-      dZone = getZone(user, destZoneId);
-      appendMessage(
-        user,
-        `♻️ ${movingCard.name} returns to your hand.`,
-        'announcement',
-        false
-      );
-    } else if (discardPlans.some((p) => p.action === 'reattach') && hostPokemon) {
-      // "attach this card from your discard pile to that Pokémon after
-      // attacking" — net effect is the energy stays attached to its host.
-      destZoneId = oZoneId;
-      dZone = oZone;
-      appendMessage(
-        user,
-        `🔥 ${movingCard.name} stays attached to ${hostPokemon.name || 'its Pokémon'} (its attack discard returns it).`,
-        'announcement',
-        false
-      );
+    if (redirect) {
+      dZoneId = redirect.destZoneId;
+      dZone = getZone(user, dZoneId);
+      if (redirect.host) {
+        // The energy stays on its host: the move below re-attaches it there.
+        targetCard = redirect.host;
+        resolvedTargetIndex = oZone.array.indexOf(targetCard);
+        reattachedToHost = true;
+      }
+      appendMessage(user, redirect.message, 'announcement', false);
     }
   }
 
   // The awaits above yield, and a caller that did not await this move (a
   // search effect shuffling the deck right after) can reorder the origin zone
   // meanwhile — so the index read on entry may name a different card by now.
-  index = oZone.array.indexOf(movingCard);
-  if (index < 0) return { destZoneId, ok: false };
+  const originIndex = oZone.array.indexOf(movingCard);
+  if (originIndex < 0) return refuse();
 
   // move card from origin array to destination array
-  dZone.array.push(...oZone.array.splice(index, 1));
+  dZone.array.push(...oZone.array.splice(originIndex, 1));
 
   if (
     rulesState.enabled &&
@@ -562,7 +541,7 @@ export const moveCard = async (
   }
 
   // update the cover of deck/discard/lostzone, if necessary
-  updateOriginCover(user, oZoneId, index);
+  updateOriginCover(user, oZoneId, originIndex);
 
   // update the zIndex and positioning of any attached cards if they have shifted, i.e., shifting energies to the left if the movingcard an energy attached to a pokemon
   updateAttachedCardsPosition(oZone, movingCard);
@@ -573,23 +552,17 @@ export const moveCard = async (
     decreaseCardLayer(movingCard);
   }
 
-  //redraw trick. for some reason, sometimes images disappear, so we will use this trick to make sure they properly load in the DOM
-  // const nonRedrawElements = ['active', 'bench', 'attachedCards'];
-  // if (!nonRedrawElements.includes(dZoneId)){
-  //     hideCard(user, movingCard);
-  //     revealCard(user, movingCard);
-  // };
-
   // determine whether to hide/reveal card
-  const isP1HideZone =
-    ['prizes'].includes(dZoneId) ||
+  const isHiddenByHideHandOption =
+    dZoneId === 'prizes' ||
     (document.getElementById('hideHandCheckbox').checked &&
-      ['hand'].includes(dZoneId) &&
+      dZoneId === 'hand' &&
       systemState.initiator !== user);
-  const isP2HideZone =
-    ['hand'].includes(dZoneId) &&
+  const isOpponentHandInTwoPlayer =
+    dZoneId === 'hand' &&
     systemState.isTwoPlayer &&
     systemState.initiator !== user;
+  const isHiddenZone = isHiddenByHideHandOption || isOpponentHandInTwoPlayer;
   const isFaceDownCard =
     movingCard.image.faceDown &&
     ['active', 'bench', 'board', 'stadium'].includes(dZoneId);
@@ -599,9 +572,9 @@ export const moveCard = async (
   if (mirrorPlayVisible) {
     revealCard(user, movingCard);
     movingCard.image.faceDown = false;
-  } else if (isP1HideZone || isP2HideZone || isFaceDownCard) {
+  } else if (isHiddenZone || isFaceDownCard) {
     hideCard(user, movingCard);
-    if (isP1HideZone || isP2HideZone) {
+    if (isHiddenZone) {
       movingCard.image.faceDown = false;
     }
   } else {
@@ -648,6 +621,7 @@ export const moveCard = async (
           'announcement',
           false
         );
+        // Listeners: setup/rules/rules-bridge.js ('rules-opponent-evolved').
         document.dispatchEvent(
           new CustomEvent('rules-opponent-evolved', {
             detail: { user, evolvedCard: movingCard, zoneId: dZoneId },
@@ -660,6 +634,7 @@ export const moveCard = async (
             'announcement',
             false
           );
+          // Listener: setup/rules/rules-bridge.js ends the turn.
           document.dispatchEvent(
             new CustomEvent('rules-mega-evolution-forces-turn-end', {
               detail: { user },
@@ -670,6 +645,8 @@ export const moveCard = async (
     } else {
       attachCard(user, initiator, movingCard, targetCard, dZoneId, dZone);
       if (rulesState.enabled && !syncReplay && isEnergy(movingCard)) {
+        // Listeners: setup/rules/rules-bridge.js (attach triggers, Pokémon Park heal)
+        // and setup/rules/card-inspector.mjs.
         document.dispatchEvent(
           new CustomEvent('rules-energy-attached', {
             detail: {
@@ -753,7 +730,7 @@ export const moveCard = async (
       oZone,
       dZoneId,
       dZone,
-      targetIndex,
+      resolvedTargetIndex,
       { syncReplay }
     );
     //automatically bump any existing stadiums and make sure it's facing right-side-up for the user
@@ -816,8 +793,8 @@ export const moveCard = async (
 
   // A Pokémon returning to hand re-arms any "when you play onto your Bench"
   // trigger window — the next play from hand is a fresh play. Also clear the
-  // per-image one-shot flags rules-bridge sets on the original play so they
-  // fire again too.
+  // per-image one-shot flags rules-bridge sets (and reads) on the original play so
+  // they fire again too.
   if (dZoneId === 'hand' && movingCard.type === 'Pokémon') {
     if (rulesState.enabled) clearPlayedToBenchWindow(user, movingCard);
     if (movingCard.image) {
@@ -826,7 +803,7 @@ export const moveCard = async (
     }
   }
   // Any card returning to hand may be played again: clear the Trainer "already
-  // announced" one-shot marker too, or a retrieved Trainer (VS Seeker, Junk
+  // announced" marker (set and read in rules-bridge.js) too, or a retrieved Trainer (VS Seeker, Junk
   // Arm) becomes a silent no-op and strands on the board.
   if (dZoneId === 'hand' && movingCard.image) {
     movingCard.image.__rulesTrainerAnnounced = false;
@@ -901,13 +878,16 @@ export const moveCard = async (
     rulesState.enabled &&
     parseStadiumBenchLimit(getStadium()?.card)
   ) {
-    await enforceBenchLimit(user);
-    await enforceBenchLimit(user === 'self' ? 'opp' : 'self');
+    await enforceBenchLimitForBothPlayers(user);
   }
 
   if (oZoneId === 'hand' || dZoneId === 'hand') {
     reconcileHandStacks(user);
   }
 
-  return { destZoneId, ok: true };
+  return {
+    destZoneId: dZoneId,
+    ...(reattachedToHost && { targetIndex: resolvedTargetIndex }),
+    ok: true,
+  };
 };

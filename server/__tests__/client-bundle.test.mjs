@@ -169,7 +169,7 @@ const templatePath = fileURLToPath(new URL('../../client/index.ejs', import.meta
 const renderPage = (locals) =>
   ejs.render(
     fs.readFileSync(templatePath, 'utf8'),
-    { importDataJSON: null, e2eAllowed: false, ...locals },
+    { e2eAllowed: false, ...locals },
     { filename: templatePath }
   );
 

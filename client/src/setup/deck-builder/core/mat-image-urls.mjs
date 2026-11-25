@@ -52,15 +52,12 @@ export function resolveMatBoardUrl(mat, base = '') {
   return proxy || local;
 }
 
-/** Ordered fallbacks for `<img onerror>` wiring in the picker. */
+/** The primary thumb and the one fallback (proxied CDN, else local PNG) for `<img onerror>` wiring in the picker. */
 export function matThumbFallbackChain(mat, base = '') {
+  if (!mat) return { primary: '', fallback: '' };
   const primary = resolveMatThumbUrl(mat, base);
-  const fallbacks = [];
   const proxy = mat.imageUrl ? matImageProxyUrl(mat.imageUrl, base) : '';
-  if (proxy && proxy !== primary) fallbacks.push(proxy);
   const localPng = mat.image ? toAbsoluteClientPath(mat.image) : '';
-  if (localPng && localPng !== primary && !fallbacks.includes(localPng)) {
-    fallbacks.push(localPng);
-  }
-  return { primary, fallback: fallbacks[0] || '' };
+  const fallback = [proxy, localPng].find((url) => url && url !== primary) || '';
+  return { primary, fallback };
 }

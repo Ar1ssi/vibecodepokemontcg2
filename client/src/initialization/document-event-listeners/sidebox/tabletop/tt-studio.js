@@ -48,6 +48,9 @@ const REFLECT_FADE_MM = 130;
 const STAGE_CENTER = new Vector2(0, -10);
 const STAGE_GLOW_MM = new Vector2(300, 950);
 
+// Clip space (-1..1) to texture coordinates (0..1): x, y and z each halved and shifted by w/2.
+const CLIP_TO_UV = new Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+
 const display = (hex) => new Color(hex);
 
 const DOME_VERTEX = /* glsl */ `
@@ -348,10 +351,10 @@ export function createStudio({ renderer, scene, camera, reflect = true }) {
     mirror.lookAt(mirrorPoint(ahead, floorY));
     mirror.updateMatrixWorld();
     mirror.projectionMatrix.copy(camera.projectionMatrix);
-    reflectMatrix.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
-    reflectMatrix.multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
+    reflectMatrix.copy(CLIP_TO_UV).multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
 
-    // An oblique near plane on the floor (Lengyel), so nothing below it is drawn.
+    // An oblique near plane on the floor (Lengyel), so nothing below it is drawn. The matrix is
+    // column-major: elements[2, 6, 10, 14] are the third row of the projection, which this replaces.
     plane.setFromNormalAndCoplanarPoint(normal, onFloor.set(0, floorY, 0)).applyMatrix4(mirror.matrixWorldInverse);
     clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
     const e = mirror.projectionMatrix.elements;

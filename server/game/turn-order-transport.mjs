@@ -29,6 +29,7 @@ import { TURN_ORDER_CALL_TIMEOUT_MS, TURN_ORDER_CHOICE_TIMEOUT_MS } from './room
  * @param {(roomId: string) => void} [deps.onCallOpened] The room format locks here.
  * @param {typeof setTimeout} [deps.setTimer]
  * @param {typeof clearTimeout} [deps.clearTimer]
+ * @param {() => number} [deps.now] The clock the answer deadlines are measured against.
  */
 export function createTurnOrderTransport({
   emitTo,
@@ -36,24 +37,34 @@ export function createTurnOrderTransport({
   onCallOpened = () => {},
   setTimer = setTimeout,
   clearTimer = clearTimeout,
+  now = Date.now,
 }) {
   const timers = new Map();
+  // When each armed timer fires, so a seat that rejoins is told the time that is left.
+  const deadlines = new Map();
 
   const clearRoomTimer = (roomId) => {
     const timer = timers.get(roomId);
     if (timer) clearTimer(timer);
     timers.delete(roomId);
+    deadlines.delete(roomId);
   };
 
   const armRoomTimer = (roomId, ms, onExpire) => {
     clearRoomTimer(roomId);
     const timer = setTimer(() => {
       timers.delete(roomId);
+      deadlines.delete(roomId);
       onExpire();
     }, ms);
     if (typeof timer?.unref === 'function') timer.unref();
     timers.set(roomId, timer);
+    deadlines.set(roomId, now() + ms);
   };
+
+  // The server acts at the armed deadline, so a replayed prompt must not promise more.
+  const timeLeftMs = (roomId, fullMs) =>
+    deadlines.has(roomId) ? Math.max(0, deadlines.get(roomId) - now()) : fullMs;
 
   const forEachSeat = (gameRoom, send) => {
     for (const playerId of Object.keys(gameRoom.state.players)) {
@@ -240,7 +251,7 @@ export function createTurnOrderTransport({
         emitTo(
           socketId,
           'turnOrderCall',
-          callPayload(roomId, turnOrder, playerId, TURN_ORDER_CALL_TIMEOUT_MS)
+          callPayload(roomId, turnOrder, playerId, timeLeftMs(roomId, TURN_ORDER_CALL_TIMEOUT_MS))
         );
         return;
       }
@@ -248,7 +259,7 @@ export function createTurnOrderTransport({
         emitTo(
           socketId,
           'turnOrderFlip',
-          flipPayload(roomId, turnOrder, playerId, TURN_ORDER_CHOICE_TIMEOUT_MS)
+          flipPayload(roomId, turnOrder, playerId, timeLeftMs(roomId, TURN_ORDER_CHOICE_TIMEOUT_MS))
         );
         return;
       }

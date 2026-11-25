@@ -26,6 +26,8 @@ import {
   isUltraBeastCard,
 } from './card-classify.mjs';
 import { normalizeStage } from './evolution.mjs';
+import { isAttachedToHost } from './energy-attachment.mjs';
+import { SYMBOL_TO_TYPE } from './energy-symbols.mjs';
 import { evolvedView } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
 import {
@@ -44,19 +46,7 @@ const textOf = (card) =>
       card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
   );
 
-const TYPE_WORDS = {
-  g: 'grass',
-  r: 'fire',
-  w: 'water',
-  l: 'lightning',
-  p: 'psychic',
-  f: 'fighting',
-  d: 'darkness',
-  m: 'metal',
-  n: 'dragon',
-  y: 'fairy',
-  c: 'colorless',
-};
+const TYPE_WORDS = SYMBOL_TO_TYPE;
 
 function hasAbility(card) {
   if (!card) return false;
@@ -133,12 +123,7 @@ function remainingHp(card) {
 
 function holderHasEnergy(holder, zoneCards) {
   if (!holder) return false;
-  return (zoneCards || []).some(
-    (c) =>
-      isEnergy(c) &&
-      (c.attachedTo === holder.instanceId ||
-        (holder.image && c.image?.relative === holder.image))
-  );
+  return (zoneCards || []).some((c) => isEnergy(c) && isAttachedToHost(c, holder));
 }
 
 // The holder phrase: "The <X> this card is attached to", where X is a stage,

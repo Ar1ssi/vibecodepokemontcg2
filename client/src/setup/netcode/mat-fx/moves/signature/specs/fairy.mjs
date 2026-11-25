@@ -7,8 +7,7 @@
 // tornado is what lands, the star flare arrives quickly and smaller, the flash is small and the
 // heat faint (the TCG Live impact replaces the dressing in a game).
 
-/** Five spikes 72° apart: the entries' "starFlare arms 'ring'" inside the 30-tongue budget. */
-const RING5 = Object.freeze([-90, -18, 54, 126, 198].map((angle) => Object.freeze({ angle, reach: 0.85 })));
+import { RING5 } from './_shared.mjs';
 
 /** The small contact flash the signatures keep. */
 const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impactFlash', params: { r0: 0.2, r1: 0.6, tint } });

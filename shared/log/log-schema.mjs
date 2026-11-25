@@ -29,6 +29,40 @@ export const CATEGORIES = Object.freeze([
   'user',
 ]);
 
+// Levels a player may ask for (the verbose toggle); the server and the client both gate on it.
+export const isCaptureLevel = (level) => level === 'debug' || level === 'trace';
+
+// Identity grammars: the client mints them, the server and the http tap validate them.
+const CLIENT_ID = /^[0-9a-f]{16}$/;
+const LOAD_ID = /^[0-9a-f]{8}$/;
+export const isClientId = (value) => typeof value === 'string' && CLIENT_ID.test(value);
+export const isLoadId = (value) => typeof value === 'string' && LOAD_ID.test(value);
+
+// Socket.IO channel that holds lobby watchers; never a game room, like a socket's own id room.
+export const LOBBY_WATCHERS = 'lobby:watchers';
+
+/** A Socket.IO room name that is a game: the lobby channel and a socket's own room never are. */
+export const isGameRoom = (room, socketId) =>
+  typeof room === 'string' && room !== '' && room !== LOBBY_WATCHERS && room !== socketId;
+
+// Wire names shared by the client shipper, the export UI and the server.
+export const LOG_EVENTS = Object.freeze({
+  hello: 'log:hello',
+  batch: 'log:batch',
+  ping: 'log:ping',
+  setLevel: 'log:setLevel',
+  level: 'log:level',
+  snapshot: 'log:snapshot',
+  export: 'log:export',
+});
+export const LOG_ROUTES = Object.freeze({ beacon: '/api/log/beacon', exportDownload: '/api/log/export/' });
+export const LOG_API_PREFIX = '/api/log/';
+export const CLIENT_HEADER = 'x-ptcg-client';
+
+// Longest note kept from a `user.mark` entry, and from an export header.
+export const MARK_NOTE_MAX = 500;
+export const EXPORT_NOTE_MAX = 2000;
+
 function deepFreeze(value) {
   for (const child of Object.values(value)) {
     if (child && typeof child === 'object') deepFreeze(child);

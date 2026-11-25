@@ -143,7 +143,7 @@ export function createGameState({
     turn: {
       player: null,
       number: 1,
-      phase: 'setup', // 'setup' | 'main' | 'attack' | 'ended'
+      phase: 'setup', // 'setup' | 'main' | 'attack' | 'tiebreak' | 'ended'
     },
     pendingChoice: null,
     commandLog: [],

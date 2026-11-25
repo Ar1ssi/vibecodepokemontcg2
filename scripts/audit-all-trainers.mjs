@@ -61,106 +61,6 @@ const AUTO_STEP_TYPES = new Set([
   'massDiscardAttached',
 ]);
 
-// Legacy-client mirror of runTrainerSteps() (client/src/setup/rules/trainer-execution.js).
-// Kept for the client-parity test and the `clientMissing` column; the authoritative
-// server coverage is `isExecutableStepType` from the effects executor (S9: this used
-// to decide the parse outcome, so server gaps looked handled — S279 §I).
-const EXECUTED_STEP_TYPES = new Set([
-  'passive',
-  ...AUTO_STEP_TYPES,
-  'discardCost',
-  'discardOwnAttachedEnergy',
-  'coinFlip',
-  'putHandOnBottom',
-  'searchDeck',
-  'searchDeckSequence',
-  'lookAtTop',
-  'lookAtBottom',
-  'recursion',
-  'shuffleFromDiscard',
-  'attachFromDiscard',
-  'attachMultipleFromDiscard',
-  'switchOpponent',
-  'switchOwn',
-  'revealOpponentHandDiscard',
-  'opponentHandBottom',
-  'opponentHandShuffleDeck',
-  'opponentActiveEnergyToDeck',
-  'opponentHandToBenchBasic',
-  'eachPlayerDiscardFromHand',
-  'opponentDiscardFromHand',
-  'eachPlayerDraw',
-  'eachPlayerReturnBench',
-  'eachPlayerShuffleHandDraw',
-  'eachPlayerHandToFive',
-  'eachPlayerRecoverPokemon',
-  'discardAnyThenDraw',
-  'discardPokemonThenDraw',
-  'opponentHandShuffleItemsDraw',
-  'discardAllTrainerInPlay',
-  'returnStadiumToHand',
-  'shuffleDeckOnly',
-  'clearAttackEffects',
-  'revealUntilCard',
-  'lookAtFaceDownPrize',
-  'putHandBasicAsActive',
-  'healPerHeads',
-  'healEachActive',
-  'opponentChoosesFromTop',
-  'millPerHeads',
-  'flipUntilTailsDraw',
-  'toolsToHand',
-  'switchHandWithTop',
-  'putHandBottomThenDraw',
-  'shuffleHandCardsThenDraw',
-  'drawBottom',
-  'moveEnergyOpponent',
-  'sendEnergyToDeckBottom',
-  'revealTopEnergy',
-  'discardAllEnergyFromActive',
-  'searchToTop',
-  'healAllOwnAndDiscardEnergy',
-  'healOneDiscardEnergy',
-  'rearrangeTop',
-  'shuffleDiscardThenMill',
-  'discardRandomOpponentHandIfSupporter',
-  'lostZoneCost',
-  'toolOrStadiumToLostZone',
-  'sendEnergyToLostZone',
-  'opponentDiscardToLostZonePerPokemon',
-  'opponentDiscardUntil',
-  'eachPlayerDiscardUntil',
-  'discardEnergyFromOpponent',
-  'returnPokemonToHand',
-  'moveEnergy',
-  'moveEnergyToActive',
-  'evolveStage2',
-  'devolve',
-  'discardTools',
-  'discardFromOpponent',
-  'discardToolAndSpecialEnergy',
-  'swapWithDiscard',
-  'revealOpponentDeckBench',
-  'opponentPrizeHandSwap',
-  'switchOpponentOut',
-  'reviveFromDiscard',
-  'moveDamageCounters',
-  'lookAtOpponentHand',
-  'attachFromHand',
-  'attachAttackTool',
-  'revealPrizes',
-  'prizeToHand',
-  'clearStatus',
-  'discardStadium',
-  'putDiscardOnTop',
-  'energyToHand',
-  'opponentDiscardToHand',
-  'opponentDiscardToDeckBottom',
-  'shufflePokemonIntoDeck',
-  'discardOwnBenchPokemon',
-  'shuffleDiscardIntoDeck',
-]);
-
 function classifyOutcome(parsed) {
   if (!parsed.recognizable) return 'unrecognizable';
   const types = parsed.steps.map((s) => s.type);
@@ -171,11 +71,6 @@ function classifyOutcome(parsed) {
   if (types.every((t) => t === 'passive')) return 'passive-only';
   if (types.some((t) => AUTO_STEP_TYPES.has(t))) return 'automated';
   return 'guided';
-}
-
-// Legacy client coverage, reported separately (parity information only).
-function clientMissingSteps(parsed) {
-  return parsed.steps.map((s) => s.type).filter((t) => !EXECUTED_STEP_TYPES.has(t));
 }
 
 function stepSummary(steps) {
@@ -241,7 +136,6 @@ function classify(card) {
     parsed,
     status,
     serverMissing: classifyTrainer(card).serverMissing,
-    clientMissing: clientMissingSteps(parsed),
     stepSummary: stepSummary(parsed.steps),
     descriptions: parsed.steps.map((s) => describeStep(s)),
     warnings: suspiciousWarnings(parsed, card.text),
@@ -292,15 +186,9 @@ for (const [k, v] of tally((r) => r.status)) log(`  ${String(v).padStart(4)}  ${
 
 const serverGaps = rows.filter((r) => r.serverMissing.length > 0);
 log(`\n=== Server coverage: cards with a parsed step the server cannot execute (${serverGaps.length}) ===`);
-log('  (The parse outcome above is now the SERVER view; the legacy client is below.)');
+log('  (The parse outcome above is the SERVER view.)');
 for (const r of serverGaps.sort((a, b) => a.card.name.localeCompare(b.card.name))) {
   log(`  [${r.card.subtitle}] ${r.card.name} — server lacks: ${r.serverMissing.join(', ')}`);
-}
-
-const clientGaps = rows.filter((r) => r.clientMissing.length > 0);
-log(`\n=== Legacy-client coverage: parsed steps with no client executor (${clientGaps.length}) ===`);
-for (const r of clientGaps.sort((a, b) => a.card.name.localeCompare(b.card.name))) {
-  log(`  [${r.card.subtitle}] ${r.card.name} — client lacks: ${r.clientMissing.join(', ')}`);
 }
 
 const GAP = (r) => r.status === 'unrecognizable' || r.status === 'empty' || r.status === 'unhandled-step';

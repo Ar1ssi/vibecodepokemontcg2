@@ -61,6 +61,7 @@ function harness({ seed, dealSucceeds = () => true } = {}) {
   const deals = [];
   const opened = [];
   const timers = fakeTimers();
+  const clock = { t: 0 };
   const transport = createTurnOrderTransport({
     emitTo: (socketId, event, payload) => sent.push({ socketId, event, payload }),
     deal: (gameRoom, roomId, starterPlayerId) => {
@@ -71,11 +72,15 @@ function harness({ seed, dealSucceeds = () => true } = {}) {
     onCallOpened: (roomId) => opened.push(roomId),
     setTimer: timers.setTimer,
     clearTimer: timers.clearTimer,
+    now: () => clock.t,
   });
   const messages = (event) => sent.filter((m) => m.event === event);
   const to = (event, socketId) => messages(event).find((m) => m.socketId === socketId)?.payload;
   const socketOf = (playerId) => room.playerToSocket.get(playerId);
-  return { room, sent, deals, opened, timers, transport, messages, to, socketOf };
+  const advance = (ms) => {
+    clock.t += ms;
+  };
+  return { room, sent, deals, opened, timers, transport, messages, to, socketOf, advance };
 }
 
 /** Opens the call and answers it; returns the room's flip state. */
@@ -324,6 +329,26 @@ test('replayTo re-sends the pending call, with the callId only to the caller', (
   assert.equal(h.to('turnOrderCall', 'sock-new').callId, h.room.turnOrder.callId);
   assert.equal(h.to('turnOrderCall', h.socketOf(otherPlayerId)).callId, null);
   assert.deepEqual(h.timers.pendingDelays(), [TURN_ORDER_CALL_TIMEOUT_MS], 'no second timer');
+});
+
+test('a replayed call and choice prompt carry the time left on the armed timer', () => {
+  const h = harness();
+  h.transport.open(h.room, 'r1');
+  const callerPlayerId = h.room.turnOrder.callerPlayerId;
+  h.advance(6000);
+  h.room.addPlayer('sock-new', callerPlayerId, callerPlayerId === 'p1' ? 'Ash' : 'Gary');
+  h.transport.replayTo(h.room, 'r1', callerPlayerId);
+  assert.equal(h.to('turnOrderCall', 'sock-new').timeoutMs, TURN_ORDER_CALL_TIMEOUT_MS - 6000);
+
+  const callerSocket = h.socketOf(callerPlayerId);
+  const { callId } = h.to('turnOrderCall', callerSocket);
+  h.transport.receiveCall(h.room, 'r1', callerSocket, { callId, call: 'heads' });
+  const winner = h.room.turnOrder.winnerPlayerId;
+  h.advance(10000);
+  h.room.addPlayer('sock-win', winner, winner === 'p1' ? 'Ash' : 'Gary');
+  h.transport.replayTo(h.room, 'r1', winner);
+  assert.equal(h.to('turnOrderFlip', 'sock-win').timeoutMs, TURN_ORDER_CHOICE_TIMEOUT_MS - 10000);
+  assert.deepEqual(h.timers.pendingDelays(), [TURN_ORDER_CHOICE_TIMEOUT_MS], 'the armed timer is untouched');
 });
 
 test('a winner whose socket was replaced gets the prompt again and can answer from it', () => {

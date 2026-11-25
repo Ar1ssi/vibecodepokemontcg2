@@ -6,6 +6,10 @@ import {
   planMenuCommands,
 } from '../manual-card-commands.mjs';
 import { translateActionToCmd } from '../dual-run-bridge.js';
+import {
+  MARKER_KEYS,
+  ROTATION_CONDITIONS,
+} from '../../../../../shared/engine/rules/special-conditions.mjs';
 import { validateCommandShape } from '../../../../../shared/engine/commands.mjs';
 
 const card = (props = {}) => ({ instanceId: 41, damage: 0, abilityUsed: false, rotation: 0, ...props });
@@ -140,4 +144,9 @@ test('context-menu buttons place real values on a server card', () => {
   assert.equal(menu('abilityCounterButton'), null);
   assert.equal(toServer(menu('changeToToolButton')).at(-1).type, 'moveCard');
   assert.equal(menu('viewAttachedCardsButton'), null);
+});
+
+test('CONDITION_CYCLE covers every Special Condition the engine can hold', () => {
+  const engineConditions = [...Object.keys(MARKER_KEYS), ...ROTATION_CONDITIONS];
+  assert.deepEqual([...CONDITION_CYCLE].sort(), engineConditions.sort());
 });

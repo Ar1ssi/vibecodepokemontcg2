@@ -252,8 +252,13 @@ export function createBoardInput({
     capture(event.pointerId, true);
   };
 
+  // A held card belongs to the pointer that lifted it: a second touch lifting or moving must not
+  // drop or drag it. (A panel's HTML5 drag holds no pointer, so it has nothing to mismatch.)
+  const isForeignPointer = (event) => drag?.pointerId != null && event.pointerId !== drag.pointerId;
+
   const onPointerUp = (event) => {
     if (drag) {
+      if (isForeignPointer(event)) return;
       swallowNativeClick = true;
       if (event.button === PRIMARY_BUTTON) commitDrag(event);
       else cancelDrag();
@@ -280,6 +285,7 @@ export function createBoardInput({
 
   const onPointerMove = (event) => {
     if (drag) {
+      if (isForeignPointer(event)) return;
       if (event.buttons & SECONDARY_BUTTONS_MASK) {
         cancelDrag();
         return;
@@ -307,6 +313,7 @@ export function createBoardInput({
   };
 
   const onPointerCancel = (event) => {
+    if (isForeignPointer(event)) return;
     press = null;
     cancelDrag();
     capture(event.pointerId, false);

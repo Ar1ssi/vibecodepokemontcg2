@@ -1,9 +1,8 @@
 /**
  * @file Pure, DOM-free turn-order coin resolution in ABSOLUTE playerId space (design 013).
  *
- * Sibling to rules-turnorder.mjs, which speaks the client's local 'self'/'opp'
- * perspective. The server authority has no such perspective — it holds both
- * playerIds — so it uses these helpers instead, and translates to 'self'/'opp'
+ * The server authority has no 'self'/'opp' perspective — it holds both
+ * playerIds — so it resolves the flip here and translates to 'self'/'opp'
  * only when broadcasting to a specific recipient.
  *
  * Every random draw here comes from the caller-supplied seeded rng

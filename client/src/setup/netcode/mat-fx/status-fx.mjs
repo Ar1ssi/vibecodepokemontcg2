@@ -320,13 +320,20 @@ export function spriteLayerKeyframes(layer, unitPx, samples = 12) {
   return frames;
 }
 
+/** The label's bounce at progress `c`: grows to 1.2, settles to 1, then rests. */
+function labelScaleAt(c) {
+  if (c < 0.12) return 0.5 + 0.7 * (c / 0.12);
+  if (c < 0.24) return 1.2 - 0.2 * ((c - 0.12) / 0.12);
+  return 1;
+}
+
 /** The condition label drops in with a bounce, holds, then fades. */
 export function statusApplyPose(t) {
   const c = clamp01(t);
   const out = easeOut(c);
   return {
     labelY: -14 * out,
-    labelScale: c < 0.12 ? 0.5 + 0.7 * (c / 0.12) : c < 0.24 ? 1.2 - 0.2 * ((c - 0.12) / 0.12) : 1,
+    labelScale: labelScaleAt(c),
     labelOpacity: c < 0.7 ? 1 : Math.max(0, 1 - (c - 0.7) / 0.3),
   };
 }

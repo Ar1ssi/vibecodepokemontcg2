@@ -19,6 +19,9 @@ import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './car
 import { isDeltaSpecies, resolveAttachedEnergyType } from './energy-effects.mjs';
 import { getSpecialEnergyHpBonus, stadiumBlanksSpecialEnergy } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
+import { cardPrintedText } from './trainer-card-text.mjs';
+import { SYMBOL_TO_TYPE, typeForSymbol } from './energy-symbols.mjs';
+import { isAttachedToHost } from './energy-attachment.mjs';
 import { symbolizeTypeWordsOnly } from './attack-text.mjs';
 //
 // Layers:
@@ -50,8 +53,7 @@ const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
 // TCGdex spells Energy symbols as type words ("Basic Grass Pokémon", "Colorless more").
-const textOf = (card) =>
-  lower(symbolizeTypeWordsOnly(card?.text ?? card?.effect ?? card?.cardText ?? ''));
+const textOf = (card) => lower(symbolizeTypeWordsOnly(cardPrintedText(card)));
 
 /**
  * Battle Style (Single Strike) is printed as a name prefix ("Single Strike
@@ -67,10 +69,10 @@ export function isSingleStrikeCard(card) {
 /** Whether a card is an Evolution Pokémon (has a non-Basic stage). */
 export function isEvolutionCard(card) {
   if (!card) return false;
-  const stage = lower(card.stage || '');
-  if (stage) return stage !== 'basic';
-  return subtypesOf(card).some((s) =>
-    /^(stage 1|stage 2|stage1|stage2|vmax|vstar|break|evolution)$/.test(s)
+  const stage = normalizeStage(card.stage);
+  if (stage) return stage !== 'Basic';
+  return [card.stage, ...subtypesOf(card)].some((s) =>
+    /^(stage 1|stage 2|stage1|stage2|vmax|vstar|break|evolution)$/.test(lower(s))
   );
 }
 
@@ -630,10 +632,6 @@ const HEAL_TYPE_WORDS = [
   'grass', 'fire', 'water', 'lightning', 'psychic', 'fighting',
   'darkness', 'metal', 'dragon', 'fairy', 'colorless',
 ];
-const HEAL_TYPE_SYMBOLS = {
-  g: 'grass', r: 'fire', w: 'water', l: 'lightning', p: 'psychic', f: 'fighting',
-  d: 'darkness', m: 'metal', n: 'dragon', y: 'fairy', c: 'colorless',
-};
 
 /** Pokémon types named in a heal clause, e.g. "water pokémon and lightning pokémon". */
 export function parseStadiumHealTypes(clause) {
@@ -642,7 +640,7 @@ export function parseStadiumHealTypes(clause) {
   const add = (type) => {
     if (type && !types.includes(type)) types.push(type);
   };
-  for (const m of body.matchAll(/\{([a-z])\}/g)) add(HEAL_TYPE_SYMBOLS[m[1]]);
+  for (const m of body.matchAll(/\{([a-z])\}/g)) add(SYMBOL_TO_TYPE[m[1]]);
   const words = body.replace(/\{[a-z]\}/g, ' ');
   for (const word of HEAL_TYPE_WORDS) {
     if (new RegExp(`\\b${word}\\b`).test(words)) add(word);
@@ -791,7 +789,7 @@ export function parseStadiumOncePerTurn(card) {
       new RegExp(`\\b${w}\\b`).test(clause)
     );
     for (const m of clause.matchAll(/\{([a-z])\}/g)) {
-      const type = HEAL_TYPE_SYMBOLS[m[1]];
+      const type = SYMBOL_TO_TYPE[m[1]];
       if (type && !types.includes(type)) types.push(type);
     }
     if (types.length) {
@@ -804,7 +802,7 @@ export function parseStadiumOncePerTurn(card) {
   if (!base.cost) {
     const bareEnergy = t.match(/discard (?:an? )?(basic )?(?:{([a-z])} )?energy card(?! (?:from|attached))/);
     if (bareEnergy) {
-      const type = bareEnergy[2] ? HEAL_TYPE_SYMBOLS[bareEnergy[2]] : null;
+      const type = bareEnergy[2] ? SYMBOL_TO_TYPE[bareEnergy[2]] : null;
       base.cost = {
         type: 'discard-energy',
         n: 1,
@@ -896,7 +894,7 @@ export function parseStadiumOncePerTurn(card) {
     const clause = t.match(/discard pile for ([^.]+)/)?.[1] || '';
     const types = [];
     for (const m of clause.matchAll(/\{([a-z])\}/g)) {
-      const type = HEAL_TYPE_SYMBOLS[m[1]];
+      const type = SYMBOL_TO_TYPE[m[1]];
       if (type && !types.includes(type)) types.push(type);
     }
     return {
@@ -919,13 +917,13 @@ export function parseStadiumOncePerTurn(card) {
   const typedMove = t.match(
     /move (?:1|an?) energy card from 1 of (?:your|their|his or her) \{([a-z])\} pok[eé]mon to another of (?:your|their|his or her) \{([a-z])\} pok[eé]mon/
   );
-  if (typedMove && HEAL_TYPE_SYMBOLS[typedMove[1]] && HEAL_TYPE_SYMBOLS[typedMove[2]]) {
+  if (typedMove && SYMBOL_TO_TYPE[typedMove[1]] && SYMBOL_TO_TYPE[typedMove[2]]) {
     return {
       ...base,
       kind: 'move-energy-typed',
       n: 1,
-      fromType: HEAL_TYPE_SYMBOLS[typedMove[1]],
-      toType: HEAL_TYPE_SYMBOLS[typedMove[2]],
+      fromType: SYMBOL_TO_TYPE[typedMove[1]],
+      toType: SYMBOL_TO_TYPE[typedMove[2]],
     };
   }
   // Stark Mountain: move a {R}/{F} Energy between your own Pokémon.
@@ -1032,13 +1030,13 @@ export function parseStadiumOncePerTurn(card) {
     /draws? cards? until (?:they|you|he or she|that player) (?:has|have) (\d+) cards? in (?:their|your|his or her) hand/
   );
   if (drawUntilCount) {
-    return { ...base, kind: 'draw-until-count', n: parseInt(drawUntilCount[1], 10) || 5 };
+    return { ...base, kind: 'draw-until-count', n: parseInt(drawUntilCount[1], 10) };
   }
   const shuffleDraw = t.match(
     /shuffle (?:their|your|his or her) hand into (?:their|your|his or her) deck and draw (\d+) cards?/
   );
   if (shuffleDraw) {
-    return { ...base, kind: 'shuffle-draw', n: parseInt(shuffleDraw[1], 10) || 5 };
+    return { ...base, kind: 'shuffle-draw', n: parseInt(shuffleDraw[1], 10) };
   }
 
   if (/put a card from their hand on top of their deck/.test(t)) {
@@ -1166,7 +1164,7 @@ export function parseStadiumOncePerTurn(card) {
   if (recoverEnergy) {
     // TCGdex prints the type as a word ("2 Metal Energy cards"), pkmncards as {M}.
     const type = recoverEnergy[3]
-      ? HEAL_TYPE_SYMBOLS[recoverEnergy[3]]
+      ? SYMBOL_TO_TYPE[recoverEnergy[3]]
       : recoverEnergy[4] || null;
     return {
       ...base,
@@ -1184,7 +1182,7 @@ export function parseStadiumOncePerTurn(card) {
     /draws? cards? until (?:they|you) have as many cards in (?:their|your) hand as (?:they|you) have \{([a-z])\} pok[eé]mon in play/
   );
   if (untilHandSize) {
-    const type = HEAL_TYPE_SYMBOLS[untilHandSize[1]];
+    const type = SYMBOL_TO_TYPE[untilHandSize[1]];
     return {
       ...base,
       kind: 'draw-until-type',
@@ -1331,11 +1329,17 @@ export function parseStadiumDamagePreventionDetail(card) {
   else if (/active pokémon|your active|the active/.test(t)) zone = 'active';
   const ruleBoxOnly =
     /don't have a rule box|without a rule box|non-rule box/.test(t);
-  let amount = Infinity;
-  if (!/all damage|all\s+damage/.test(t)) {
-    const m = t.match(/(\d+)\s*(?:damage|poison|special)/);
-    amount = m ? parseInt(m[1], 10) : Infinity;
-  }
+  // Only a printed prevention clause counts: "heal 60 damage … prevent all effects of that card"
+  // (Life Forest, Black Market) is about the Stadium card, not damage.
+  const counted = t.match(/prevent (all|\d+) damage/);
+  const amount = counted
+    ? counted[1] === 'all'
+      ? Infinity
+      : parseInt(counted[1], 10)
+    : /prevent all effects of [^.]*?including damage/.test(t)
+      ? Infinity
+      : null;
+  if (amount === null) return null;
   return { amount, zone, ruleBoxOnly };
 }
 
@@ -1379,30 +1383,17 @@ export function stadiumFilterMatches(card, stadiumCard) {
   if (/n's pokémon/.test(t) && !/\bn's\b/.test(name) && !name.startsWith('n '))
     return false;
   const cardTypes = (card?.types || []).map(lower);
-  const typeMap = {
-    c: 'colorless',
-    r: 'fire',
-    w: 'water',
-    l: 'lightning',
-    f: 'fighting',
-    m: 'metal',
-    p: 'psychic',
-    d: 'darkness',
-    g: 'grass',
-    y: 'fairy',
-    n: 'dragon',
-  };
   // "non-{C} Pokémon" excludes that type instead of requiring it (Sky Field).
   for (const m of t.matchAll(/non-\{([a-z])\}/g)) {
-    if (cardTypes.includes(typeMap[m[1]])) return false;
+    if (cardTypes.includes(typeForSymbol(m[1]))) return false;
   }
   if (/(?<!non-)\{c\} pokémon/.test(t)) {
     if (cardTypes.length && !cardTypes.includes('colorless')) return false;
   }
-  const typeMatches = [...t.matchAll(/(?<!non-)\{([rwlfmpdgyn])\}/gi)];
+  const typeMatches = [...t.matchAll(/(?<!non-)\{([wlfmpdgynr])\}/gi)];
   if (typeMatches.length) {
     const wanted = typeMatches
-      .map((m) => typeMap[m[1].toLowerCase()])
+      .map((m) => typeForSymbol(m[1]))
       .filter(Boolean);
     const types = (card?.types || []).map(lower);
     // A multi-type card (Moonlight Stadium's {P}/{D}) matches if the Pokémon
@@ -1424,11 +1415,7 @@ export function stadiumFilterMatches(card, stadiumCard) {
     if (stage && stage === 'basic') return false;
   }
   if (/each psyduck/.test(t) && !name.includes('psyduck')) return false;
-  if (
-    /tera pokémon/.test(t) &&
-    !(card?.subtypes || []).map(lower).includes('tera')
-  )
-    return false;
+  if (/tera pokémon/.test(t) && !isTeraCard(card)) return false;
   return true;
 }
 
@@ -1445,7 +1432,7 @@ function hasAttachedEnergy(pokemon, zoneCards, { type = null, namePart = null } 
   if (!pokemon) return false;
   const wanted = type ? lower(type) : null;
   for (const c of Array.isArray(zoneCards) ? zoneCards : []) {
-    if (c?.attachedTo !== pokemon.instanceId) continue;
+    if (!isAttachedToHost(c, pokemon)) continue;
     const supertype = lower(c?.supertype || c?.type || '');
     if (!supertype.includes('energy') && !/\benergy\b/i.test(String(c?.name || '')))
       continue;
@@ -1551,6 +1538,13 @@ export function isStadiumRetreatPrevention(card) {
   return /your opponent/.test(t) && /can'?t retreat|cannot retreat/.test(t);
 }
 
+/** The amount printed before `word`: "{C}{C} less" is 2, "1 less" is 1; null when none is printed. */
+function printedAmountBefore(t, word) {
+  const m = t.match(new RegExp(`((?:\\{[a-z]\\})+|\\d+)\\s+${word}\\b`));
+  if (!m) return null;
+  return /^\d/.test(m[1]) ? parseInt(m[1], 10) : m[1].length / 3;
+}
+
 /**
  * Cost modifier (continuous): "the energy cost of attacks by your Active
  * Pokémon is reduced by 1" / "attacks cost 1 less Energy" — the stadium
@@ -1562,10 +1556,11 @@ export function isStadiumRetreatPrevention(card) {
  */
 export function parseStadiumCostModifier(card) {
   const t = textOf(card);
-  if (!t || !/cost/.test(t)) return 0;
+  // "Retreat Cost … is {C} less" (Beach Court) is a retreat modifier, not an attack discount.
+  if (!t || !/cost/.test(t) || !/\battacks?\b/.test(t)) return 0;
   if (!/(less|reduc|lower)/.test(t)) return 0;
-  const m = t.match(/(?:by|less)\s*(\d+)/) || t.match(/(\d+)\s+less/);
-  return m ? parseInt(m[1], 10) || 1 : 1;
+  const reducedBy = t.match(/\bby\s*(\d+)/);
+  return printedAmountBefore(t, 'less') ?? (reducedBy ? parseInt(reducedBy[1], 10) : 0);
 }
 
 /**
@@ -1621,8 +1616,8 @@ export function parseStadiumHpModifier(card) {
     const m = t.match(
       /(\d+)\s*less\s*hp|decreases? by\s*(\d+)|reduced by\s*(\d+)|lowered by\s*(\d+)/
     );
-    const n = m ? parseInt(m[1] || m[2] || m[3] || m[4], 10) : 10;
-    return -(n || 10);
+    // "maximum HP less than 70" (Mt. Moon) prints no amount: not an HP modifier.
+    return m ? -parseInt(m[1] || m[2] || m[3] || m[4], 10) : 0;
   }
   const m = t.match(
     /\+\s*(\d+)\s*(?:hp|more hp)|hp\s*(?:increases?|goes? up|raises?)\s*by\s*(\d+)|(\d+)\s*more hp/
@@ -1768,21 +1763,8 @@ export function parseStadiumEvolutionSpeed(card) {
   const t = textOf(card);
   const out = { relaxTurnGate: false, costReduce: 0, typeFilter: null };
   if (!t || !/evolv/.test(t)) return out;
-  const typeMatch = t.match(/\{([wlfmpdgyn])\}/i);
-  if (typeMatch) {
-    const typeMap = {
-      w: 'water',
-      l: 'lightning',
-      f: 'fighting',
-      m: 'metal',
-      p: 'psychic',
-      d: 'darkness',
-      g: 'grass',
-      y: 'fairy',
-      n: 'dragon',
-    };
-    out.typeFilter = typeMap[typeMatch[1].toLowerCase()] || null;
-  }
+  const typeMatch = t.match(/\{([wlfmpdgynr])\}/i);
+  if (typeMatch) out.typeFilter = typeForSymbol(typeMatch[1]);
   if (
     /as if (?:it|they) (?:had been|were) (?:in play|already)/.test(t) ||
     /since the start of the (?:game|battle|previous turn)/.test(t) ||
@@ -1858,20 +1840,15 @@ export function parseStadiumRetreatModifier(card) {
   if (!t || !/retreat cost|retreat/.test(t)) return 0;
   if (/no retreat cost|retreat cost of 0|retreat for free|retreat cost .* is 0/.test(t))
     return -Infinity;
-  // "pays {C} more to retreat" (Broken Ground Gym, The Rocket's Training Gym,
-  // Team Aqua Hideout) raises the cost.
-  if (/\{c\}\s+more to retreat|pays? \{c\} more to retreat|more to retreat/.test(t)) {
-    return 1;
-  }
-  // Mount Lanakila (sm3-118): "The Retreat Cost of each Basic Pokémon in play … is {C} more."
-  const more = t.match(/retreat cost[^.]* is ((?:\{c\})+)\s+more/);
-  if (more) return more[1].length / 3;
+  // "pays {C} more to retreat" (Broken Ground Gym, The Rocket's Training Gym, Team Aqua Hideout)
+  // and "Retreat Cost … is {C}{C} more" (Galar Mine) raise the cost by the printed amount.
+  const more = printedAmountBefore(t, 'more');
+  if (more !== null) return more;
+  if (/more to retreat/.test(t)) return 1;
   if (/(less|reduc|lower)/.test(t)) {
-    // Altar of the Moone: "is {C}{C} less".
-    const symbols = t.match(/((?:\{c\})+)\s+less/);
-    if (symbols) return -(symbols[1].length / 3);
-    const m = t.match(/(?:by|less)\s*(\d+)|(\d+)\s+less/);
-    return -(m ? parseInt(m[1] || m[2], 10) || 1 : 1);
+    const reducedBy = t.match(/\bby\s*(\d+)/);
+    const less = printedAmountBefore(t, 'less') ?? (reducedBy ? parseInt(reducedBy[1], 10) : 0);
+    return -less;
   }
   return 0;
 }
@@ -2016,11 +1993,9 @@ export function stadiumBlocksStatusApplication(pokemon, zoneCards = []) {
   // Festival Grounds: only Energy-attached Pokémon are protected. Blanket
   // immunity cards are filtered by their printed type/name.
   if (/energy attached/.test(t)) {
-    if (!pokemon?.image) return false;
-    const attached = (zoneCards || []).filter(
-      (c) => c.type === 'Energy' && c.image?.relative === pokemon.image
+    return (zoneCards || []).some(
+      (c) => c.type === 'Energy' && isAttachedToHost(c, pokemon)
     );
-    return attached.length > 0;
   }
   return stadiumFilterMatches(pokemon, stadium);
 }
@@ -2346,9 +2321,9 @@ export function stadiumBetweenTurnsDamageFor(pokemon, card, { affected = false }
 /** Nighttime Mine: attacks cost {C} more for filtered Pokémon. */
 export function parseStadiumAttackCostIncrease(card) {
   const t = textOf(card);
-  if (!/cost/.test(t) || !/more/.test(t)) return 0;
-  const m = t.match(/\{c\}\s+more|cost\s+\{c\}\s+more|(\d+)\s+more/);
-  return m ? parseInt(m[1], 10) || 1 : 1;
+  // "The Retreat Cost of each Basic Pokémon … is {C} more" (Mount Lanakila) is a retreat modifier.
+  if (!/cost/.test(t) || !/\battacks?\b/.test(t)) return 0;
+  return printedAmountBefore(t, 'more') ?? 0;
 }
 
 export function getStadiumAttackCostIncrease(attacker, targetPlayer) {
@@ -2551,8 +2526,8 @@ export function applyStadiumEffect(card) {
       if (drawN) results.push({ action: 'draw', n: drawN });
       return {
         family,
-        executed: true,
-        message: `◈ ${description} → Draw ${drawN ?? 1} card(s).`,
+        executed: Boolean(drawN),
+        message: drawN ? `◈ ${description} → Draw ${drawN} card(s).` : `◈ ${description}`,
         results,
       };
     }

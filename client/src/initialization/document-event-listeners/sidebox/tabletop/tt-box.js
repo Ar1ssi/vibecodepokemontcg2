@@ -106,7 +106,7 @@ export async function prepareBoxFaces({ look, dims, boxKey = null }) {
  *   crinkle: object}} args
  */
 export function buildBox({ renderer, envMap, dims, faces, board, crinkle }) {
-  const { width: W, height: H, depth: D, board: b, lidFront, lidBack, collar } = dims;
+  const { width: W, height: H, depth: D, board: boardThickness, lidFront, lidBack, collar } = dims;
   const yFront = H - lidFront;
   const yHinge = H - lidBack;
   const disposables = [];
@@ -149,7 +149,7 @@ export function buildBox({ renderer, envMap, dims, faces, board, crinkle }) {
   const topUv = (x, y) => [(x + W / 2) / W, (y + D / 2) / D];
 
   const panel = (points, uv, mats, place) => {
-    const geometry = track(boardPanel(points, b, uv));
+    const geometry = track(boardPanel(points, boardThickness, uv));
     const mesh = new Mesh(geometry, mats);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -221,7 +221,7 @@ export function buildBox({ renderer, envMap, dims, faces, board, crinkle }) {
     panel(rect(-W / 2, -D / 2, W / 2, D / 2), topUv, materials.bottom, atBottom)
   );
   // The collar: bare board inside the front and sides, standing `collar` mm proud of the cut.
-  const inset = b;
+  const inset = boardThickness;
   const collarFront = panel(
     rect(-W / 2 + 2 * inset, inset, W / 2 - 2 * inset, yFront + collar),
     frontUv,
@@ -235,7 +235,7 @@ export function buildBox({ renderer, envMap, dims, faces, board, crinkle }) {
         [D / 2 - 2 * inset, inset],
         [D / 2 - 2 * inset, (sign < 0 ? leftCut(D / 2) : rightCut(-D / 2)) + collar],
         [-D / 2 + 2 * inset, (sign < 0 ? leftCut(-D / 2) : rightCut(D / 2)) + collar],
-      ].map(([x, y]) => [x, y]),
+      ],
       sideUv,
       materials.collar,
       (mesh) => {
@@ -453,19 +453,19 @@ function filmAtlasTexture(renderer) {
  *   `{x, y, z, rotX}` (the item stands upright, facing +z, tilted back by rotX radians)
  */
 export function interiorSlots(dims, { packCount = 4, deckCount = 40, leaflet = { height: 112, thickness: 1.2 } } = {}) {
-  const { depth: D, board: b } = dims;
+  const { depth: D, board: boardThickness } = dims;
   // A full pack bulges BULGE × its width each side (pack3d.mjs), so packs stand that far apart.
   const packPitch = 2 * BULGE * PACK.width + 0.4;
-  let z = -D / 2 + b + 0.4;
-  const leafletSlot = { x: 0, y: b + leaflet.height / 2, z: z + leaflet.thickness / 2, rotX: -0.03 };
+  let z = -D / 2 + boardThickness + 0.4;
+  const leafletSlot = { x: 0, y: boardThickness + leaflet.height / 2, z: z + leaflet.thickness / 2, rotX: -0.03 };
   z += leaflet.thickness + 0.4;
   const packs = [];
   for (let index = 0; index < packCount; index += 1) {
-    packs.push({ x: (index % 2 ? 1 : -1) * 0.8, y: b + PACK.height / 2, z: z + packPitch / 2, rotX: -0.045 });
+    packs.push({ x: (index % 2 ? 1 : -1) * 0.8, y: boardThickness + PACK.height / 2, z: z + packPitch / 2, rotX: -0.045 });
     z += packPitch;
   }
   const deckT = deckThickness(deckCount) + 0.6;
   // The deck leans back a little, so its promo face tips up toward whoever opens the lid.
-  const deck = { x: 0, y: b + CARD.height / 2 + 0.3, z: D / 2 - b - 1.6 - deckT / 2, rotX: -0.06 };
+  const deck = { x: 0, y: boardThickness + CARD.height / 2 + 0.3, z: D / 2 - boardThickness - 1.6 - deckT / 2, rotX: -0.06 };
   return { leaflet: leafletSlot, packs, deck };
 }

@@ -46,13 +46,13 @@ import {
 import {
   boxShot,
   boxUnboxingOptions,
-  browserStorage,
   createPoolTab,
   el,
   mountBoxOnStage,
   renderBoxPicker,
   unlimitedEnergyCards,
 } from './native-deck-builder-bb-shared.js';
+import { browserStorage } from './native-deck-builder-storage.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
 

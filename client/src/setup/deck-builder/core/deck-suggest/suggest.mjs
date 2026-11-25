@@ -2,6 +2,7 @@
 // (weighted by your steering), then report what those lists play that you don't, and the reverse.
 // Pure: takes the builder's deck shape and an index from dataset.mjs `indexDataset`.
 import { nameKey } from './dataset.mjs';
+import { deckVariants } from '../deck-variants.mjs';
 import { BUDGET_GOAL, BUDGET_MAX_USD } from './goals.mjs';
 import { normalizeSuggestPrefs } from './prefs.mjs';
 
@@ -53,15 +54,13 @@ export function prefKeyOf(countKey, index) {
 export function deckToCounts(deck, index) {
   const counts = new Map();
   const labels = new Map();
-  for (const group of Object.values(deck || {})) {
-    for (const variant of group?.cards || []) {
-      const count = Number(variant?.count) || 0;
-      if (count < 1) continue;
-      const idx = resolveDeckCard(variant.data, index);
-      const key = idx === null ? `x:${nameKey(variant.data?.name)}` : idx;
-      counts.set(key, (counts.get(key) || 0) + count);
-      if (!labels.has(key)) labels.set(key, idx === null ? variant.data?.name || '?' : index.dataset.cards[idx].name);
-    }
+  for (const variant of deckVariants(deck)) {
+    const count = Number(variant?.count) || 0;
+    if (count < 1) continue;
+    const idx = resolveDeckCard(variant.data, index);
+    const key = idx === null ? `x:${nameKey(variant.data?.name)}` : idx;
+    counts.set(key, (counts.get(key) || 0) + count);
+    if (!labels.has(key)) labels.set(key, idx === null ? variant.data?.name || '?' : index.dataset.cards[idx].name);
   }
   const unresolved = [...labels.entries()].filter(([key]) => typeof key === 'string').map(([, name]) => name);
   return { counts, labels, unresolved };
@@ -113,11 +112,7 @@ export function findNeighbors(
   scored.sort((a, b) => b.similarity - a.similarity || index.listWeights[b.listIdx] - index.listWeights[a.listIdx]);
   const eligible = scored.filter((entry) => entry.similarity >= minSimilarity);
   const confident = eligible.length >= minNeighbors && coreCopies >= minCoreCopies;
-  const chosen = confident
-    ? eligible.slice(0, k)
-    : eligible.length >= minNeighbors
-      ? eligible.slice(0, k)
-      : scored.slice(0, minNeighbors);
+  const chosen = eligible.length >= minNeighbors ? eligible.slice(0, k) : scored.slice(0, minNeighbors);
 
   const neighbors = chosen.map(({ listIdx, similarity }) => {
     const listCounts = index.listCounts[listIdx];
@@ -326,19 +321,19 @@ export function metaOverview(index, limit = 12) {
 export function describeList(index, listIdx) {
   const list = index.dataset.lists[listIdx];
   const event = index.dataset.events[list.e];
+  // A list may lack a placing (placementWeight counts it as 65+); then only the event is named.
+  if (!Number.isInteger(list.p) || list.p < 1) return `${event.name} · ${event.date}`;
   const suffix = [11, 12, 13].includes(list.p % 100) ? 'th' : ['th', 'st', 'nd', 'rd'][list.p % 10] || 'th';
   return `${list.p}${suffix} · ${event.name} · ${event.date}`;
 }
 
 /** The deck card (its `data`) that a steering key stands for, for Cut buttons; null when absent. */
 export function findDeckCardForKey(deck, index, key) {
-  for (const group of Object.values(deck || {})) {
-    for (const variant of group?.cards || []) {
-      if (!(Number(variant?.count) > 0)) continue;
-      const idx = resolveDeckCard(variant.data, index);
-      const variantKey = idx === null ? `x:${nameKey(variant.data?.name)}` : index.dataset.cards[idx].key;
-      if (variantKey === key) return variant.data;
-    }
+  for (const variant of deckVariants(deck)) {
+    if (!(Number(variant?.count) > 0)) continue;
+    const idx = resolveDeckCard(variant.data, index);
+    const variantKey = idx === null ? `x:${nameKey(variant.data?.name)}` : index.dataset.cards[idx].key;
+    if (variantKey === key) return variant.data;
   }
   return null;
 }

@@ -1,13 +1,13 @@
-const SUPERTYPE_PRIORITY = {
-  'Pokémon': 1,
-  Pokemon: 1,
-  Trainer: 2,
-  Energy: 3,
-};
+import { parseSupertype } from './supertype.mjs';
+
+const SUPERTYPE_PRIORITY = { pokemon: 1, trainer: 2, energy: 3 };
+const UNKNOWN_SUPERTYPE_PRIORITY = 999;
+
+const priorityOf = (card) => SUPERTYPE_PRIORITY[parseSupertype(card?.supertype)] ?? UNKNOWN_SUPERTYPE_PRIORITY;
 
 export function compareCardsBySupertype(a = {}, b = {}) {
-  const priorityA = SUPERTYPE_PRIORITY[a?.supertype] || 999;
-  const priorityB = SUPERTYPE_PRIORITY[b?.supertype] || 999;
+  const priorityA = priorityOf(a);
+  const priorityB = priorityOf(b);
 
   if (priorityA < priorityB) return -1;
   if (priorityA > priorityB) return 1;

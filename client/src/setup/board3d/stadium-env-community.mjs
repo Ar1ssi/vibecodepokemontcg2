@@ -192,7 +192,7 @@ void main() {
   float kind = 0.0;
   float tone = 0.3;
   if (sd < 0.0) {
-    h = uShape.y * smoothstep(0.0, -4.0, sd);
+    h = uShape.y * (1.0 - smoothstep(-4.0, 0.0, sd));
     kind = 1.0;
   }
   float yMask = smoothstep(uCliff.w, uCliff.w + 150.0, p.y + 70.0 * (fbm3(vec2(p.x / 230.0, 8.0)) - 0.5));

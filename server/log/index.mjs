@@ -1,7 +1,7 @@
 // Server logging assembly: store, logger, taps, disk mirror. `LOG_OFF=1` builds an inert twin.
 import { createLogger } from '../../shared/log/logger.mjs';
 import { LIMITS } from '../../shared/log/log-schema.mjs';
-import { createLogStore } from './log-store.mjs';
+import { createLogStore, roomStreamId } from './log-store.mjs';
 import { createDiskSink, resolveLogDir } from './disk-sink.mjs';
 import { createServerLog } from './server-logger.mjs';
 import { installProcessTap } from './process-tap.mjs';
@@ -39,9 +39,14 @@ function createInert(now) {
   };
 }
 
-function totalBytesFrom(env) {
+const maxMbFrom = (env) => {
   const mb = Number(env.LOG_MAX_MB);
-  return Number.isFinite(mb) && mb > 0 ? mb * 1048576 : LIMITS.totalBytesDefault;
+  return mb > 0 ? mb : NaN;
+};
+
+function totalBytesFrom(env) {
+  const mb = maxMbFrom(env);
+  return Number.isFinite(mb) ? mb * 1048576 : LIMITS.totalBytesDefault;
 }
 
 export function createServerLogging({
@@ -71,7 +76,7 @@ export function createServerLogging({
   const journalBytes = () => {
     let sum = 0;
     for (const [roomId, journal] of journals) {
-      if (store.stream(`room:${roomId}`)) sum += journal.stats().bytes;
+      if (store.stream(roomStreamId(roomId))) sum += journal.stats().bytes;
     }
     return sum;
   };
@@ -81,13 +86,16 @@ export function createServerLogging({
   const sweep = () => {
     store.sweep();
     for (const roomId of journals.keys()) {
-      if (!store.stream(`room:${roomId}`)) journals.delete(roomId);
+      if (!store.stream(roomStreamId(roomId))) journals.delete(roomId);
     }
   };
   const sweepTimer = setInterval(sweep, LIMITS.sweepMs);
   sweepTimer.unref();
   const build = readBuild({ env, cwd: repoRoot });
   log.info('boot', 'start', { commit: build.commit, node: build.node, pid: process.pid, logDir: diskSink?.dir ?? null });
+  if (env.LOG_MAX_MB && !Number.isFinite(maxMbFrom(env))) {
+    log.warn('boot', 'config.ignored', { name: 'LOG_MAX_MB', value: String(env.LOG_MAX_MB).slice(0, 40) });
+  }
 
   let seatOf = () => null;
   let ingest = null;
@@ -122,7 +130,7 @@ export function createServerLogging({
     diskSink,
     httpMiddleware: httpLog({ log }),
     beaconHandler: (req, res) => (ingest ? ingest.beaconHandler(req, res) : res.status(204).end()),
-    levelFor: (roomId) => ingest?.levelFor(roomId) ?? 'debug',
+    levelFor: (roomId, clientId) => ingest?.levelFor(roomId, clientId) ?? 'debug',
     exportDownloadHandler: delegate('downloadHandler'),
     devRoomsHandler: delegate('devRoomsHandler'),
     devExportHandler: delegate('devExportHandler'),
@@ -135,7 +143,7 @@ export function createServerLogging({
         log,
         io,
         journalFor: (roomId) => journals.get(roomId) ?? null,
-        levelFor: (roomId) => ingest?.levelFor(roomId) ?? 'debug',
+        levelFor: (roomId, clientId) => ingest?.levelFor(roomId, clientId) ?? 'debug',
         build,
         netcode: options.netcode ?? null,
         acceptTail: (socket, tail) => ingest.acceptTail(socket, tail),

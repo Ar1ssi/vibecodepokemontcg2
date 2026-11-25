@@ -60,10 +60,14 @@ export function hydrateSetCards(setInfo, rows = []) {
  */
 export function hydrateBoxData(raw = {}) {
   const cardsById = new Map((raw.cards || []).map((card) => [card.id, card]));
-  const toRows = (entries = []) =>
-    entries.filter((entry) => cardsById.has(entry.id)).map(({ id, qty }) => ({ ...cardsById.get(id), qty }));
+  const toRows = (deckKey, entries = []) =>
+    entries.map(({ id, qty }) => {
+      const card = cardsById.get(id);
+      if (!card) throw new Error(`box deck ${deckKey} names card ${id}, which the box module does not hold`);
+      return { ...card, qty };
+    });
   const decks = raw.decks
-    ? Object.fromEntries(Object.entries(raw.decks).map(([key, entries]) => [key, toRows(entries)]))
+    ? Object.fromEntries(Object.entries(raw.decks).map(([key, entries]) => [key, toRows(key, entries)]))
     : null;
   return {
     kind: raw.kind,

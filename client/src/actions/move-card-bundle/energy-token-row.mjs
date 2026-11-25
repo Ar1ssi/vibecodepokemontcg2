@@ -40,7 +40,7 @@ export function planEnergyTokenRow(keys, cardWidth) {
   const tokens = list.map((_, i) => ({ left: i * pitch, zIndex: 100 + i + 1 }));
   const badges = [];
   if (list.length <= ENERGY_TOKEN_ROW_MAX) {
-    return fitToCard({ tokenSize, tokens, badges }, rowEnd(tokens, badges, tokenSize), width);
+    return fitToCard({ tokenSize, tokens, badges }, width);
   }
 
   const fontSize = tokenSize * BADGE_FONT;
@@ -56,7 +56,7 @@ export function planEnergyTokenRow(keys, cardWidth) {
     badges.push({ left: badgeLeft, label, fontSize, zIndex: 100 + list.length + 1 });
     cursor = badgeLeft + badgeWidth(label, fontSize) + tokenSize * BADGE_GAP_AFTER;
   }
-  return fitToCard({ tokenSize, tokens, badges }, rowEnd(tokens, badges, tokenSize), width);
+  return fitToCard({ tokenSize, tokens, badges }, width);
 }
 
 /** Token indices grouped by key, groups in order of first appearance. */
@@ -88,13 +88,16 @@ function rowEnd(tokens, badges, tokenSize) {
   return end;
 }
 
-/** Offsets shrink (sizes don't) until that last item ends at the card's edge. */
-function fitToCard(plan, end, cardWidth) {
+/** A plan whose offsets shrink (sizes don't) until the last item ends at the card's edge. */
+function fitToCard(plan, cardWidth) {
+  const end = rowEnd(plan.tokens, plan.badges, plan.tokenSize);
   if (!cardWidth || end.left <= 0 || end.left + end.width <= cardWidth) return plan;
   const scale = Math.max(0, cardWidth - end.width) / end.left;
-  for (const token of plan.tokens) token.left *= scale;
-  for (const badge of plan.badges) badge.left *= scale;
-  return plan;
+  return {
+    ...plan,
+    tokens: plan.tokens.map((token) => ({ ...token, left: token.left * scale })),
+    badges: plan.badges.map((badge) => ({ ...badge, left: badge.left * scale })),
+  };
 }
 
 /**

@@ -2,7 +2,6 @@ import './log/boot.js';
 export * from './state.js';
 
 import { initializeDOMEventListeners } from './initialization/document-event-listeners/initialize-document-event-listeners.js';
-import { loadImportData } from './initialization/load-import-data/load-import-data.js';
 import { initializeMutationObservers } from './initialization/mutation-observers/initialize-mutation-observers.js';
 import { initializeSocketEventListeners } from './initialization/socket-event-listeners/socket-event-listeners.js';
 import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
@@ -13,6 +12,9 @@ import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-s
 import { initializeHoverPreview } from './setup/image-logic/hover-preview.js';
 import { loadFoilManifest } from './setup/foil/tcgl-foil-store.js';
 import { installDeckBoxes } from './setup/netcode/mat-fx/deck-box.js';
+import { setAuthoritativeDispatchContext } from './setup/netcode/authoritative-dispatch.js';
+import { autoJoinSoloAtLoad } from './setup/netcode/solo-room.js';
+import { appendMessage } from './setup/chatbox/append-message.js';
 
 applyFxSettings();
 loadFoilManifest();
@@ -29,5 +31,10 @@ import('./setup/board3d/board3d.js')
   .catch((error) => console.error('board3d failed to start', error));
 initializeHoverPreview();
 installDeckBoxes();
-loadImportData();
 installE2eApi();
+// Design 090: with no room every gated action refuses and the board draws nothing, so the page
+// opens in its solo room and tells the player when an action is refused for want of one.
+setAuthoritativeDispatchContext({
+  notify: (text) => appendMessage('', text, 'announcement', false),
+});
+autoJoinSoloAtLoad();

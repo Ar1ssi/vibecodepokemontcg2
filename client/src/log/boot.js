@@ -8,6 +8,7 @@ import { installPerfCapture } from './capture-perf.js';
 import { installAppEventCapture } from './capture-app.js';
 import { tapClientSocket } from './capture-socket.js';
 import { startShipping } from './ship.js';
+import { MARK_NOTE_MAX } from '../../../shared/log/log-schema.mjs';
 import { exportFullLog, initExport, markMoment, setVerbose } from './export-ui.js';
 
 const originalConsoleError = console.error.bind(console);
@@ -41,7 +42,7 @@ try {
       if (lvl) setVerbose(lvl);
       return log.level();
     },
-    mark: (note) => log.info('user', 'mark', { note: String(note ?? '').slice(0, 500) }),
+    mark: (note) => log.info('user', 'mark', { note: String(note ?? '').slice(0, MARK_NOTE_MAX) }),
   };
 
   if (typeof globalThis.io === 'function') {

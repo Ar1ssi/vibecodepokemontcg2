@@ -29,7 +29,14 @@ export function createBoardEnvironmentQueue({ push, clear, mayAnimate }) {
 
   const run = (plan) => {
     pending.delete(plan);
-    return plan.play();
+    try {
+      return plan.play();
+    } catch (error) {
+      // The target is already set from the view: a play that cannot run must still land on it.
+      console.warn('[mat-fx] board environment play failed', error);
+      plan.settle();
+      return 0;
+    }
   };
 
   const clearAll = () => {

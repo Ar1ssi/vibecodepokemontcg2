@@ -15,7 +15,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { litSideLight, moddedKit, unstyled } from './_kit-mod.js';
 import { mergeFxMods, withFxMod } from './_mods.js';
-import { grainPass, inShadow, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
+import { grainPass, inShadow, seedHash, shardOutline, styledKit, tongueOutline, traceOutline } from './_shared.js';
 import { streamGlobs } from './poison.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
@@ -59,12 +59,6 @@ const rad = (deg) => (deg * Math.PI) / 180;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 
-/** A stable pseudo-random value in [0, 1) for (seed, index). */
-const hash = (seed, index) => {
-  const v = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
-
 const CLOD_CORNERS = 7;
 const SPIKE_SHOULDER = 0.68;
 const FACET_ALPHA = 0.55;
@@ -99,8 +93,8 @@ const MUD_PALETTE = Object.freeze({
 export function clodOutline(x, y, r, seed = 0, spin = 0) {
   const points = [];
   for (let i = 0; i < CLOD_CORNERS; i += 1) {
-    const theta = spin + ((i + 0.5 * (hash(seed, i) - 0.5)) / CLOD_CORNERS) * TAU;
-    const radius = r * (0.8 + 0.4 * hash(seed, i + 11));
+    const theta = spin + ((i + 0.5 * (seedHash(seed, i) - 0.5)) / CLOD_CORNERS) * TAU;
+    const radius = r * (0.8 + 0.4 * seedHash(seed, i + 11));
     points.push([x + Math.cos(theta) * radius, y + Math.sin(theta) * radius]);
   }
   return points;
@@ -119,8 +113,8 @@ export function spikeOutline({ x, y, angleDeg, length, width, seed = 0 }) {
   const nx = -uy;
   const ny = ux;
   const at = (f, side) => [x + ux * length * f + nx * width * side, y + uy * length * f + ny * width * side];
-  const lean = (hash(seed, 1) - 0.5) * 0.16;
-  const tooth = (k) => 0.12 + 0.08 * hash(seed, k);
+  const lean = (seedHash(seed, 1) - 0.5) * 0.16;
+  const tooth = (k) => 0.12 + 0.08 * seedHash(seed, k);
   const tip = at(1, lean);
   return {
     left: [at(0, 0.5), at(SPIKE_SHOULDER, 0.24), at(0.8, 0.07), at(0.88, tooth(2)), tip],
@@ -139,14 +133,14 @@ export function fissureSeams(s, r) {
   if (!(spread > 0) || !(r > 0)) return { spread: 0, seams: [] };
   const seams = [];
   for (let i = 0; i < SEAMS; i += 1) {
-    const angle = ((i + 0.6 * (hash(5, i) - 0.5)) / SEAMS) * TAU;
-    const reach = r * (0.6 + 0.4 * hash(9, i)) * spread;
+    const angle = ((i + 0.6 * (seedHash(5, i) - 0.5)) / SEAMS) * TAU;
+    const reach = r * (0.6 + 0.4 * seedHash(9, i)) * spread;
     const ca = Math.cos(angle);
     const sa = Math.sin(angle);
     const line = [];
     for (let j = 0; j <= SEAM_JOINTS; j += 1) {
       const d = (j / SEAM_JOINTS) * reach;
-      const jag = j === 0 ? 0 : (hash(13 + i, j) - 0.5) * 0.16 * r * spread;
+      const jag = j === 0 ? 0 : (seedHash(13 + i, j) - 0.5) * 0.16 * r * spread;
       line.push([ca * d - sa * jag, (sa * d + ca * jag) * POOL_SQUASH]);
     }
     seams.push(line);

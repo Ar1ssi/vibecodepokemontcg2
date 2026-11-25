@@ -1,16 +1,11 @@
 // Builds the export file (design 088 §6): header, journal, state ring, client snapshots, merged timeline.
 // Pure: reads the store and journal it is given, returns one JSON record per array element.
 import { LOG_FORMAT } from '../../shared/log/log-schema.mjs';
+import { LEGEND, clientSrc, exportNote, timelineLine } from '../../shared/log/export-format.mjs';
+import { SERVER_STREAM, clientStreamId, roomStreamId } from './log-store.mjs';
 
 const SERVER_WINDOW_MS = 60000;
 const PREFIX_FIELDS = /^\{"t":[^,]*,"seq":\d+,"lvl":"([^"]*)","cat":"([^"]*)"/;
-
-const LEGEND = Object.freeze({
-  record: 'k = header | journal | state | snap | e',
-  e: 'ts = server-aligned ms; src = server or c:<client>; t = source clock ms; seq = per-source counter; lvl; cat; ev; room; seat; sv = stateVersion; cs = clientSeq; d = detail',
-  journal: 'rec.k = rebase | rng | cmd — replayable with: node tools/log.mjs replay <file>',
-  cli: 'node tools/log.mjs summary <file>',
-});
 
 export function findGaps(entries) {
   const groups = new Map();
@@ -44,11 +39,6 @@ function sortedTimeline(sources) {
     for (const entry of entries) rows.push({ ...entry, src });
   }
   return rows.sort(compareTimeline);
-}
-
-function timelineLine({ ts, src, load, line }) {
-  const loadPart = load ? `,"load":${JSON.stringify(load)}` : '';
-  return `{"k":"e","ts":${ts},"src":${JSON.stringify(src)}${loadPart},${line.slice(1)}`;
 }
 
 export function mergeTimeline(sources) {
@@ -98,9 +88,9 @@ function gatherClients({ store, scope }) {
   const rows = scope.roomId == null ? [{ clientId: scope.clientId }] : store.participants(scope.roomId);
   const clients = [];
   for (const row of rows) {
-    const stream = store.stream(`client:${row.clientId}`);
+    const stream = store.stream(clientStreamId(row.clientId));
     if (!stream) continue;
-    clients.push({ row, stream, src: `c:${row.clientId.slice(0, 8)}`, entries: stream.entries() });
+    clients.push({ row, stream, src: clientSrc(row.clientId), entries: stream.entries() });
   }
   return clients;
 }
@@ -118,7 +108,7 @@ export function buildExport({
   describe = () => ({}),
   levelFor = () => 'debug',
 }) {
-  const roomStream = scope.roomId == null ? null : store.stream(`room:${scope.roomId}`);
+  const roomStream = scope.roomId == null ? null : store.stream(roomStreamId(scope.roomId));
   const roomEntries = roomStream?.entries() ?? [];
   const clients = gatherClients({ store, scope });
 
@@ -128,7 +118,7 @@ export function buildExport({
   for (const client of clients) for (const entry of client.entries) from = Math.min(from, entry.ts);
   if (from === Infinity) from = now() - SERVER_WINDOW_MS;
 
-  const serverStream = store.stream('server');
+  const serverStream = store.stream(SERVER_STREAM);
   const serverEntries = [
     ...roomEntries,
     ...(serverStream?.entries() ?? []).filter(
@@ -157,7 +147,7 @@ export function buildExport({
       seat,
       loadIds: Object.keys(meta.loads ?? {}),
       ua: meta.ua ?? null,
-      level: levelFor(scope.roomId),
+      level: levelFor(scope.roomId, row.clientId),
       offset: meta.offset ?? null,
       rtt: meta.rtt ?? null,
       entries: entries.length,
@@ -180,7 +170,7 @@ export function buildExport({
     format: LOG_FORMAT,
     exportedAt: new Date(now()).toISOString(),
     requester,
-    note: String(note).slice(0, 2000),
+    note: exportNote(note),
     room: scope.roomId ?? null,
     netcode,
     build: { server: build?.commit ?? null, clients: buildByClient },

@@ -53,6 +53,7 @@ import {
   packFlyPose,
   packSlotKind,
   packSpreadSlot,
+  packBodyEdge,
   packTearEdge,
   packTearProgress,
   packTornAt,
@@ -77,6 +78,8 @@ import {
 import { playFxSound } from '../../../setup/netcode/mat-fx/fx-audio.js';
 import { brighten, fxRgbForCard, rgbCss } from '../../../setup/netcode/mat-fx/fx-colors.mjs';
 import { burstParticles } from '../../../setup/netcode/mat-fx/particles.mjs';
+import { trackPress } from './native-deck-builder-press-gesture.js';
+import { cardImage } from './native-deck-builder-shared-logic.js';
 
 /**
  * The Build & Battle unboxing scene (design 052 § DOM twin, Pocket-style rework in § Deviations):
@@ -124,9 +127,6 @@ const button = (className, label) => {
   return node;
 };
 
-const cardImage = (card, size = 'small') =>
-  card?.images?.[size] || card?.images?.small || card?.image || '';
-
 const instant = () => motionReduced() || fxDisabled();
 
 // "Sound before sight": every beat calls this before its first frame. playFxSound re-checks the
@@ -158,6 +158,18 @@ const playPose = (node, poseFn, toFrame, durationMs, { delay = 0, samples = 24 }
     node.style.willChange = '';
   });
 };
+
+// hitFlipPose turns 180° → 0° with a pop; `toBack` runs it the other way, 0° → 180°.
+const playFlip = (node, { tier = 0, toBack = false, samples } = {}) =>
+  playPose(
+    node,
+    (t) => hitFlipPose(t, { tier }),
+    (pose) => ({
+      transform: `rotateY(${toBack ? 180 - pose.rotateYDeg : pose.rotateYDeg}deg) scale(${pose.scale})`,
+    }),
+    HIT_FLIP_MS,
+    { samples }
+  );
 
 // CSS y points down: the pose's lid angle (y up, negative = swinging up and back) flips sign here.
 const lidTransform = ({ rotateXDeg, translateYPx }) =>
@@ -194,11 +206,11 @@ const launchRectFrom = (rect) => {
 const promoTransform = ({ translateYPx, rotateXDeg, rotateYDeg, scale }) =>
   `translateY(${translateYPx}px) rotateX(${rotateXDeg}deg) rotateY(${rotateYDeg}deg) scale(${scale})`;
 
-// The body of a torn pack: everything below the tear line `packTearEdge` cut.
-const packBodyClip = (tearEdge) => {
-  const points = tearEdge.slice('polygon('.length, -1).split(', ').slice(2);
-  return `polygon(${[...points, '0% 100%', '100% 100%'].join(', ')})`;
-};
+// A pack's tear as two clip-paths: the strip above the tear line and the body below it.
+const tearClips = (seed, packIndex) => ({
+  strip: packTearEdge(seed, packIndex),
+  body: packBodyEdge(seed, packIndex),
+});
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -553,7 +565,7 @@ export const mountUnboxingScene = ({
   const doneText = presentation?.doneText ?? (isEtb ? etbDoneText(packs, contents) : 'All four packs are open.');
   const finishLabel = presentation?.finishLabel ?? (isEtb ? 'See collection' : 'Build your deck');
   const textures = new Map();
-  const tearEdges = packs.map((_, index) => packTearEdge(seed, index));
+  const tearClipsByPack = packs.map((_, index) => tearClips(seed, index));
   const slotOf = (packIndex, cardIndex) =>
     packSlotKind(packModel, cardIndex, packs[packIndex]?.[cardIndex]);
   const tierOf = (packIndex, cardIndex) => {
@@ -872,15 +884,7 @@ export const mountUnboxingScene = ({
       prop.setAttribute('aria-pressed', String(showing));
       sound(voice);
       dropPoses(flip);
-      // hitFlipPose turns 180° → 0° with a pop; showing the far side runs it the other way.
-      playPose(
-        flip,
-        (t) => hitFlipPose(t, { tier: 0 }),
-        (pose) => ({
-          transform: `rotateY(${showing ? 180 - pose.rotateYDeg : pose.rotateYDeg}deg) scale(${pose.scale})`,
-        }),
-        HIT_FLIP_MS
-      );
+      playFlip(flip, { toBack: showing });
       later(() => {
         line.textContent = showing ? shownLabel : label;
       }, instant() ? 0 : HIT_FLIP_MS / 2);
@@ -1077,7 +1081,7 @@ export const mountUnboxingScene = ({
     if (packIndex === focus) {
       pack.classList.add('is-focus');
       const strip = el('div', 'bb-pack__strip');
-      strip.style.clipPath = tearEdges[packIndex];
+      strip.style.clipPath = tearClipsByPack[packIndex].strip;
       strip.append(packArt('bb-pack__art', packIndex));
       const cut = el('div', 'bb-cutline');
       const top = button('bb-pack__top', `Swipe across pack ${packIndex + 1} to open it`);
@@ -1599,7 +1603,7 @@ export const mountUnboxingScene = ({
     const u = getUnboxing();
     const packIndex = lastTorn(u);
     const packEl = el('div', 'bb-pocket__pack');
-    packEl.style.clipPath = packBodyClip(tearEdges[packIndex]);
+    packEl.style.clipPath = tearClipsByPack[packIndex].body;
     packEl.append(packArt('bb-pack__art', packIndex), el('div', 'bb-pack__foil'));
     stack.after(packEl);
     const drop = playPose(
@@ -1833,13 +1837,7 @@ export const mountUnboxingScene = ({
     sound(unboxingVoiceFor('revealCard', tier));
     node.classList.add('is-turning');
     playHitFlare(node.querySelector('.bb-pcard__front'), card, tier);
-    const turned = playPose(
-      flip,
-      (t) => hitFlipPose(t, { tier }),
-      (pose) => ({ transform: `rotateY(${pose.rotateYDeg}deg) scale(${pose.scale})` }),
-      HIT_FLIP_MS,
-      { samples: 32 }
-    );
+    const turned = playFlip(flip, { tier, samples: 32 });
     flippedHits.add(hitKey(packIndex, cardIndex));
     const current = await holdWhile(turned);
     if (!current) return;
@@ -1890,57 +1888,45 @@ export const mountUnboxingScene = ({
   // Drag the top card sideways; release past SWIPE_AT sends it off that side. A hit that is still
   // face down turns over instead, whatever the gesture.
   function bindSwipe(node, packIndex) {
-    let drag = null;
     const widthOf = () => node.clientWidth || 200;
     const hidden = () => isHiddenHit(packIndex, Number(node.dataset.cardIndex));
     const follow = (dx) => {
       node.style.transform = `translateX(${dx}px) rotate(${dx * DRAG_TILT}deg)`;
     };
-    node.addEventListener('pointerdown', (event) => {
-      if (event.button !== 0) return;
-      if (busy) {
-        queuedTap = true;
-        return;
-      }
-      dropPoses(node);
-      drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, dx: 0, moved: 0 };
-      node.setPointerCapture?.(event.pointerId);
-    });
-    node.addEventListener('pointermove', (event) => {
-      if (!drag || event.pointerId !== drag.id) return;
-      drag.dx = event.clientX - drag.x0;
-      drag.moved = Math.max(drag.moved, Math.hypot(drag.dx, event.clientY - drag.y0));
-      if (drag.moved >= TAP_SLOP_PX && !hidden()) follow(drag.dx);
-    });
-    const release = (event) => {
-      if (!drag || event.pointerId !== drag.id) return;
-      const { dx, moved } = drag;
-      drag = null;
-      const outcome =
-        event.type === 'pointercancel' ? 'spring' : swipeOutcome({ dxPx: dx, movedPx: moved, widthPx: widthOf() });
-      if (hidden()) {
-        if (outcome !== 'spring') tapTop();
-        return;
-      }
-      if (outcome === 'tap') tapTop();
-      else if (outcome === 'swipe') swipeAway(Math.sign(dx) || 1, dx);
-      else {
-        playPose(
-          node,
-          (t) => lerp(dx, 0, easeOut(t)),
-          (x) => ({ transform: `translateX(${x}px) rotate(${x * DRAG_TILT}deg)` }),
-          SPRING_BACK_MS,
-          { samples: 8 }
-        );
-      }
-    };
-    node.addEventListener('pointerup', release);
-    node.addEventListener('pointercancel', release);
-    // Pointer presses are handled on release; `detail === 0` is Enter/Space or a scripted click.
-    node.addEventListener('click', (event) => {
-      if (event.detail !== 0) return;
-      if (busy) queuedTap = true;
-      else tapTop();
+    trackPress(node, {
+      onPress: () => {
+        if (busy) {
+          queuedTap = true;
+          return false;
+        }
+        dropPoses(node);
+        return true;
+      },
+      onMove: ({ dx, moved }) => {
+        if (moved >= TAP_SLOP_PX && !hidden()) follow(dx);
+      },
+      onRelease: ({ dx, moved }, cancelled) => {
+        const outcome = cancelled ? 'spring' : swipeOutcome({ dxPx: dx, movedPx: moved, widthPx: widthOf() });
+        if (hidden()) {
+          if (outcome !== 'spring') tapTop();
+          return;
+        }
+        if (outcome === 'tap') tapTop();
+        else if (outcome === 'swipe') swipeAway(Math.sign(dx) || 1, dx);
+        else {
+          playPose(
+            node,
+            (t) => lerp(dx, 0, easeOut(t)),
+            (x) => ({ transform: `translateX(${x}px) rotate(${x * DRAG_TILT}deg)` }),
+            SPRING_BACK_MS,
+            { samples: 8 }
+          );
+        }
+      },
+      onKeyboard: () => {
+        if (busy) queuedTap = true;
+        else tapTop();
+      },
     });
   }
 
@@ -2017,44 +2003,38 @@ export const mountUnboxingScene = ({
 
   // ── Tear input: drag ≥ 40 % across, or press (row 5); Enter/Space on the button ─
   function bindTear(target, { widthOf, onStart, onProgress, onSpring, onTear }) {
-    let drag = null;
-    target.addEventListener('pointerdown', (event) => {
-      if (target.disabled || busy || event.button !== 0) return;
-      drag = { id: event.pointerId, x0: event.clientX, y0: event.clientY, dx: 0, moved: 0, fired: false };
-      target.setPointerCapture?.(event.pointerId);
-      onStart?.(event);
-    });
-    target.addEventListener('pointermove', (event) => {
-      if (!drag || event.pointerId !== drag.id || drag.fired) return;
-      drag.dx = Math.abs(event.clientX - drag.x0);
-      drag.moved = Math.max(drag.moved, Math.hypot(event.clientX - drag.x0, event.clientY - drag.y0));
-      if (drag.moved < TAP_SLOP_PX) return;
-      const progress = packTearProgress(drag.dx, widthOf());
-      if (packTornAt(progress)) {
-        drag.fired = true;
-        onTear(progress);
-        return;
-      }
-      onProgress(progress);
-    });
-    const release = (event) => {
-      if (!drag || event.pointerId !== drag.id) return;
-      const { dx, moved, fired } = drag;
-      drag = null;
-      if (fired) return;
-      const progress = packTearProgress(dx, widthOf());
-      const outcome =
-        event.type === 'pointercancel'
+    // Set once a drag crosses the tear point: the rest of that press does nothing more.
+    let fired = false;
+    trackPress(target, {
+      onPress: (event) => {
+        if (target.disabled || busy) return false;
+        fired = false;
+        onStart?.(event);
+        return true;
+      },
+      onMove: ({ dx, moved }) => {
+        if (fired || moved < TAP_SLOP_PX) return;
+        const progress = packTearProgress(Math.abs(dx), widthOf());
+        if (packTornAt(progress)) {
+          fired = true;
+          onTear(progress);
+          return;
+        }
+        onProgress(progress);
+      },
+      onRelease: ({ dx, moved }, cancelled) => {
+        if (fired) return;
+        const travelPx = Math.abs(dx);
+        const progress = packTearProgress(travelPx, widthOf());
+        const outcome = cancelled
           ? 'spring'
-          : tearReleaseOutcome({ dxPx: dx, movedPx: moved, widthPx: widthOf() });
-      if (outcome === 'tear') onTear(progress);
-      else onSpring(progress);
-    };
-    target.addEventListener('pointerup', release);
-    target.addEventListener('pointercancel', release);
-    // Pointer presses are handled on release; `detail === 0` is Enter/Space or a scripted click.
-    target.addEventListener('click', (event) => {
-      if (event.detail === 0 && !target.disabled && !busy) onTear(0);
+          : tearReleaseOutcome({ dxPx: travelPx, movedPx: moved, widthPx: widthOf() });
+        if (outcome === 'tear') onTear(progress);
+        else onSpring(progress);
+      },
+      onKeyboard: () => {
+        if (!target.disabled && !busy) onTear(0);
+      },
     });
   }
 

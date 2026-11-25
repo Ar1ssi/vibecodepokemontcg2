@@ -85,11 +85,12 @@ function fakeRes(status, headers = {}) {
   res.getHeader = (k) => headers[k];
   return res;
 }
-function runHttp(url, status, { msTaken = 3, headers } = {}) {
+const CLIENT = '0123456789abcdef';
+function runHttp(url, status, { msTaken = 3, headers, client = CLIENT } = {}) {
   const { log, parsed } = setup();
   let t = 0;
   const mw = httpLog({ log, now: () => t });
-  const req = { method: 'GET', originalUrl: url, get: (k) => (k === 'x-ptcg-client' ? 'cid' : undefined) };
+  const req = { method: 'GET', originalUrl: url, get: (k) => (k === 'x-ptcg-client' ? client : undefined) };
   const res = fakeRes(status, headers);
   let nexted = false;
   mw(req, res, () => { nexted = true; });
@@ -105,7 +106,7 @@ test('http tap levels', () => {
   assert.equal(api.length, 1);
   assert.equal(api[0].lvl, 'debug');
   assert.equal(api[0].ev, 'req');
-  assert.deepEqual(api[0].d, { method: 'GET', path: '/api/x', query: 'q=1', status: 200, ms: 3, bytes: 12, client: 'cid' });
+  assert.deepEqual(api[0].d, { method: 'GET', path: '/api/x', query: 'q=1', status: 200, ms: 3, bytes: 12, client: CLIENT });
   const missing = runHttp('/src/a.png', 404);
   assert.equal(missing[0].lvl, 'warn');
   assert.equal(missing[0].ev, 'req.failed');
@@ -115,6 +116,11 @@ test('http tap levels', () => {
   assert.equal(runHttp('/p?' + 'a'.repeat(300), 404)[0].d.query.length, 200);
   assert.equal('query' in runHttp('/api/y', 200)[0].d, false);
   assert.equal(runHttp('/api/y', 200)[0].d.bytes, null);
+});
+
+test('http tap logs the client header only when it is a client id', () => {
+  assert.equal(runHttp('/api/y', 200, { client: 'x'.repeat(500) })[0].d.client, null);
+  assert.equal(runHttp('/api/y', 200, { client: null })[0].d.client, null);
 });
 
 function fakeSocket(extra = {}) {

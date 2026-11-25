@@ -8,7 +8,8 @@
 // Design 065: `info.materialAt(i)` is item i's material on the multi-item drawers (beat `hues`),
 // anchored drawers place themselves with `anchorPoint`, and travelling / orbiting drawers draw
 // their `unit` (materials/_units.js; 'body' is the material's own body / projectile).
-// Design 078: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`), and
+// Design 078: travelling and burst drawers own their exit as a GPU dissolve (`burnOut`), called
+// inside the drawer or by the registry's `burning` wrapper (IMPLEMENTATIONS), and
 // every drawer owns its place in height (`ctx.fxLift`, beat-lift.mjs): no beat lies on the cloth.
 import { rgbCss } from '../fx-colors.mjs';
 import { LIFT, anchorLift, bodyLift, burstLift, standOn, travelLift } from './beat-lift.mjs';

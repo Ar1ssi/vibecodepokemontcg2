@@ -7,9 +7,10 @@
  */
 
 import { hasCondition } from './special-conditions.mjs';
+import { cardPrintedText } from './trainer-card-text.mjs';
 
 const lower = (v) => String(v ?? '').toLowerCase().replace(/[\u2018\u2019]/g, "'");
-const textOf = (card) => lower(card?.text ?? card?.effect ?? card?.cardText ?? '');
+const textOf = (card) => lower(cardPrintedText(card));
 const typesOf = (card) => (Array.isArray(card?.types) ? card.types : []).map(lower);
 const hasType = (card, type) =>
   typesOf(card).some((t) => t === type || (type === 'darkness' && t === 'dark'));

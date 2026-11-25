@@ -1,4 +1,5 @@
 import { describeElement } from '../../../shared/log/describe-element.mjs';
+import { patchMethod } from '../../../shared/log/patch-method.mjs';
 
 // The renderer string of the first WebGL context the page itself created. Read there, so a
 // snapshot never has to create a context of its own (slow under software GL).
@@ -15,32 +16,30 @@ function readRenderer(gl) {
 
 function wrapGetContext(win, log) {
   const proto = win.HTMLCanvasElement?.prototype;
-  if (!proto || typeof proto.getContext !== 'function') return () => {};
-  const original = proto.getContext;
+  if (!proto) return () => {};
   const seen = new WeakSet();
-  proto.getContext = function getContext(type, ...rest) {
-    const result = original.call(this, type, ...rest);
-    try {
-      if (String(type).startsWith('webgl')) {
-        const el = describeElement(this);
-        if (result === null) {
-          log.warn('fx', 'gl.context.failed', { type, el });
-        } else if (!seen.has(this)) {
-          seen.add(this);
-          if (gpuRenderer === null) gpuRenderer = readRenderer(result);
-          log.debug('fx', 'gl.context', { type, el, w: this.width, h: this.height, gpu: gpuRenderer });
-          this.addEventListener?.('webglcontextlost', () => log.warn('fx', 'gl.context.lost', { el }));
-          this.addEventListener?.('webglcontextrestored', () => log.info('fx', 'gl.context.restored', { el }));
+  return patchMethod(proto, 'getContext', (original) =>
+    function getContext(type, ...rest) {
+      const result = original.call(this, type, ...rest);
+      try {
+        if (String(type).startsWith('webgl')) {
+          const el = describeElement(this);
+          if (result === null) {
+            log.warn('fx', 'gl.context.failed', { type, el });
+          } else if (!seen.has(this)) {
+            seen.add(this);
+            if (gpuRenderer === null) gpuRenderer = readRenderer(result);
+            log.debug('fx', 'gl.context', { type, el, w: this.width, h: this.height, gpu: gpuRenderer });
+            this.addEventListener?.('webglcontextlost', () => log.warn('fx', 'gl.context.lost', { el }));
+            this.addEventListener?.('webglcontextrestored', () => log.info('fx', 'gl.context.restored', { el }));
+          }
         }
+      } catch {
+        // capture must never throw into the page
       }
-    } catch {
-      // capture must never throw into the page
+      return result;
     }
-    return result;
-  };
-  return () => {
-    if (proto.getContext !== original) proto.getContext = original;
-  };
+  );
 }
 
 export function installErrorCapture({ log, win = window }) {

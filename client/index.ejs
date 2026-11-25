@@ -54,7 +54,6 @@
 <%# /deck-builder renders this same page as the deck builder's own tab (design 050);
     /build-and-battle is that tab in Build & Battle mode (design 051). %>
 <body<% if (isHomebrewBattle) { %> class="deck-builder-window build-battle-window etb-host"<% } else if (isBuildBattle) { %> class="deck-builder-window build-battle-window"<% } else if (isBuilderWindow) { %> class="deck-builder-window etb-host"<% } %>>
-    <div id="importDataJSON" style="display: none;"><%= importDataJSON %></div>
     <div id="cover"></div>
     <div id="battleMat">
         <div id="battleMatTrim">
@@ -136,13 +135,7 @@
         <div id="chatboxButtonContainer" class="chat-button-container">
             <button id="attackButton" class="self-color">Attack</button>
             <button id="retreatButton" class="self-color">Retreat</button>
-            <button id="healButton" class="self-color">Heal</button>
-            <button id="switchButton" class="self-color">Switch</button>
-            <button id="attachButton" class="self-color">Attach</button>
-            <button id="searchButton" class="self-color">Search</button>
-            <button id="abilityButton" class="self-color">✦ Ability</button>
             <button id="stadiumButton" class="self-color">Stadium</button>
-            <button id="energyRedirectButton" class="self-color">🔀 Redirect</button>
             <button id="undoButton" class="self-color">Undo</button>
             <button id="FREEBUTTON" class="self-color">🌺</button>
         </div>
@@ -198,14 +191,7 @@
             <div id="p2ChatboxButtonContainer" class="chat-button-container">
                 <button id="p2AttackButton" class="self-color">Attack</button>
                 <button id="p2RetreatButton" class="self-color">Retreat</button>
-                <button id="p2HealButton" class="self-color">Heal</button>
-                <button id="p2SwitchButton" class="self-color">Switch</button>
-                <button id="p2AttachButton" class="self-color">Attach</button>
-                <button id="p2SearchButton" class="self-color">Search</button>
-                <button id="p2AbilityButton" class="self-color">✦ Ability</button>
                 <button id="p2StadiumButton" class="self-color">Stadium</button>
-                <button id="p2EnergyRedirectButton" class="self-color">🔀 Redirect</button>
-                <!-- <button id="p2UndoButton" class="self-color">Undo</button> -->
                 <button id="p2FREEBUTTON" class="self-color">🌺</button>
             </div>
             <input id="p2MessageInput" type="text" placeholder="Type your message here...">
@@ -516,7 +502,7 @@
         </div>
         <div id="twitterDescription">
             <div>Please reach out if you have any questions, suggestions, bugs etc.!</div>
-            <a href="https://twitter.com/xxmichaellong" target="blank" rel="noopener noreferrer">
+            <a href="https://twitter.com/xxmichaellong" target="_blank" rel="noopener noreferrer">
                 <div id="twitterHandle">
                     <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Logo_of_Twitter.svg/512px-Logo_of_Twitter.svg.png">
                     <span id="username">@xxmichaellong</span>
@@ -587,14 +573,6 @@
     </div>
 
     <div id="optionsContextMenu">
-        <div id="exitReplay" style="display:none">Exit replay mode</div>
-        <div id="jsonReplayDiv"><label for="jsonReplay" id="importReplay" style="cursor: pointer;">Enter replay mode</label>
-            <input type="file" id="jsonReplay" accept=".json" style="display:none;" />
-        </div>
-        <div id="jsonDiv"><label for="jsonFile" id="importState" style="cursor: pointer;">Import game state</label>
-            <input type="file" id="jsonFile" accept=".json" style="display:none;" />
-        </div>
-        <div id="exportState">Export game state</div>
         <div id="exportLog">Export battle log</div>
         <div id="exportFullLog">Export full log (both players + server)</div>
         <div id="markLogMoment">Mark this moment in the log</div>

@@ -12,7 +12,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { moddedKit } from './_kit-mod.js';
 import { withFxMod, withLiftZ } from './_mods.js';
-import { grainPass, sphere, styledKit, traceOutline } from './_shared.js';
+import { grainPass, seedHash, sphere, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Gusts fray and churn like moving air; their streak lines stay crisp.
@@ -46,14 +46,8 @@ const GLOSS = Object.freeze({ volume: Object.freeze({ amount: 1, spec: 1, rim: 0
 const RIBBON_ALPHA = 0.35;
 const RIBBON_WIDTH = 0.5;
 
-/** A stable pseudo-random value in [0, 1) for a seed. */
-const hash = (seed) => {
-  const v = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
-
 /** The height (lane units) a lone blade's sheet sits at: stable per seed, so a whirl's layers hold. */
-const sheetZ = (seed) => SHEET_Z.low + (SHEET_Z.high - SHEET_Z.low) * hash(Number(seed) || 0);
+const sheetZ = (seed) => SHEET_Z.low + (SHEET_Z.high - SHEET_Z.low) * seedHash(Number(seed) || 0, 1);
 
 const TAU = Math.PI * 2;
 const SAMPLES = 12;

@@ -76,6 +76,7 @@ import {
   findWallpaper,
 } from '../../../setup/deck-builder/core/box-wallpapers.mjs';
 import { syncDeckFromLoadedRows } from './native-deck-builder-sync.js';
+import { cardPreviewImage, createNameSearch, sideOf } from './native-deck-builder-shared-logic.js';
 import {
   importDeckEntries,
   parseDeckText,
@@ -316,9 +317,20 @@ export const initializeNativeDeckBuilder = ({
   // picker has nothing to commit to, and the choice would be lost on Save.
   const chosenCosmetics = { self: {}, opp: {} };
   const rememberCosmetic = (target, key, value) => {
-    const side = target === 'opp' ? 'opp' : 'self';
-    chosenCosmetics[side][key] = value;
+    chosenCosmetics[sideOf(target)][key] = value;
   };
+  // What belonged to the saved deck the editor just left: with the deck gone the mirror would
+  // carry its sprites, wallpaper, box and steering into the next Save. The sleeve, coin and mat
+  // stay: they are live on the board.
+  const dropDeckMirror = (target) => {
+    rememberCosmetic(target, 'sprites', []);
+    rememberCosmetic(target, 'wallpaperId', null);
+    rememberCosmetic(target, 'deckBoxId', null);
+    rememberCosmetic(target, 'suggestPrefs', undefined);
+  };
+  // A non-empty deck should sync into the playmat on close; an empty one (freshly created or
+  // cleared) should not wipe whatever the playmat is holding.
+  const syncsOnClose = (cards) => Object.keys(cards).length > 0;
   // Coins and sleeves are JSON loaded on demand (design 073). Work that reads them runs at once when
   // both are in memory, exactly as when they were modules, else as soon as they land.
   const cosmeticsLoaded = () => coinCatalogLoaded() && sleeveCatalogLoaded();
@@ -464,18 +476,11 @@ export const initializeNativeDeckBuilder = ({
           // Detaching from a deck (it was deleted, or the editor was cleared)
           // must also drop the mirrored sprite choice, or the strip would keep
           // showing the previous deck's Pokémon over an empty editor.
-          if (!deckId) {
-            rememberCosmetic(target, 'sprites', []);
-            rememberCosmetic(target, 'wallpaperId', null);
-            rememberCosmetic(target, 'deckBoxId', null);
-            rememberCosmetic(target, 'suggestPrefs', undefined);
-          }
+          if (!deckId) dropDeckMirror(target);
           deck = cards;
           syncedDecks[target] = cards;
           noteDeckReplaced();
-          // A non-empty deck should sync into the playmat on close; a freshly
-          // created empty deck should not wipe whatever the playmat is holding.
-          deckDirty = Object.keys(cards).length > 0;
+          deckDirty = syncsOnClose(cards);
           render();
           refreshSleeveSelection();
           refreshCoinSelection();
@@ -503,9 +508,7 @@ export const initializeNativeDeckBuilder = ({
       const currentDeckSprites = () => {
         const loaded = deckLibrary?.getActiveDeckId?.(currentLoadTarget);
         if (loaded) return normalizeDeckSprites(deckLibrary?.getActiveSprites?.(currentLoadTarget));
-        return normalizeDeckSprites(
-          chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].sprites
-        );
+        return normalizeDeckSprites(chosenCosmetics[sideOf(currentLoadTarget)].sprites);
       };
 
       const spritePicker = initializeNativeDeckBuilderSpritePicker({
@@ -521,10 +524,7 @@ export const initializeNativeDeckBuilder = ({
       // ── PC Box wallpaper (design 025) ────────────────────────────────────
       // Per deck like the other cosmetics; the mirror covers "no deck loaded".
       const currentWallpaper = () =>
-        findWallpaper(
-          deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ??
-            chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].wallpaperId
-        );
+        findWallpaper(currentCosmeticId('wallpaperId', deckLibrary?.getActiveWallpaper));
 
       const applyWallpaper = () => {
         const wallpaper = currentWallpaper();
@@ -601,12 +601,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         panelEl: browserPanel,
         getQuantities: () => cardQuantities(),
         getOwned: ownedCardCounts,
-        onAddCard: (card) => {
-          deck = addCard(deck, card);
-          deckDirty = true;
-          render();
-          flashDeckStatus();
-        },
+        onAddCard: (card) => commitDeckEdit(addCard(deck, card)),
         // Deferred so this object can be built before showCardPreview is
         // declared below (it is referenced lazily, at call time).
         onPreviewCard: (imageUrl, card, sourceEl) =>
@@ -667,7 +662,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     
         // Customize sub-panels: only one visible at a time (setView handles
         // sleeve/coin/mat toggling). While not in customize, hide all three.
-        if (typeof sleevePanel !== 'undefined' && sleevePanel) {
+        if (sleevePanel) {
           if (!isCustomize) {
             sleevePanel.hidden = true;
             if (coinPanel) coinPanel.hidden = true;
@@ -697,7 +692,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       // cosmetics mirror until Save writes it.
       const currentSuggestPrefs = () =>
         deckLibrary?.getActiveSuggestPrefs?.(currentLoadTarget) ??
-        chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'].suggestPrefs ??
+        chosenCosmetics[sideOf(currentLoadTarget)].suggestPrefs ??
         EMPTY_PREFS;
       const setSuggestPrefs = (prefs) => {
         if (!deckLibrary?.setActiveSuggestPrefs?.(currentLoadTarget, prefs)) {
@@ -710,7 +705,6 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         suggestPanel?.invalidate();
         if (resetSteering) setSuggestPrefs({ ...EMPTY_PREFS, goals: [...currentSuggestPrefs().goals] });
       };
-      const suggestNameSearches = new Map();
       suggestPanel =
         isEditor && !isBuildBattle
           ? initializeNativeDeckBuilderSuggest({
@@ -718,35 +712,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               getDeck: () => deck,
               getPrefs: currentSuggestPrefs,
               setPrefs: setSuggestPrefs,
-              onAddCard: (card) => {
-                deck = addCard(deck, card);
-                deckDirty = true;
-                render();
-                flashDeckStatus();
-              },
-              onRemoveCard: (card) => {
-                deck = removeCard(deck, card);
-                deckDirty = true;
-                render();
-                flashDeckStatus();
-              },
-              onReplaceDeck: (nextDeck) => {
-                deck = nextDeck;
-                deckDirty = true;
-                render();
-                flashDeckStatus();
-              },
+              onAddCard: (card) => commitDeckEdit(addCard(deck, card)),
+              onRemoveCard: (card) => commitDeckEdit(removeCard(deck, card)),
+              onReplaceDeck: (nextDeck) => commitDeckEdit(nextDeck),
               onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
               deps: {
                 fetchCardDetail: fetchNormalizedCardDetail,
-                searchByName: (name) => {
-                  if (!suggestNameSearches.has(name)) {
-                    const search = queryCards({ term: name }).then((found) => found.results);
-                    search.catch(() => suggestNameSearches.delete(name));
-                    suggestNameSearches.set(name, search);
-                  }
-                  return suggestNameSearches.get(name);
-                },
+                searchByName: createNameSearch(queryCards),
               },
             })
           : null;
@@ -761,10 +733,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               storage: window.localStorage,
               onAddToDeck: (card) => {
                 if (!card) return;
-                deck = addCard(deck, card);
-                deckDirty = true;
-                render();
-                flashDeckStatus();
+                commitDeckEdit(addCard(deck, card));
               },
             })
           : null;
@@ -806,8 +775,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
               if (!raw) return null;
               const parsed = JSON.parse(raw);
               if (parsed && ('self' in parsed || 'opp' in parsed)) {
-                const side = target === 'opp' ? 'opp' : 'self';
-                return parsed[side]?.id || null;
+                return parsed[sideOf(target)]?.id || null;
               }
               return target === 'self' ? parsed?.id || null : null;
             } catch {
@@ -837,7 +805,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             effectiveCosmeticId({
               loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
               activeId: readActive?.(currentLoadTarget),
-              mirrored: chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'][key],
+              mirrored: chosenCosmetics[sideOf(currentLoadTarget)][key],
             });
           const currentDeckBoxId = () =>
             currentCosmeticId('deckBoxId', deckLibrary?.getActiveDeckBox);
@@ -847,16 +815,17 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
             gameLink.announceDeckBox(currentLoadTarget, box ? box.id : null);
             customizeStage?.refresh();
           };
-          const applySleeve = (sleeve) => {
-            deckLibrary?.setActiveSleeve(currentLoadTarget, sleeve ? sleeve.id : null);
-            rememberCosmetic(currentLoadTarget, 'sleeveId', sleeve ? sleeve.id : null);
+          // `id` outlasts a catalog that is missing or does not list it: a CSV import still stores the pick.
+          const applySleeve = (sleeve, id = sleeve ? sleeve.id : null) => {
+            deckLibrary?.setActiveSleeve(currentLoadTarget, id);
+            rememberCosmetic(currentLoadTarget, 'sleeveId', id);
             if (sleeve?.image) gameLink.changeCardBack(currentLoadTarget, sleeve.image, true);
             gameLink.announceSleeve(currentLoadTarget, sleeve?.image || null);
             customizeStage?.refresh();
           };
-          const applyCoin = (coin) => {
-            deckLibrary?.setActiveCoin(currentLoadTarget, coin ? coin.id : null);
-            rememberCosmetic(currentLoadTarget, 'coinId', coin ? coin.id : null);
+          const applyCoin = (coin, id = coin ? coin.id : null) => {
+            deckLibrary?.setActiveCoin(currentLoadTarget, id);
+            rememberCosmetic(currentLoadTarget, 'coinId', id);
             gameLink.announceCoin(currentLoadTarget, coin);
             customizeStage?.refresh();
           };
@@ -1206,6 +1175,28 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     });
   };
 
+  // The one way an edit lands in the editor deck: it must reach the game on close, show on screen
+  // and flash the status.
+  const commitDeckEdit = (nextDeck) => {
+    deck = nextDeck;
+    deckDirty = true;
+    render();
+    flashDeckStatus();
+  };
+
+  // Puts `nextDeck` in the editor with no saved deck behind it (cleared, or a box deck that did not
+  // save), so the editor never silently overwrites the deck it just left.
+  const detachToUnsavedDeck = (nextDeck) => {
+    deckLibrary?.setActiveDeck(currentLoadTarget, null);
+    dropDeckMirror(currentLoadTarget);
+    refreshDeckBoxSelection();
+    noteDeckReplaced();
+    deck = nextDeck;
+    syncedDecks[currentLoadTarget] = nextDeck;
+    deckDirty = syncsOnClose(nextDeck);
+    render();
+  };
+
   const updateVisibleResults = () => {
     // Filters narrow first, then the TCG/Pocket select and the sort run over
     // what is left — sorting a smaller set is cheaper and the order is the
@@ -1296,10 +1287,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
           customSetPanel?.addFromSearch(card);
           return;
         }
-        deck = addCard(deck, card);
-        deckDirty = true;
-        render();
-        flashDeckStatus();
+        commitDeckEdit(addCard(deck, card));
       },
     });
     renderFilterSummary();
@@ -1397,12 +1385,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       const card =
         (cardId && currentResults.find((c) => c.id === cardId)) ||
         (index !== undefined ? currentResults[Number(index)] : null);
-      const previewImage =
-        target.dataset.previewImage ||
-        card?.images?.large ||
-        card?.images?.small ||
-        card?.image ||
-        target.querySelector('img')?.src;
+      const previewImage = cardPreviewImage(target, card);
       if (previewImage) {
         showCardPreview(previewImage, card, target);
       }
@@ -1423,12 +1406,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     // Row indexes count the filtered list on screen, not the whole deck.
     const sortedCards = deckListCards();
     const card = index >= 0 ? sortedCards[index] : null;
-    const previewImage =
-      target.dataset.previewImage ||
-      card?.images?.large ||
-      card?.images?.small ||
-      card?.image ||
-      target.querySelector('img')?.src;
+    const previewImage = cardPreviewImage(target, card);
     if (previewImage) {
       showCardPreview(previewImage, card, target);
     }
@@ -1559,15 +1537,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
     const replace =
       importListModal.querySelector('input[name="nativeImportListMode"]:checked')?.value !== 'add';
-    const nameSearches = new Map();
     const deps = {
       fetchCardDetail: fetchNormalizedCardDetail,
-      searchByName: (name) => {
-        if (!nameSearches.has(name)) {
-          nameSearches.set(name, queryCards({ term: name }).then((search) => search.results));
-        }
-        return nameSearches.get(name);
-      },
+      searchByName: createNameSearch(queryCards),
       // "4 Tyranitar HBW 1": the installed custom sets' codes resolve like printed ones (design 075).
       setIds: customSetCodes(await fetchCustomSetManifest()),
     };
@@ -1656,14 +1628,13 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       _provider: 'custom',
     };
 
+    let nextDeck = deck;
     for (let i = 0; i < qty; i++) {
-      deck = addCard(deck, card);
+      nextDeck = addCard(nextDeck, card);
     }
 
-    deckDirty = true;
     closeCustomCardModal();
-    render();
-    flashDeckStatus();
+    commitDeckEdit(nextDeck);
   });
 
   const render = () => {
@@ -1778,18 +1749,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
     renderDeckCards({
       cardsEl: cards,
       sortedCards,
-      onAdd: (card) => {
-        deck = addCard(deck, card);
-        deckDirty = true;
-        render();
-        flashDeckStatus();
-      },
-      onRemove: (card) => {
-        deck = removeCard(deck, card);
-        deckDirty = true;
-        render();
-        flashDeckStatus();
-      },
+      onAdd: (card) => commitDeckEdit(addCard(deck, card)),
+      onRemove: (card) => commitDeckEdit(removeCard(deck, card)),
     });
 
     renderResults();
@@ -1989,18 +1950,12 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         await loadCosmetics().catch((error) => console.warn('[deck builder] coin/sleeve catalog unavailable.', error));
       }
       if (sleeveId !== null) {
-        deckLibrary?.setActiveSleeve(currentLoadTarget, sleeveId);
         sleevePicker?.setSelected(sleeveId);
-        const sleeve = getSleeves().find((s) => s.id === sleeveId) || null;
-        if (sleeve?.image) {
-          gameLink.changeCardBack(currentLoadTarget, sleeve.image, true);
-          gameLink.announceSleeve(currentLoadTarget, sleeve.image);
-        }
+        applySleeve(getSleeves().find((entry) => entry.id === sleeveId) || null, sleeveId);
       }
       if (coinId !== null) {
-        deckLibrary?.setActiveCoin(currentLoadTarget, coinId);
         coinPicker?.setSelected(coinId);
-        gameLink.announceCoin(currentLoadTarget, getCoinById(coinId) || null);
+        applyCoin(getCoinById(coinId) || null, coinId);
       }
       // The default box is stored as null; an id this build's catalog does not list is ignored.
       const importedCatalog = boxPicker?.catalog();
@@ -2021,19 +1976,15 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
   saveButton?.addEventListener('click', () => {
     // Cosmetics live on the deck, so pass the picker's current choices through:
     // Save writes the whole board state the user set up, not just the cards.
-    const chosen = chosenCosmetics[currentLoadTarget === 'opp' ? 'opp' : 'self'];
     const result = deckLibrary?.saveCurrentDeck?.(deck, {
-      sleeveId:
-        chosen.sleeveId ?? deckLibrary?.getActiveSleeve?.(currentLoadTarget) ?? null,
-      coinId:
-        chosen.coinId ?? deckLibrary?.getActiveCoin?.(currentLoadTarget) ?? null,
-      matId: chosen.matId ?? deckLibrary?.getActiveMat?.(currentLoadTarget) ?? null,
+      sleeveId: currentCosmeticId('sleeveId', deckLibrary?.getActiveSleeve),
+      coinId: currentCosmeticId('coinId', deckLibrary?.getActiveCoin),
+      matId: currentCosmeticId('matId', deckLibrary?.getActiveMat),
       deckBoxId: deckBoxIdForSave({
         loadedDeckId: deckLibrary?.getActiveDeckId?.(currentLoadTarget),
-        mirrored: chosen.deckBoxId,
+        mirrored: chosenCosmetics[sideOf(currentLoadTarget)].deckBoxId,
       }),
-      wallpaperId:
-        chosen.wallpaperId ?? deckLibrary?.getActiveWallpaper?.(currentLoadTarget) ?? null,
+      wallpaperId: currentCosmeticId('wallpaperId', deckLibrary?.getActiveWallpaper),
       sprites: currentDeckSprites(),
       suggestPrefs: currentSuggestPrefs(),
       // I205: a deck first saved from the Build & Battle tab is a 4-Prize record; a saved
@@ -2050,18 +2001,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
 
   clearButton.addEventListener('click', () => {
         if (!window.confirm('Are you sure you want to delete your deck?')) return;
-        // Detach from the saved deck so clearing the editor never silently
-        // wipes a saved deck from the library.
-        deckLibrary?.setActiveDeck(currentLoadTarget, null);
-        rememberCosmetic(currentLoadTarget, 'sprites', []);
-        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
-        refreshDeckBoxSelection();
-        rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
-        noteDeckReplaced();
-        deck = createEmptyDeck();
-        syncedDecks[currentLoadTarget] = deck;
-        deckDirty = true;
-        render();
+        detachToUnsavedDeck(createEmptyDeck());
       });
 
   const rerenderSearchLocally = () => {
@@ -2211,7 +2151,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
         if (payload.matId && !mat) return;
         link.announceMat(payload.target, mat, payload.emit);
       } else if (type === 'coin') {
-        const side = payload.target === 'opp' ? 'opp' : 'self';
+        const side = sideOf(payload.target);
         const seq = (coinMessageSeq[side] += 1);
         // Answered at once, so a 'play' sent after it never overtakes it: a coin catalog not in
         // memory yet (JSON loaded on demand, design 073) announces the default coin now and the
@@ -2284,35 +2224,9 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       deckLibrary,
       getTarget: () => currentLoadTarget,
       getDeck: () => deck,
-      addToDeck: (card) => {
-        deck = addCard(deck, card);
-        deckDirty = true;
-        render();
-        flashDeckStatus();
-      },
-      showUnsavedDeck: (cards) => {
-        deckLibrary?.setActiveDeck(currentLoadTarget, null);
-        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
-        refreshDeckBoxSelection();
-        rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
-        noteDeckReplaced();
-        deck = cards;
-        syncedDecks[currentLoadTarget] = cards;
-        deckDirty = true;
-        render();
-      },
-      detachEditor: () => {
-        deckLibrary?.setActiveDeck(currentLoadTarget, null);
-        rememberCosmetic(currentLoadTarget, 'sprites', []);
-        rememberCosmetic(currentLoadTarget, 'deckBoxId', null);
-        refreshDeckBoxSelection();
-        rememberCosmetic(currentLoadTarget, 'suggestPrefs', undefined);
-        noteDeckReplaced();
-        deck = createEmptyDeck();
-        syncedDecks[currentLoadTarget] = deck;
-        deckDirty = false;
-        render();
-      },
+      addToDeck: (card) => commitDeckEdit(addCard(deck, card)),
+      showUnsavedDeck: detachToUnsavedDeck,
+      detachEditor: () => detachToUnsavedDeck(createEmptyDeck()),
       showPool: () => switchMode('pool'),
       onPreviewCard: (imageUrl, card, sourceEl) => showCardPreview(imageUrl, card, sourceEl),
     });
@@ -2328,12 +2242,7 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       shelfPanelEl: shelfPanel,
       collectionPanelEl: collectionPanel,
       getDeck: () => deck,
-      addToDeck: (card) => {
-        deck = addCard(deck, card);
-        deckDirty = true;
-        render();
-        flashDeckStatus();
-      },
+      addToDeck: (card) => commitDeckEdit(addCard(deck, card)),
       showShelf: () => switchMode('shelf'),
       showCollection: () => switchMode('collection'),
       openSetBrowser: (setId) => {
@@ -2377,7 +2286,8 @@ const tabCustomize = document.getElementById('nativeDeckBuilderTabCustomize');
       syncCustomizationToDeck();
       updateReadyButtons();
       return true;
-    } catch {
+    } catch (error) {
+      console.warn('[deck builder] could not restore the last used deck.', error);
       return false;
     }
   };

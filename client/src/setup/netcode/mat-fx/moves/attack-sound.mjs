@@ -21,5 +21,5 @@ export function attackSoundFields({ signatureSpec = null, zeroDamage = false, pi
   if (pick?.score) {
     return { family: pick.family, attackTier: pick.tier, contactMs: pick.score.contactMs, attackType };
   }
-  return { family: pick?.family, attackTier: tierFor(card), contactMs: LUNGE_CONTACT_MS, attackType };
+  return { family: pick?.family, attackTier: pick?.tier ?? tierFor(card), contactMs: LUNGE_CONTACT_MS, attackType };
 }

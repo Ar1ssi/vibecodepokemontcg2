@@ -1,7 +1,8 @@
 export const LAST_SESSION_STORAGE_KEY = 'ptcg-sim.last-session.v1';
 
+/** @returns {boolean} false when nothing was stored (no storage or deck, or the browser refused). */
 export function saveLastSession(storage, { deckId, target = 'self' } = {}) {
-  if (!storage?.setItem || !deckId) return;
+  if (!storage?.setItem || !deckId) return false;
   try {
     storage.setItem(
       LAST_SESSION_STORAGE_KEY,
@@ -11,8 +12,9 @@ export function saveLastSession(storage, { deckId, target = 'self' } = {}) {
         savedAt: Date.now(),
       })
     );
+    return true;
   } catch {
-    /* persistence is best-effort */
+    return false;
   }
 }
 

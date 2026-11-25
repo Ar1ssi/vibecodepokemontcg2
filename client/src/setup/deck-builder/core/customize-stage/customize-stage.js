@@ -28,6 +28,9 @@ const warnOnce = (error) => {
   console.warn('[customize stage] 3D preview unavailable; the pickers still work.', error);
 };
 
+/** One value per customize slot, for the per-slot state maps. */
+const slotMap = (value) => Object.fromEntries(VIEWS.map((view) => [view, value]));
+
 let radiusPromise = null;
 /** The coin disc's radius from its mesh, fetched once; a failed fetch is retried next time. */
 const loadCoinRadius = () => {
@@ -111,10 +114,10 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
     frameId: 0,
     current: null,
     tween: null,
-    yaw: { box: 0, sleeve: 0, coin: 0 },
+    yaw: slotMap(0),
     lastFrameAt: 0,
     drag: null,
-    applied: { box: undefined, sleeve: undefined, coin: undefined },
+    applied: slotMap(undefined),
     coinSide: 0,
     coinChain: Promise.resolve(),
   };
@@ -142,23 +145,25 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
   const applySelection = () => {
     const selection = getSelection();
     paintCaption(selection);
-    const { objects, coin, applied } = state;
-    if (objects && applied.box !== selection.boxAtlasUrl) {
-      applied.box = selection.boxAtlasUrl;
-      objects.setBoxAtlas(selection.boxAtlasUrl).catch(warnOnce);
-    }
-    if (objects && applied.sleeve !== selection.sleeveUrl) {
-      applied.sleeve = selection.sleeveUrl;
-      objects.setSleeveTexture(selection.sleeveUrl).catch(warnOnce);
+    const { objects, coin } = state;
+    const applyIfChanged = (slot, key, apply) => {
+      if (state.applied[slot] === key) return;
+      state.applied[slot] = key;
+      apply();
+    };
+    if (objects) {
+      applyIfChanged('box', selection.boxAtlasUrl, () => objects.setBoxAtlas(selection.boxAtlasUrl).catch(warnOnce));
+      applyIfChanged('sleeve', selection.sleeveUrl, () => objects.setSleeveTexture(selection.sleeveUrl).catch(warnOnce));
     }
     const coinKey = selection.coin ? `${selection.coin.id}|${selection.coin.artUrl ?? ''}` : '';
-    if (coin && applied.coin !== coinKey) {
-      applied.coin = coinKey;
-      // coin-stage's setCoin has no ordering guard: swaps run one after another, so the last pick wins.
-      const wanted = selection.coin ?? null;
-      state.coinChain = state.coinChain
-        .then(() => (state.coin === coin ? coin.setCoin(wanted) : undefined))
-        .catch(warnOnce);
+    if (coin) {
+      applyIfChanged('coin', coinKey, () => {
+        // coin-stage's setCoin has no ordering guard: swaps run one after another, so the last pick wins.
+        const wanted = selection.coin ?? null;
+        state.coinChain = state.coinChain
+          .then(() => (state.coin === coin ? coin.setCoin(wanted) : undefined))
+          .catch(warnOnce);
+      });
     }
   };
 
@@ -166,7 +171,7 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
   const retarget = (now) => {
     if (!state.scene || !state.current) return;
     // A spun object settles back to its layout's orientation, as the game's own tween does.
-    state.yaw = { box: 0, sleeve: 0, coin: 0 };
+    state.yaw = slotMap(0);
     const layout = layoutFor(state.scene, focusSlot());
     const to = {};
     for (const slot of VIEWS) to[slot] = layout[slot].pose;
@@ -266,7 +271,7 @@ export const initializeCustomizeStage = ({ panelEl, getSelection, onStep, loadSt
     state.coin = null;
     state.tween = null;
     state.coinSide = 0;
-    state.applied = { box: undefined, sleeve: undefined, coin: undefined };
+    state.applied = slotMap(undefined);
   };
 
   const build = async () => {

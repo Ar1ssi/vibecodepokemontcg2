@@ -1,5 +1,8 @@
 # pkmncards Trainer parse coverage + Lost Zone
 
+> **2026-11-19 (design 090):** the client-side rules layer this document describes was removed. `chat-buttons.js` now only sends server commands, `trainer-execution.js`, the ability buttons and the client attack/Trainer/ability bodies are gone, and the rules run only in `shared/engine` on the server. Client file references below are historical.
+
+
 Session S207, worktree `vibe-pkmncards-parse`, branch `task/pkmncards-parse`.
 
 This document is the end-to-end log of the work: what was measured, what was
