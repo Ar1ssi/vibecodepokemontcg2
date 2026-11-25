@@ -649,6 +649,10 @@ export function parseAttackDamage(
       // (ctx.optionalCostCount, set with ctx.optionalCostPaid by the reducer).
       count = ctx.optionalCostCount;
       label = 'paid for the optional cost';
+    } else if (/special energy (?:card )?attached to this pok[ée]mon/.test(unit)) {
+      // Rayquaza ex Spiral Burst: Special Energy only, so it must precede the all-Energy branch below.
+      count = specialEnergyOnSelfCount;
+      label = 'Special Energy attached to this Pokémon';
     } else if (/energy attached to all of your pok[ée]mon/.test(unit)) {
       count = ownEnergyCount;
       label = 'Energy on all your Pokémon';
@@ -726,9 +730,6 @@ export function parseAttackDamage(
     } else if (/pok[ée]mon in play/.test(unit)) {
       count = ownPokemonInPlayCount;
       label = 'Pokémon in play';
-    } else if (/special energy card attached to this pok[ée]mon/.test(unit)) {
-      count = specialEnergyOnSelfCount;
-      label = 'Special Energy attached to this Pokémon';
     } else if (
       /special condition affecting your opponent's active/.test(unit)
     ) {
