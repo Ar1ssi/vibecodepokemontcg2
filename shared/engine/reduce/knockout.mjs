@@ -1266,7 +1266,8 @@ export function resolvePrizeChoice(draft, { playerId, selection, events }) {
     (card) => !chosenIds.has(card.instanceId)
   );
   for (const card of taken) delete card.revealed;
-  player.zones.hand.push(...taken);
+  const landing = prizeLandingZone(draft, playerId);
+  landing.zone.push(...taken);
   consumePrizeEntitlement(player, taken.length);
   draft.pendingChoice = null;
 
