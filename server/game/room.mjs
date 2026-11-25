@@ -25,6 +25,8 @@ import {
 import {
   clockSnapshot,
   createClock,
+  creditCardPlay,
+  isCardPlay,
   flaggedRunner,
   syncClock,
 } from '../../shared/engine/homebrew-clock.mjs';
@@ -574,7 +576,12 @@ export class GameRoom {
     if (typeof cmd.clientSeq === 'number') {
       this.clientSeqByPlayer.set(playerId, cmd.clientSeq);
     }
-    this.#syncClock();
+    // Credit after the sync so a play that is the game's first command still finds an armed clock.
+    this.#syncClock(() => {
+      if (isCardPlay(commandWithPlayer, stateBefore)) {
+        creditCardPlay(this.clock, playerId, cmd.payload.instanceId, stateBefore.turn?.number);
+      }
+    });
 
     // Assemble redacted views for all connected sockets
     const broadcasts = [];
@@ -1155,9 +1162,10 @@ export class GameRoom {
     return result;
   }
 
-  #syncClock() {
+  #syncClock(afterSync) {
     if (this.solo) return;
     syncClock(this.clock, this.state, this.now());
+    afterSync?.();
     if (this.clock.armed) this.#notifyClock();
   }
 

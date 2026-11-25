@@ -7,10 +7,13 @@ import { applyCommand } from '../../../shared/engine/reduce.mjs';
 import {
   CLOCK_BANK_MS,
   CLOCK_INCREMENT_MS,
+  CLOCK_PLAY_BONUS_MS,
   clockRunner,
   createClock,
+  creditCardPlay,
   decksAreHomebrew,
   formatClock,
+  isCardPlay,
   syncClock,
 } from '../../../shared/engine/homebrew-clock.mjs';
 
@@ -218,4 +221,44 @@ test('clock transport arms one timer for the running bank and fires the flag', (
   timers[1].fn();
   assert.deepEqual(flagged, ['clock-room']);
   assert.equal(transport.hasTimer('clock-room'), false);
+});
+
+test('room: each card played from hand adds 15 s once per turn; discards add nothing', () => {
+  const { room, advance } = roomInPlay();
+  const hand = room.state.players.p1.zones.hand;
+  const [first, second, third] = [901, 902, 903];
+  for (const instanceId of [first, second, third]) hand.push(createCard({ instanceId, ownerId: 'p1', name: 'Card', id: 'sv1-2' }));
+  const move = (instanceId, to, clientSeq) =>
+    room.handleClientCommand('sock-1', { type: 'moveCard', payload: { instanceId, from: 'hand', to }, clientSeq });
+  const bank = () => room.clockPayload().remaining.p1;
+
+  advance(10_000);
+  assert.equal(move(first, 'bench', 0).success, true); // first command in play arms the clock
+  assert.equal(bank(), CLOCK_BANK_MS + 15_000);
+  advance(5_000);
+  assert.equal(move(second, 'discard', 1).success, true);
+  assert.equal(bank(), CLOCK_BANK_MS + 15_000 - 5_000);
+  assert.equal(move(third, 'bench', 2).success, true);
+  assert.equal(bank(), CLOCK_BANK_MS + 30_000 - 5_000);
+});
+
+test('creditCardPlay credits a card once per turn and never to a bank at 0:00', () => {
+  const state = { players: { p1: { zones: { deck: [{ id: 'customhb-1' }] } }, p2: { zones: { deck: [{ id: 'customhb-2' }] } } }, turn: { phase: 'main', number: 1, player: 'p1' } };
+  const clock = syncClock(createClock(), state, 0);
+  assert.equal(creditCardPlay(clock, 'p1', 'a', 1), true);
+  assert.equal(creditCardPlay(clock, 'p1', 'a', 1), false);
+  assert.equal(creditCardPlay(clock, 'p1', 'a', 2), true);
+  assert.equal(clock.banks.p1, CLOCK_BANK_MS + 2 * CLOCK_PLAY_BONUS_MS);
+  clock.banks.p2 = 0;
+  assert.equal(creditCardPlay(clock, 'p2', 'b', 2), false);
+});
+
+test('isCardPlay: Trainer, attach and hand→board count; hand→discard and board moves do not', () => {
+  const before = { players: { p1: { zones: { hand: [{ instanceId: 'h1' }] } } } };
+  const cmd = (type, payload) => ({ type, playerId: 'p1', payload });
+  assert.equal(isCardPlay(cmd('playTrainer', { instanceId: 'h1' }), before), true);
+  assert.equal(isCardPlay(cmd('attachCard', { instanceId: 'h1', targetInstanceId: 't' }), before), true);
+  assert.equal(isCardPlay(cmd('moveCard', { instanceId: 'h1', from: 'hand', to: 'bench' }), before), true);
+  assert.equal(isCardPlay(cmd('moveCard', { instanceId: 'h1', from: 'hand', to: 'discard' }), before), false);
+  assert.equal(isCardPlay(cmd('attachCard', { instanceId: 'b9', targetInstanceId: 't' }), before), false);
 });

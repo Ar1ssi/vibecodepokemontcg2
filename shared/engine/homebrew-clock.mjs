@@ -2,13 +2,15 @@
  * @file The homebrew game clock (design 090). Pure; wall time comes in as `now` (ms).
  * A chess clock: each player has a 10:00 bank that runs only while that player owes the game an
  * action (their turn, or a prompt they must answer on the opponent's turn); every turn a player
- * finishes adds 15 s to their bank. A bank at 0:00 loses the game (the room sends `timeOut`).
+ * finishes adds 40 s and every card they play from hand adds 15 s to their bank. A bank at 0:00 loses the game (the room sends `timeOut`).
  * It runs only when the room's toggle is on and both decks hold at least one homebrew card.
  */
 
 export const HOMEBREW_SET_ID = 'customhb';
 export const CLOCK_BANK_MS = 10 * 60 * 1000;
 export const CLOCK_INCREMENT_MS = 40 * 1000;
+export const CLOCK_PLAY_BONUS_MS = 15 * 1000;
+const PLAY_DESTINATIONS = ['active', 'bench', 'board', 'stadium'];
 export const TIME_OUT_REASON = 'time ran out';
 
 /** @returns {boolean} true for a card of the homebrew set (TCGdex-shaped id `customhb-<n>`). */
@@ -52,7 +54,36 @@ export function createClock({ enabled = true } = {}) {
     turnNumber: 0,
     turnPlayer: null,
     flagged: null,
+    playCredits: [],
   };
+}
+
+/**
+ * @returns {boolean} true when `cmd` (applied to `stateBefore`) puts a card from the issuer's
+ * hand into play: a Trainer, an attach/evolve, or a hand→board/Stadium move. Discards don't count.
+ */
+export function isCardPlay(cmd, stateBefore) {
+  const hand = stateBefore?.players?.[cmd?.playerId]?.zones?.hand;
+  if (!Array.isArray(hand)) return false;
+  const inHand = hand.some((c) => c.instanceId === cmd.payload?.instanceId);
+  if (!inHand) return false;
+  if (cmd.type === 'playTrainer' || cmd.type === 'attachCard') return true;
+  return cmd.type === 'moveCard' && cmd.payload?.from === 'hand' && PLAY_DESTINATIONS.includes(cmd.payload?.to);
+}
+
+/**
+ * Adds the per-play bonus to `playerId`'s bank. Each card earns it once per turn, so undoing and
+ * replaying a play cannot farm time. Call before `syncClock` for the same command.
+ * @returns {boolean} whether time was added
+ */
+export function creditCardPlay(clock, playerId, instanceId, turnNumber) {
+  if (!clock.enabled || clock.armed !== true || !(clock.banks[playerId] > 0)) return false;
+  const key = `${turnNumber}:${instanceId}`;
+  clock.playCredits = (clock.playCredits || []).filter((k) => k.startsWith(`${turnNumber}:`));
+  if (clock.playCredits.includes(key)) return false;
+  clock.playCredits.push(key);
+  clock.banks[playerId] += CLOCK_PLAY_BONUS_MS;
+  return true;
 }
 
 /** @returns {number} the runner's bank at `now`, others as stored (ms, never below 0). */
