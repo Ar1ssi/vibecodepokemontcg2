@@ -403,3 +403,45 @@ test('checkup: Poison Heal on an undamaged Pokémon changes nothing and stays Po
   assert.equal(defender.damage, 0);
   assert.ok(!res.events.some((e) => e.type === 'checkupDamage'));
 });
+
+// Card data source (directive 7): the cardStats records in the user's 2026-11-25 log. Their homebrew
+// Archen is a Stage 1 from "Unidentified Fossil"; Archeops is a Stage 2 from Archen whose client-stamped
+// evolvesFromBase ("antique plume fossil") came from the printed Archen of the same name.
+test('rareCandyOptions: a homebrew line in the player’s own cards beats a stamped base from a same-named printed card', () => {
+  const state = game();
+  const p1 = state.players.p1;
+  p1.zones.bench.push(pokemon({ instanceId: 2, name: 'Unidentified Fossil', playedAsPokemon: true, enteredPlayTurn: 1 }));
+  p1.zones.hand.push(
+    pokemon({ instanceId: 50, name: 'Archeops', stage: 'Stage2', evolvesFrom: 'Archen', evolvesFromBase: 'antique plume fossil' })
+  );
+  p1.zones.deck.push(pokemon({ instanceId: 51, name: 'Archen', stage: 'Stage1', evolvesFrom: 'Unidentified Fossil' }));
+
+  const options = rareCandyOptions(p1, ownedCards(p1), state.turn.number);
+  assert.equal(options.length, 1);
+  assert.deepEqual(options[0].basics.map((c) => c.instanceId), [2]);
+  const plume = pokemon({ instanceId: 3, name: 'Antique Plume Fossil' });
+  assert.equal(stage2EvolvesFromBasic(options[0].stage2, plume, ownedCards(p1)), false, 'the owned Archen does not evolve from the Plume Fossil');
+});
+
+test('playTrainer: Rare Candy on a played Fossil reaches the homebrew Stage 2 end to end', () => {
+  const state = game();
+  const p1 = state.players.p1;
+  p1.zones.bench.push(pokemon({ instanceId: 2, name: 'Unidentified Fossil', playedAsPokemon: true, enteredPlayTurn: 1 }));
+  p1.zones.hand.push(
+    pokemon({ instanceId: 50, name: 'Archeops', stage: 'Stage2', hp: 150, evolvesFrom: 'Archen', evolvesFromBase: 'antique plume fossil' }),
+    createCard({ instanceId: 60, supertype: 'Trainer', type: 'Trainer', ...rareCandy })
+  );
+  p1.zones.deck.push(pokemon({ instanceId: 51, name: 'Archen', stage: 'Stage1', evolvesFrom: 'Unidentified Fossil' }));
+
+  let res = applyCommand(state, { type: 'playTrainer', payload: { instanceId: 60 }, playerId: 'p1' });
+  assert.equal(res.error ?? null, null);
+  for (let step = 0; res.pendingChoice && step < 3; step += 1) {
+    const [first] = res.pendingChoice.options;
+    res = applyCommand(res.state, {
+      type: 'resolveChoice', playerId: 'p1', payload: { choiceId: res.pendingChoice.choiceId, selection: [first.instanceId ?? first] },
+    });
+    assert.equal(res.error ?? null, null);
+  }
+  const bench = res.state.players.p1.zones.bench;
+  assert.ok(bench.some((c) => c.name === 'Archeops' && c.attachedTo === 2), 'Archeops sits on the Fossil');
+});
