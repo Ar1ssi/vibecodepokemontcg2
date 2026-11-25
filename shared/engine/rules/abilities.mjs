@@ -370,6 +370,9 @@ export function parseAbilitySearchParams(lower) {
   const typedEnergy = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
   if (typedEnergy) {
     what = `Basic ${typedEnergy[1].toUpperCase()} Energy`;
+  } else if (/\bspecial energy\b/.test(scope)) {
+    // Archeops Primal Turbo (customcheck-017): "a Special Energy card" never matches a Basic Energy.
+    what = 'Special Energy';
   } else if (/\{[a-z]\} energy/.test(scope)) {
     // "search your deck for up to 2 {G} Energy cards" (Rillaboom Voltage Beat)
     what = `${scope.match(/(\{[a-z]\}) energy/)[1].toUpperCase()} Energy`;
@@ -632,6 +635,14 @@ function withIfYouDoHalves(lower, parsed) {
   if (lostCost) {
     steps = [
       { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: PROVIDES_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Tyrunt In Fighting (customcheck-012): the Benched Pokémon is the cost, so it runs before the draw.
+  if (/you may discard (?:a|1) benched pok[eé]mon and all cards attached to it in order to/.test(lower)) {
+    steps = [
+      { type: 'discardOwnBenchPokemon', count: 1, required: true, cost: true, guidance: 'Discard a Benched Pokémon and all cards attached to it (cost).' },
       ...steps,
     ];
   }

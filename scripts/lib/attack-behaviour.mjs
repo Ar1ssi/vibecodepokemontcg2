@@ -220,7 +220,8 @@ export function attackBoardFor(text) {
 export function attackMismatches(text, tags) {
   const mismatches = [];
   const searchesToTop = SEARCH_TO_DECK_TOP.test(normalizeAttackText(text));
-  for (const sentence of normalizeAttackText(text).split(/(?<=\.)\s+/)) {
+  // Hand-typed "Acitve" (customcheck-004 Rock Tomb) hid its lock from the sentence checks below.
+  for (const sentence of normalizeAttackText(text).replace(/\bacitve\b/g, 'active').split(/(?<=\.)\s+/)) {
     for (const [mech, re, expect] of MECH) {
       if (!re.test(sentence)) continue;
       if (mech === 'search-to-hand' && searchesToTop) break;

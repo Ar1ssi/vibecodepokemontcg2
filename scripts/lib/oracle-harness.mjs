@@ -109,6 +109,12 @@ function deckFor(pfx) {
     tool('Tool Card')
   );
   out.push(energy('Fire'), energy('Water'), energy('Lightning'));
+  // "Search your deck for a Special Energy card" (Primal Turbo): a Basic Energy never answers it.
+  // Last in the deck so the cards drawn from the top do not move.
+  out.push(
+    mk({ name: 'Probe Special Energy', supertype: 'Energy', subtypes: ['Special'], type: 'Energy' }),
+    mk({ name: 'Probe Special Energy', supertype: 'Energy', subtypes: ['Special'], type: 'Energy' })
+  );
   return out;
 }
 

@@ -397,7 +397,14 @@ export function rootMatchesTarget(player, root, target = '') {
   if (/\bpok[eé]mon v\b/.test(t) && !isVCard(top)) return false;
   // "your {P} Pokémon and {M} Pokémon" (X-Boot): a Pokémon of any listed type.
   const typed = [...t.matchAll(/\{([a-z])\}/g)].map((m) => m[1]).filter((letter) => letter !== 'c');
-  if (typed.length > 0) return typed.some((letter) => pokemonHasType(top, letter));
+  // Archeops Primal Turbo (customcheck-017): "your {C} Pokémon" is the Colorless type, not any Pokémon.
+  const wantsColorless = /\{c\}\s+pok[eé]mon/.test(t);
+  if (typed.length > 0 || wantsColorless) {
+    return (
+      typed.some((letter) => pokemonHasType(top, letter)) ||
+      (wantsColorless && (top.types || []).some((type) => String(type).toLowerCase() === 'colorless'))
+    );
+  }
   return true;
 }
 
@@ -3141,9 +3148,9 @@ function discardOwnBenchPokemon(ctx) {
   if (bench.length === 0) return skip(ctx, 'no_matching_bench');
   const count = Math.min(step.count || 1, bench.length);
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${count} Benched Pokémon to discard`,
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${step.required ? '' : 'up to '}${count} Benched Pokémon to discard`,
     options: bench,
-    min: 0,
+    min: step.required ? count : 0,
     max: count,
   });
 }

@@ -823,7 +823,9 @@ export function parseAttackDamage(
     // Prize-count comparisons are conditional bonuses (attack-conditions.mjs), not per-Prize scaling.
     !/\b(?:more|fewer|less) prize cards? remaining than\b/.test(text) &&
     // "If your opponent has exactly 6 Prize cards remaining" (customhb Kartana Divine Paper) is a condition too.
-    !/\b\d+ prize cards? (?:remaining|left)\b/.test(text)
+    !/\b\d+ prize cards? (?:remaining|left)\b/.test(text) &&
+    // "If your opponent has not taken any Prize cards" (Archeops Undefeated) is a condition too.
+    !/\bhas (?:not )?taken any prize cards?\b/.test(text)
   ) {
     const per = amount(text, /(\d+) more damage|does (\d+) damage/);
     total = base + per * opponentPrizes;

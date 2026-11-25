@@ -224,8 +224,12 @@ function inPlayConditionMet(text, target, ctx) {
     if (!hasEnergyOfType(target, ctx.sideCards || ctx.inPlayCards, type)) return false;
   }
   if (/if (?:this pok[eé]mon|it) has any (?:special )?energy attached/.test(text)) {
-    if (attachedEnergy(target, ctx.sideCards || ctx.inPlayCards).length === 0)
-      return false;
+    const attached = attachedEnergy(target, ctx.sideCards || ctx.inPlayCards);
+    // Tyrantrum Tyrannically Gutsy (customcheck-010): "any Special Energy" is not met by a Basic Energy.
+    const wanted = /if (?:this pok[eé]mon|it) has any special energy attached/.test(text)
+      ? attached.filter((e) => !isBasicEnergy(e))
+      : attached;
+    if (wanted.length === 0) return false;
   }
   // Shelgon Energy Guard (sm7.5-43): "If this Pokémon has any basic Energy attached to it".
   const anyBasic = /if (?:this pok[eé]mon|it) has any basic energy attached/.test(text);
