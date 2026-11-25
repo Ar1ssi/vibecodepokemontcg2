@@ -30,6 +30,7 @@ import {
   healBlockedByAbility,
   abilityMirrorCounter,
   abilityDamagedOwnBenchCounters,
+  abilityDamagedReturnsAttackerEnergy,
   abilityLostZoneKnockouts,
 } from '../rules/ability-combat.mjs';
 import { isExCard, isGxCard } from '../rules/card-classify.mjs';
@@ -1273,6 +1274,19 @@ export function resolveAttackEffectPhase(draft, ctx) {
             }
             for (const cond of lands ? onDamageStatus.conditions : []) {
               if (addCondition(atkRef.card, cond)) events.push(conditionsUpdatedEvent(atkRef.card, cond));
+            }
+          }
+
+          // Lugia ex Silver Sparkle: on heads, the holder's owner returns an Energy card from the
+          // Attacking Pokémon to its owner's hand — picked at the command tail (settleAttackerEnergyToHand).
+          if (abilityDamagedReturnsAttackerEnergy(defenderView, defenderSide)) {
+            const face = flipCoin(activeRng);
+            events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: defenderView.name });
+            if (face === 'heads') {
+              draft.__attackerEnergyToHand = [
+                ...(draft.__attackerEnergyToHand || []),
+                { chooserId: defenderPlayerId, ownerId: playerId, attackerId: attacker.instanceId, source: defenderView.name },
+              ];
             }
           }
 

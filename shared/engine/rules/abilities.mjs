@@ -408,7 +408,7 @@ export function parseAbilitySearchParams(lower) {
   }
 
   const nameWord = scope.match(NAME_WORD_CLAUSE)?.[0];
-  if (nameWord && what) what = `${what}${nameWord.startsWith(' ') ? '' : ' '}${nameWord.trim()}`;
+  if (nameWord && what) what = `${what} ${nameWord.trim()}`;
 
   if (!upTo) {
     const upToM = lower.match(/up to\s+(\d+)/);
