@@ -672,7 +672,13 @@ export function resolveAttackEffectPhase(draft, ctx) {
     ? events
         .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
         .reduce((total, e) => total + e.cards.length, 0)
-    : undefined;
+    : // "Put any number of Basic Energy cards from your hand into the Lost Zone. This attack does 50
+      // damage for each card you discarded in this way": the Lost Zone move is the counted discard.
+      attackSteps.before.some((step) => step.countsForDamage && step.type === 'atkLostZoneFromHand')
+      ? events
+          .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
+          .reduce((total, e) => total + e.count, 0)
+      : undefined;
   const lostZoned = ctx.lostZoned ?? attackSteps.before.some((step) => step.countsForDamage)
     ? events
         .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)

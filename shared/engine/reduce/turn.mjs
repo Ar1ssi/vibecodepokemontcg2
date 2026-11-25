@@ -291,6 +291,31 @@ function applyEndOfTurnToolHeals(draft, { endingPlayerId, events }) {
   }
 }
 
+// Jirachi Wish (custom set): "At the end of your next turn, heal 100 damage from your Active
+// Pokémon" — the Pokémon Active when that turn ends, before Pokémon Checkup.
+function applyDeferredActiveHeal(draft, { endingPlayerId, events }) {
+  const player = draft.players?.[endingPlayerId];
+  const pending = player?.deferredActiveHeal;
+  if (!Array.isArray(pending) || pending.length === 0) return;
+  const turn = draft.turn?.number || 0;
+  const due = pending.filter((entry) => entry.atTurn === turn);
+  const later = pending.filter((entry) => entry.atTurn > turn);
+  if (later.length > 0) player.deferredActiveHeal = later;
+  else delete player.deferredActiveHeal;
+  const active = player.zones?.active?.find((c) => !c.attachedTo);
+  if (!active || due.length === 0 || !(active.damage > 0)) return;
+  if (stadiumBlocksHealing(draft.stadium?.card || draft.stadium || null) || healBlockedByAbility(draft, active)) return;
+  const before = active.damage;
+  active.damage = Math.max(0, before - due.reduce((sum, entry) => sum + (entry.amount || 0), 0));
+  events.push({
+    type: 'damageUpdated',
+    instanceId: active.instanceId,
+    damage: active.damage,
+    healed: before - active.damage,
+    source: due[0].sourceAttack,
+  });
+}
+
 // TM/Cube Items (design 035 slice 7): "At the end of your turn, discard <tool>." SV TMs
 // attach as ordinary Tools, so the printed clause is read here, not only the attach-time flag.
 // The sweep runs for the player whose turn is ending, after Pokémon Checkup. Metal Core Barrier
@@ -592,6 +617,7 @@ export function resolveCheckup(
 ) {
   resolveDeferredKnockouts(draft, { events });
   applyEndOfTurnToolHeals(draft, { endingPlayerId, events });
+  applyDeferredActiveHeal(draft, { endingPlayerId, events });
   // A condition landed this command (the attack that ended the turn) on a Pokémon whose
   // special Energy makes it immune never reaches Checkup.
   applySpecialEnergyStatusImmunity(draft, { events });
