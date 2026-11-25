@@ -10,6 +10,7 @@ import {
   teamNoRetreatCostForActive,
 } from './ability-executors.mjs';
 import { combinedToolRetreatCost } from './tool-combat.mjs';
+import { abilityRetreatCost } from './ability-combat.mjs';
 import { getStadiumRetreatCost, stadiumBlocksToolEffects } from './stadium-effects.mjs';
 import { pendingRetreatCostDelta } from './attack-pending-effects.mjs';
 import { classifyEnergyEffect, pokemonHasRedirectEnergy } from './energy-effects.mjs';
@@ -41,6 +42,18 @@ export function getEffectiveRetreatCost(
     stadium: getStadium(),
     benchCards,
     sideCards: [...cards, ...(Array.isArray(benchCards) ? benchCards : [])],
+  });
+  // In-play Ability wordings aimed at the Active ("As long as this Pokémon is on your Bench,
+  // your Active Pokémon's Retreat Cost is {C}{C} less", Hisuian Sneasler); the server reads
+  // the same function in reduce/retreat.mjs.
+  const bench = Array.isArray(benchCards) ? benchCards : [];
+  const activeIds = new Set(cards.map((c) => c?.instanceId));
+  cost += abilityRetreatCost(activeCard, {
+    sideCards: [...cards, ...bench],
+    sideActive: cards.length ? cards : [activeCard],
+    sideBench: bench.filter((c) => !activeIds.has(c?.instanceId)),
+    zone: 'active',
+    isActive: true,
   });
   cost += pendingRetreatCostDelta(rulesState, player);
   return Math.max(0, cost);
