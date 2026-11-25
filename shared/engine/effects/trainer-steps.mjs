@@ -4040,6 +4040,35 @@ function discardInPlayPokemon(player, root, events) {
   });
 }
 
+/**
+ * Omastar Primordial Sacrifice: "discard 1 of your Benched Pokémon and move all Energy attached to
+ * that Pokémon to this Pokémon." The Energy moves first so it survives the discard; the rest of
+ * the stack (Tools, evolution cards) goes to the discard pile with the Pokémon.
+ */
+function discardBenchMoveEnergyAbility(ctx) {
+  const { player } = ctx;
+  const self = sourceRoot(ctx);
+  if (!self) return skip(ctx, 'source_not_in_play');
+  const candidates = benchRootsOf(player).filter((root) => root.instanceId !== self.instanceId);
+
+  if (ctx.selection) {
+    const chosen = candidates.find((root) => root.instanceId === ctx.selection[0]);
+    if (!chosen) return skip(ctx, 'target_not_found');
+    for (const energy of attachedCards(player, chosen.instanceId).filter(isEnergy)) {
+      attachTo(player, energy, self, ctx.events);
+    }
+    discardInPlayPokemon(player, chosen, ctx.events);
+    return null;
+  }
+  if (candidates.length === 0) return skip(ctx, 'no_bench_to_discard');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: Choose 1 of your Benched Pokémon to discard (its Energy moves to this Pokémon)`,
+    options: candidates,
+    min: 1,
+    max: 1,
+  });
+}
+
 function winConditionMet(ctx, condition) {
   const { player, opponent } = ctx;
   if (condition.kind === 'opponentLostZoneSupporters') {
@@ -6404,6 +6433,7 @@ export const EXTRA_STEP_HANDLERS = {
   gxReuseTurn,
   returnSelfToHandAbility,
   selfLeavesAbility,
+  discardBenchMoveEnergyAbility,
   // Design 034 slice 6 one-offs.
   winGameAbility,
   festivalLeadAbility,
