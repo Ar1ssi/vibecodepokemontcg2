@@ -1206,3 +1206,29 @@ test('Mars: a non-Supporter random card is still discarded', () => {
   assert.equal(noDraw.error, null);
   assert.equal(noDraw.state.players.p2.zones.hand.length, 1, 'no draw, no discard');
 });
+
+// Text source (directive 7): the Unidentified Fossil (customhb-982) cardStats record in the user's
+// 2026-11-25 log. A drag onto the Bench reaches the server as a plain hand→bench moveCard.
+const UNIDENTIFIED_FOSSIL_TEXT =
+  "Play this card as if it were a 60-HP Basic {C} Pokémon. At any time during your turn, you may discard this card from play.\n\nThis card can't retreat.";
+
+test('a Fossil Item dropped on the Bench is played as a Basic Pokémon; other Trainers stay refused', () => {
+  const { state, rng } = setupGame();
+  const fossil = createCard({
+    instanceId: 41, name: 'Unidentified Fossil', supertype: 'Trainer', trainerType: 'Item', text: UNIDENTIFIED_FOSSIL_TEXT,
+  });
+  const potion = createCard({
+    instanceId: 42, name: 'Potion', supertype: 'Trainer', trainerType: 'Item', text: 'Heal 30 damage from 1 of your Pokémon.',
+  });
+  state.players.p1.zones.hand.push(fossil, potion);
+
+  const played = applyCommand(state, { type: 'moveCard', playerId: 'p1', payload: { instanceId: 41, from: 'hand', to: 'bench' } }, rng);
+  assert.equal(played.error ?? null, null);
+  const benched = played.state.players.p1.zones.bench.find((c) => c.instanceId === 41);
+  assert.ok(benched, 'the Fossil is on the Bench');
+  assert.equal(benched.hp, 60);
+  assert.equal(played.state.players.p1.zones.hand.some((c) => c.instanceId === 41), false);
+
+  const refused = applyCommand(state, { type: 'moveCard', playerId: 'p1', payload: { instanceId: 42, from: 'hand', to: 'bench' } }, rng);
+  assert.ok(refused.error, 'a non-Fossil Trainer is still refused on the Bench');
+});

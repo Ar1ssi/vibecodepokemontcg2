@@ -6,6 +6,7 @@
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isTrainer } from '../cards.mjs';
+import { isFossilItem } from '../rules/fossil.mjs';
 import { flipCoin } from '../rng.mjs';
 import { isPokemonToolCard } from '../rules/tool-combat.mjs';
 import { stadiumTrainerPlayCoin } from '../rules/stadium-triggers.mjs';
@@ -95,6 +96,8 @@ export function endTurnAfterTrainer(draft, { card, playerId, activeRng, events }
  * playTrainer here, from the server's own card data, is what makes the effect run; deciding
  * it server-side also means a client cannot place a Trainer while skipping its effect.
  * A Tool dropped on the board asks which Pokémon to attach to; a Stadium goes to the Stadium zone.
+ * A Fossil Item dropped on the Bench is played the same way (its effect puts it on the Bench as a
+ * Basic Pokémon); other Trainers dropped there stay refused by legality.
  *
  * @param {object} state GameState
  * @param {object} command Shape-valid command envelope
@@ -107,11 +110,7 @@ export function trainerEffectText(card) {
 export function promoteTrainerPlay(state, command) {
   if (!state.rulesEnabled) return command;
   const { type, payload, playerId } = command;
-  if (
-    type !== 'moveCard' ||
-    payload.from !== 'hand' ||
-    payload.to !== 'board'
-  ) {
+  if (type !== 'moveCard' || payload.from !== 'hand' || !['board', 'bench'].includes(payload.to)) {
     return command;
   }
   const cardRef = findCard(state, payload.instanceId);
@@ -119,6 +118,7 @@ export function promoteTrainerPlay(state, command) {
     return command;
   }
   const card = cardRef.card;
+  if (payload.to === 'bench' && !isFossilItem(card)) return command;
   const kind =
     `${card.type || ''} ${card.trainerType || ''} ${card.subtypes || ''}`.toLowerCase();
   if (!isTrainer(card) && !/item|supporter/.test(kind)) return command;
