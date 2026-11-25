@@ -1792,6 +1792,8 @@ const BLOCKS = [
   // Patrat Glance (sm2-107): only as the whole attack text, so an Ability's "look at the top card
   // of your opponent's deck. If you do, …" (Malamar Psychic Insight) keeps its own reader.
   [/^look at the top card of your opponent's deck\.$/g, () => ({ type: 'atkLookAt', source: 'oppDeckTop', count: 1 })],
+  // Rockruff Dig It Up (customcheck set.json): the attacker sees their own top card and may discard it.
+  [/look at the top card of your deck\. you may discard that card\./g, () => ({ type: 'atkLookTopMayDiscard' })],
   // Meganium Quick-Ripening Herb (sm8-8): a Stage 2 from the hand onto a chosen Basic.
   [
     /choose 1 of your basic pokémon in play\. if you have a stage 2 card in your hand that evolves from that pokémon, put that card onto the basic pokémon to evolve it\./g,

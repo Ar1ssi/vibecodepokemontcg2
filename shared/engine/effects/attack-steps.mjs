@@ -3560,6 +3560,30 @@ function atkOppDeckTopDiscard(ctx) {
   });
 }
 
+// Rockruff Dig It Up: the attacker looks at their own top card and may discard it.
+function atkLookTopMayDiscard(ctx) {
+  const { player } = ctx;
+  const top = player.zones.deck?.[0];
+  if (ctx.memo?.offered) {
+    if (ctx.selection?.[0] === ATTACK_YES && top && top.instanceId === ctx.memo.cardId) {
+      discardCards(player, [top], ctx.events);
+    }
+    return null;
+  }
+  if (!top) return skip(ctx, 'empty_deck');
+  ctx.events.push({ type: 'cardsLookedAt', playerId: ctx.playerId, count: 1 });
+  return ctx.ask({
+    prompt: `${attackName(ctx)}: Discard the top card of your deck?`,
+    options: [
+      { instanceId: ATTACK_YES, name: `Yes (${top.name})`, type: 'option' },
+      { instanceId: ATTACK_NO, name: `No (${top.name})`, type: 'option' },
+    ],
+    min: 1,
+    max: 1,
+    memo: { offered: true, cardId: top.instanceId },
+  });
+}
+
 // Tapu Lele Magical Swap: one damage counter at a time from one of the opponent's Pokémon to
 // another of theirs, until the player picks Done.
 function atkMoveOppCountersAnyWay(ctx) {
@@ -5055,6 +5079,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkLostZoneOppHandRandom,
   atkMoveCounterToOpponent,
   atkLookDeckReorder,
+  atkLookTopMayDiscard,
   atkAttachEachBench,
   atkShuffleFromDiscard: optional(atkShuffleFromDiscard, () => 'Shuffle cards from your discard pile into your deck'),
   atkShuffleOppActive,
