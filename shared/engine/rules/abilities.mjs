@@ -722,6 +722,17 @@ export function parseAbility(text = '') {
     ];
   }
 
+  // Excadrill Excavation: attach a Pokémon Tool from your discard pile to this Pokémon.
+  if (/you may attach a pok[eé]mon tool from your discard pile to this pok[eé]mon/.test(lower)) {
+    return [
+      {
+        type: 'attachToolFromDiscardAbility',
+        guidance:
+          'Once during your turn: you may attach a Pokémon Tool from your discard pile to this Pokémon (as described).',
+      },
+    ];
+  }
+
   // Doduo Two Minds: look at the bottom N cards of your deck, may move 1 of them to the top.
   {
     const twoMinds = lower.match(
