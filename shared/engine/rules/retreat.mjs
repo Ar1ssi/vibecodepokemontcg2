@@ -35,7 +35,7 @@ export function getEffectiveRetreatCost(
   // Team-wide "no Retreat Cost" ability on a Benched Pokémon (Latias ex "Skyliner").
   if (teamNoRetreatCostForActive(activeCard, benchCards, cards)) return 0;
   let cost = getRetreatCostCount(activeCard);
-  cost = getStadiumRetreatCost(cost, activeCard, player);
+  cost = getStadiumRetreatCost(cost, activeCard, player, null, cards);
   cost = combinedToolRetreatCost(cost, activeCard, cards, {
     blockTools: stadiumBlocksToolEffects(),
     stadium: getStadium(),

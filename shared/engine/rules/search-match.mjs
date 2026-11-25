@@ -134,14 +134,18 @@ function markerKindMatch(card, w) {
   return null;
 }
 
-// "an Item card that has the word "Ball" in its name" (Lopunny Bunny Business).
+// "an Item card that has the word "Ball" in its name" (Lopunny Bunny Business); "an Item that
+// has“Antique” in its name" (Relicanth Antique Search, customhb-890: no "the word", no space).
 export const NAME_WORD_CLAUSE =
-  /\s*(?:that |which )?(?:has|with) the word ["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
+  /\s*(?:that |which )?(?:has|with)\s*(?:the word )?["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
 
 /** Match a card against a parsed search-step `what` string. */
 export function matchesSearch(card, what = '') {
-  // Fossil Researcher: "up to 2 in any combination of Amaura or Tyrunt".
+  // Fossil Researcher: "up to 2 in any combination of Amaura or Tyrunt"; Silcoon Cocoon Collector
+  // (sm8-25): "in any combination of Silcoon and Cascoon" — either name.
+  const combination = /^\s*in any combination of\s+/i.test(String(what));
   what = String(what).replace(/^\s*in any combination of\s+/i, '');
+  if (combination && !/\bpokémon\b|\benergy\b|\bcards?\b/i.test(what)) what = what.replace(/\s+and\s+/gi, ' or ');
   const nameWord = what.match(NAME_WORD_CLAUSE);
   if (nameWord) {
     if (!lowerName(card).includes(nameWord[1].toLowerCase())) return false;

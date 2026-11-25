@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I296). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I301). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,11 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I300 2026-11-24 P2 [rules] ability-combat.mjs damage shields ignore kind/type/attacker filters (Leavanny {G}, Dachsbun, Mew Neutral Shield), lend "it takes N less" to the side (Armarouge ex), read activated shields as permanent (Zamazenta VSTAR); Bench path reads only plain "your Pokémon" shields
+- I299 2026-11-24 P2 [rules] On-damage triggers (Silver Sparkle customhb-872, Lucky Energy, thorns, Rocky Helmet) fire only on an attack's main damage, not a chosen-target or damage-each hit on the Active (applyFlatDamageToTarget) — needs one shared helper
+- I298 2026-11-21 P2 [attacks] `pnpm audit:attacks` fails on main (d6c26287) with 8 regressions vs its baseline: Fuecoco ex Cheerful Flame, Salazzle-GX Diabolical Claws, Mega Mawile ex Gobble Down, Aegislash ex Peerless Edge → ran-no-effect; Leafeon-EX, Muk & Alolan Muk-GX, Altaria-EX, Mamoswine → partial. Bisect.
+- I297 2026-11-19 P3 [rules] customhb HB 554 Giratina ex Alpha Rage: the chosen Pokémon's attack does its damage as that Pokémon (reduce/controlled-attack.mjs) but its other printed effects (status, self-discard, draws) do not run — mapping "you"/"Defending Pokémon" for a controlled attack needs a design
+- I296 2026-11-19 P2 [client] The attack-button glow ignores marker cost increases (Head Ringer Tool, Flapple V Sour Spit): listUsableActions gets only `costDiscounts`, so it lights an attack the server then refuses (legality.mjs attackCostPayable markerIncrease). Needs a view `costIncreases` map.
 - I295 2026-11-12 P2 [netcode] An undo lowers stateVersion (draw,draw,undo,draw → 3,4,3,4 from GameRoom) and apply-view.js's monotonic guard drops any view ≤ lastRenderedVersion, so the undo may not render; in a log: view/apply applied:false out_of_order (refs: design 088 Review)
 - I294 2026-11-12 P2 [server] No socket handler in server/server.js has a try/catch: a throw in any one is an uncaught exception that ends the process and every room. Now logged (088 process tap, stderr fatal line) but not contained (refs: design 088 Current state)
 - I293 2026-11-12 P3 [netcode] applyView's own diff is always "initial": no caller passes options.previousView, so the returned diff lists every card as added. Unused today; apply-view-logged.js keeps its own previous view (refs: design 088)
@@ -24,7 +29,7 @@
 - I288 2026-11-15 P3 [tooling] oracle harness deck has no {Y}/{N} Energy and no card named like the holder, so `engine-check.mjs` reads homebrew {Y} attaches and "search for <own name>" as gaps that parse fine (Xerneas ex Geocharge, Grookey Supporting Act); adding them shifts audit baselines
 - I287 2026-11-15 P2 [rules] printed Trainers still misread: Raihan (attach from discard, then search any card → parses as one Basic Energy search), Café Master (per-Bench attach from deck → plain search), Cyrus Prism Star keeps 2 whatever is printed; Trainer parser residual drift: `node scripts/reword-drift.mjs trainer numbers`
 - I286 2026-11-14 P3 [tooling] `scripts/e2e/board3d-view-test.mjs` reports 4 FAILs on origin/main `6f5011bec` too (not from 089); not triaged (refs: 089)
-- I284 2026-11-13 P2 [tooling] e2e harness (merged I284, I245): boot, deck count, test:solo, flip-gate fixed 2026-11-13. Left: opening-coin-choice fails "the loser is told the opponent is deciding"; room-change-reset waits for a legacy coin picker; playtest-bot unchecked; dead cdn.socket.io shims
+- I284 2026-11-13 P2 [tooling] e2e harness (merged I284, I245): boot, deck count, test:solo, flip-gate fixed 2026-11-13. Left: opening-coin-choice fails "the loser is told the opponent is deciding"; room-change-reset waits for a legacy coin picker; playtest-bot times out in setup (`waitFor` predicate, 2026-11-19); fx-sequence D1 (discard flies on a ghost mesh) fails; dead cdn.socket.io shims
 - I283 2026-11-12 P1 [board-ui] No-room board draws no cards: before the Solo tab is clicked, deck load and Set Up run on the hidden mirror (chat lines, client coin prompt) while the three.js board stays empty. Repro: load page, load both decks, Set Up Both (refs: D246, design 087 § No-room board)
 - I282 2026-11-09 P3 [mat-fx] 7 Homebrew Stadiums have no board: Altar of the Moone, Altar of the Sunne, Broken Time-Space, Shrine of Punishment, Sky Field, Sky Pillar, Temple of Sinnoh (pinned in stadium-environment-layout.test; the other 25 follow the card's name, D249; design 077)
 - I280 2026-11-05 P3 [deck] Per-form Zygarde deck limit (D240) reads `form`/description/stage off deck data; rows with none (CSV imports, decks saved before D240) count under plain "Zygarde" or by stage, so a 50% Basic can read as 10% — backfill `form` on hydrate (review of D240)

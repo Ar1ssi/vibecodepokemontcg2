@@ -107,7 +107,7 @@
     },
     "ability:heal": {
       "n": 211,
-      "observed": 211
+      "observed": 209
     },
     "ability:hp-bonus": {
       "n": 22,
@@ -118,20 +118,20 @@
       "observed": 0
     },
     "ability:ko-prevention": {
-      "n": 61,
-      "observed": 54
+      "n": 63,
+      "observed": 56
     },
     "ability:look-at-top": {
       "n": 67,
-      "observed": 66
+      "observed": 60
     },
     "ability:lost-zone": {
       "n": 2,
       "observed": 2
     },
     "ability:move-damage": {
-      "n": 296,
-      "observed": 296
+      "n": 294,
+      "observed": 289
     },
     "ability:on-opponent-evolve": {
       "n": 30,
@@ -151,7 +151,7 @@
     },
     "ability:recursion": {
       "n": 119,
-      "observed": 117
+      "observed": 110
     },
     "ability:retreat-cost": {
       "n": 169,
@@ -174,8 +174,8 @@
       "observed": 2
     },
     "ability:status": {
-      "n": 501,
-      "observed": 371
+      "n": 507,
+      "observed": 376
     },
     "ability:status-recover": {
       "n": 38,
@@ -187,7 +187,7 @@
     },
     "ability:tool-cap": {
       "n": 48,
-      "observed": 4
+      "observed": 7
     },
     "ability:type-change": {
       "n": 18,
@@ -239,7 +239,7 @@
     },
     "attack:discard-cost": {
       "n": 597,
-      "observed": 582
+      "observed": 585
     },
     "attack:discard-opponent": {
       "n": 151,
@@ -247,11 +247,11 @@
     },
     "attack:draw-attach": {
       "n": 321,
-      "observed": 317
+      "observed": 319
     },
     "attack:draw-until": {
       "n": 45,
-      "observed": 44
+      "observed": 45
     },
     "attack:dual-status": {
       "n": 78,
@@ -335,7 +335,7 @@
     },
     "attack:per-prize": {
       "n": 147,
-      "observed": 74
+      "observed": 65
     },
     "attack:recover-status": {
       "n": 12,

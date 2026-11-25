@@ -18,6 +18,7 @@ import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
 import { boardRefuses, playsOntoBoard, zoneOf } from './drop-zone.mjs';
 import { endDragAvatar, startDragAvatar } from './drag-avatar.js';
 import { uiCue } from '../netcode/mat-fx/ui-cue.mjs';
+import { isViewingBoard } from './view-board-toggle.mjs';
 
 const popupContainers = [
   'lostZone',
@@ -93,6 +94,11 @@ export const refuseBoardDrop = () => {
 };
 
 export const dragStart = (event) => {
+  // View Board only looks; moving a card waits for Back.
+  if (isViewingBoard()) {
+    event.preventDefault();
+    return;
+  }
   event.target.classList.add('high-zIndex');
   if (event.target.attached) {
     event.target.style.opacity = '0';

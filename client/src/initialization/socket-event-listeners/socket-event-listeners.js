@@ -15,6 +15,7 @@ import {
 import { socket, systemState } from '../../state.js';
 import { appendMessage } from '../../setup/chatbox/append-message.js';
 import { renderRoomFormatPanel } from '../../setup/general/room-format-panel.js';
+import { renderHomebrewClockPanel } from '../../setup/general/homebrew-clock-panel.js';
 import { announceHostState } from '../document-event-listeners/sidebox/deck-builder-window.js';
 import { exchangeData } from '../../setup/deck-constructor/exchange-data.js';
 import { deckBoxes } from '../../setup/netcode/mat-fx/deck-box-state.mjs';
@@ -377,6 +378,7 @@ export const initializeSocketEventListeners = () => {
     systemState.initiator = 'self';
     systemState.isTwoPlayer = true;
     renderRoomFormatPanel();
+    renderHomebrewClockPanel();
     // An open Build & Battle tab learns the room, so a box from another room is not reused.
     announceHostState();
     startSyncCheckHeartbeat();

@@ -742,6 +742,140 @@ body.fx-off .fx-overlay.fx-draw {
 }
 
 
+/* Design 027 / 034 / 037: Tera entry — the whole Scarlet/Violet
+   Terastallization (orb, jewel, crystal cluster, burst) is drawn on one canvas
+   stage (tera-crystal.mjs); its clock is its own animation. */
+.fx-tera-entry {
+  overflow: visible;
+  z-index: 2470;
+}
+
+.fx-tera-entry__stage {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* Design 027 / 034 / 035 / 036: Mega entry — a prismatic hex field floods the mat
+   from the card outward (painted inside #battleMatSurface, so it takes the
+   table tilt and mat outline and stays under the card zones); over the card,
+   the keystone orb (canvas, mega-orb.mjs) forms, cracks and shatters into a
+   vortex of brush strokes drawn on the same canvas (mega-vortex.mjs). */
+.fx-mega-field {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  will-change: clip-path, opacity;
+}
+
+body.fx-off .fx-mega-field {
+  display: none;
+}
+
+/* No mat surface: a free-standing field around the card, soft at the edges. */
+.fx-mega-field--floating {
+  position: fixed;
+  inset: auto;
+  z-index: 2465;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 70%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 70%, transparent 100%);
+}
+
+/* Design 074: the three.js board's mat is a canvas — the field rides above it, clipped to the
+   projected cloth (inline clip-path) and screened so the cards under it stay readable. */
+.fx-mega-field-board3d {
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
+.fx-mega-field > * {
+  position: absolute;
+  will-change: transform, opacity;
+}
+
+/* Pastel holo wash (teal, mint, pink, lavender), oversized so it can drift. */
+.fx-mega-field__wash {
+  inset: -12%;
+  background:
+    radial-gradient(ellipse 22% 30% at 18% 30%, rgba(255, 170, 215, 0.9), rgba(255, 170, 215, 0) 70%),
+    radial-gradient(ellipse 20% 28% at 72% 22%, rgba(196, 170, 255, 0.85), rgba(196, 170, 255, 0) 70%),
+    radial-gradient(ellipse 26% 26% at 58% 76%, rgba(160, 245, 170, 0.85), rgba(160, 245, 170, 0) 70%),
+    radial-gradient(ellipse 18% 30% at 88% 64%, rgba(255, 190, 225, 0.8), rgba(255, 190, 225, 0) 70%),
+    radial-gradient(ellipse 24% 30% at 12% 78%, rgba(175, 250, 225, 0.85), rgba(175, 250, 225, 0) 70%),
+    radial-gradient(ellipse 18% 22% at 40% 48%, rgba(230, 255, 250, 0.7), rgba(230, 255, 250, 0) 70%),
+    linear-gradient(125deg, #6fd3cf, #8fe2c0 35%, #79c9e4 62%, #aca6ea);
+}
+
+.fx-mega-field__hex {
+  inset: 0;
+}
+
+/* A band of light gliding across the lattice, like tilting a holo card. */
+.fx-mega-field__sheen {
+  inset: 0 -40%;
+  background: linear-gradient(110deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.32) 48%, rgba(255, 255, 255, 0) 58%);
+}
+
+.fx-mega-field__wave {
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0) 88%, rgba(255, 255, 255, 0.9) 97%, rgba(255, 255, 255, 0) 100%);
+}
+
+/* The glass lens around the card, with a smaller inner ring. */
+.fx-mega-field__lens {
+  border-radius: 50%;
+  opacity: 0;
+  background: radial-gradient(circle, rgba(60, 150, 150, 0.22) 0 58%, rgba(200, 255, 250, 0.2) 78%, rgba(255, 255, 255, 0.6) 89%, #fff 92.5%, rgba(255, 255, 255, 0.5) 95%, rgba(255, 255, 255, 0) 99%);
+  box-shadow: 0 0 28px rgba(200, 255, 245, 0.55), inset 0 0 30px rgba(255, 255, 255, 0.35);
+}
+
+.fx-mega-field__lens-core {
+  position: absolute;
+  inset: 27%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 70%);
+}
+
+.fx-mega-entry {
+  overflow: visible;
+  z-index: 2470;
+}
+
+.fx-mega-entry > * {
+  position: absolute;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* The card goes white-hot as the keystone orb swells out of it. */
+.fx-mega-entry__silhouette {
+  inset: -2%;
+  border-radius: 0.4rem;
+  background: #fff;
+  box-shadow: 0 0 14px 6px rgba(255, 244, 228, 0.95), 0 0 42px 16px rgba(255, 170, 90, 0.55);
+}
+
+/* Canvas stage for the 3D orb and vortex; its clock is its own animation. */
+.fx-mega-entry__orb {
+  display: block;
+}
+
+.fx-mega-entry__flash {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 22%, rgba(255, 244, 225, 0.85) 40%, rgba(255, 220, 170, 0) 70%);
+}
+
+.fx-mega-entry__burst {
+  inset: 0;
+  opacity: 1;
+}
+
 /* ── Design 024 slice 2: attack choreography ──────────────────────────── */
 
 /* The attack banner sits on the same strip as the turn/ability banners but

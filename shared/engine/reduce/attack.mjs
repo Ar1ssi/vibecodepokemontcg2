@@ -13,13 +13,13 @@ import {
 } from '../rules/legacy-attached-trainer.mjs';
 import { countUnit, normalizeUnit } from '../rules/scaling-count.mjs';
 import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
-import { parseGrantedAttacks } from '../rules/tool-attacks.mjs';
+import { parseGrantedAttacks, toolGrantsAttackTo } from '../rules/tool-attacks.mjs';
 import { attachedTools, isTeraCard } from '../rules/tool-combat.mjs';
 import {
   isAbilitySuppressed, abilityAttackFlipGate, abilityVictoryStar,
 } from '../rules/ability-combat.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
-import { replaceSelfName } from '../rules/attack-text.mjs';
+import { replaceSelfName, symbolizeTypeWords } from '../rules/attack-text.mjs';
 import { parseAttackUseGate, attackConditionMet } from '../rules/attack-conditions.mjs';
 import {
   parseCopyAttack, inCopyGroup, copiedAttackFor, parseAttackBorrowAbility, parseAttackGrant,
@@ -419,6 +419,9 @@ function toolGrantedAttacksFor(state, card) {
     // Evolution cards sit in the stack attached to the Basic root: their attacks are the
     // previous Evolutions', usable only through a grant (design 049), never as a Tool's.
     if (isPokemon(attached) || isEnergy(attached)) continue;
+    // "The Mega Zygarde ex this card is attached to can use the attack on this card" (Core Memory,
+    // G Booster, G Scope, Power Memory; customhb): only a holder of that name gets the attack.
+    if (!toolGrantsAttackTo(attached, inPlayView(state, card))) continue;
     out.push(...parseGrantedAttacks(attached));
   }
   return out;
@@ -598,7 +601,19 @@ export function withSelfNamedAttack(ctx) {
   if (!text) return ctx;
   // TCGdex prints curly apostrophes ("opponent’s"); every reader matches straight ones.
   const straight = String(text).replace(/[‘’]/g, "'");
-  const named = name ? replaceSelfName(straight, name) : straight;
+  // Hand-written wordings (custom sets: "cannot attack next turn", "your opponents Bench",
+  // "Metal Energy") read as their printed spelling and symbols, so every reader matches one
+  // wording (effect-wording.mjs).
+  // A hand-typed text may drop its final period ("… discarded in this way"); printed sentences
+  // end with one, and the sentence readers anchor on it.
+  const named = symbolizeTypeWords(name ? replaceSelfName(straight, name) : straight)
+    .replace(/([^.!?)\s])\s*$/, '$1.')
+    // Serperior Solar Coiling (customhb): "On your next turn, this attack does 160 damage." is the
+    // printed "During your next turn, this Pokémon's <attack> attack's base damage is 160."
+    .replace(
+      /\bon your next turn, this attack does (\d+) damage\b/gi,
+      (_, n) => `During your next turn, this Pokémon's ${ctx.attack.name} attack's base damage is ${n}`
+    );
   return named === text ? ctx : { ...ctx, attack: { ...ctx.attack, text: named } };
 }
 
@@ -620,9 +635,18 @@ function flipAndResolveAttack(draft, ctx) {
     defenderId: ctx.defender?.instanceId ?? null,
     attackName: attack?.name,
   });
+  // Alolan Graveler Rolling Tackle (customhb): "This attack does 20 more damage each time it is
+  // used" counts this Pokémon's uses of the attack while it stays in play (cleared off the board).
+  // Carracosta Shell Smash (customcheck-014): "for each time you have used this attack" counts the same way.
+  if (ctx.attacker && attack?.name && /\beach time (?:it is used|you have used this attack)\b/i.test(attack.text || '')) {
+    ctx.attacker.attackUses = { ...(ctx.attacker.attackUses || {}), [attack.name]: (ctx.attacker.attackUses?.[attack.name] || 0) + 1 };
+  }
   // A new attack starts with no before-damage discard recorded (attack-steps recordDiscardedForDamage).
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  delete draft.attackEnergyDiscarded;
+  delete draft.attackBenchedFromDeck;
+  delete draft.attackPleaRefused;
   // The attack this player used, for next-turn copy wordings (Mimikyu Copycat, Sudowoodo
   // Watch and Learn): the copied attack when one was chosen, scoped by turn number so the
   // opponent reads it only during their next turn (design 039).
@@ -631,7 +655,11 @@ function flipAndResolveAttack(draft, ctx) {
     // the attack, not to the attack a next-turn copier reads (design 049 review).
     const printedAttack = { ...attack };
     for (const key of ['bonusBeforeWR', 'grantedBy', 'copiedFrom', 'waivesUseGate']) delete printedAttack[key];
+    // The attack it replaces stays readable for this attack's own "used … during your last turn"
+    // reads (Araquanid Bubble Trap, attack-damage-context.mjs lastTurnAttackOf); one level only.
+    const { previous: _older, ...previous } = attackerPlayer.lastAttack || {};
     attackerPlayer.lastAttack = {
+      ...(attackerPlayer.lastAttack ? { previous } : {}),
       attack: printedAttack,
       isGx: isGxAttack(attack),
       attackerName: ctx.attackerView?.name || ctx.attacker?.name || '',
@@ -1114,6 +1142,23 @@ export function attackCommand({ draft, playerId, payload, activeRng, events }) {
 
       endTurnAfterFailedAttack(draft, { playerId, oppId, activeRng, events });
       return;
+    }
+  }
+
+  // Dragonite ex Fly (customhb): the Defending Pokémon's marker makes the attacker flip; tails, it
+  // takes no damage from this attack (a one-turn prevention marker).
+  if (
+    defender &&
+    activeAttackMarkers(draft, defenderPlayerId, defender).some((m) => m.kind === 'flipOrTakeNoDamage')
+  ) {
+    const coin = flipCoin(activeRng);
+    events.push({ type: 'attackMarkerCoinFlipped', kind: 'flipOrTakeNoDamage', playerId, coin });
+    if (coin === 'tails') {
+      const turn = draft.turn?.number || 1;
+      defender.attackMarkers = [
+        ...(defender.attackMarkers || []),
+        { kind: 'incomingPrevent', filter: null, fromTurn: turn, untilTurn: turn },
+      ];
     }
   }
 

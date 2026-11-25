@@ -106,6 +106,9 @@ const typeChangeText = (t) =>
   /is both \{[a-z]\} and \{[a-z]\}/.test(t);
 
 const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
+// Orthworm Earth Eater (custom set): the Energy goes onto the holder, not to the opponent's Bench or
+// between your own Pokémon, so neither move-Energy reading below may take it; the attack templates do.
+const OPPONENT_ENERGY_TO_SELF = /from your opponent's active pok[eé]mon to this pok[eé]mon/;
 // Mawile Energy Crunch (HB 160): played onto the Bench, one Energy from any of the opponent's Pokémon.
 const OPPONENT_ANY_ENERGY_DISCARD = /when you play [^.]*from your hand (?:on)?to your bench[^.]*, you may discard (?:1|an?) energy from 1 of your opponent's pok[eé]mon/;
 
@@ -366,6 +369,9 @@ export function parseAbilitySearchParams(lower) {
   const typedEnergy = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
   if (typedEnergy) {
     what = `Basic ${typedEnergy[1].toUpperCase()} Energy`;
+  } else if (/\bspecial energy\b/.test(scope)) {
+    // Archeops Primal Turbo (customcheck-017): "a Special Energy card" never matches a Basic Energy.
+    what = 'Special Energy';
   } else if (/\{[a-z]\} energy/.test(scope)) {
     // "search your deck for up to 2 {G} Energy cards" (Rillaboom Voltage Beat)
     what = `${scope.match(/(\{[a-z]\}) energy/)[1].toUpperCase()} Energy`;
@@ -407,7 +413,7 @@ export function parseAbilitySearchParams(lower) {
   }
 
   const nameWord = scope.match(NAME_WORD_CLAUSE)?.[0];
-  if (nameWord && what) what = `${what}${nameWord.startsWith(' ') ? '' : ' '}${nameWord.trim()}`;
+  if (nameWord && what) what = `${what} ${nameWord.trim()}`;
 
   if (!upTo) {
     const upToM = lower.match(/up to\s+(\d+)/);
@@ -495,6 +501,9 @@ function parseTransformShape(lower) {
     what: what ? what.trim() : null,
     except: lower.match(/except any ([a-z0-9é' -]+?)[,.]/)?.[1]?.trim() || null,
     keepState: onTop || /(?:remain|are now) on the new pok[eé]mon/.test(lower),
+    ...(/any cards attached to this pok[eé]mon and damage counters remain on the new pok[eé]mon/.test(lower)
+      ? { keepConditions: false }
+      : {}),
     onTop,
     shuffle: source === 'deck',
   };
@@ -590,11 +599,39 @@ function withIfYouDoHalves(lower, parsed) {
     ];
   }
 
+  // Iono's Kilowattrel Flashing Draw: "You must discard a Basic {L} Energy from this Pokémon in
+  // order to use this Ability." The attached-Energy discard is the cost of the draw that follows.
+  const mustDiscardOwn = lower.match(
+    new RegExp(`you must discard an? (basic )?((?:\\{[a-z]\\}|[a-z]+) )?energy(?: card)? from ${SELF} in order to use this ability`)
+  );
+  if (mustDiscardOwn) {
+    const energyType = mustDiscardOwn[2] ? parseEnergyTypeHint(mustDiscardOwn[2]) : null;
+    steps = [
+      {
+        type: 'discardOwnAttachedEnergy',
+        selfOnly: true,
+        cost: true,
+        ...(mustDiscardOwn[1] ? { basicOnly: true } : {}),
+        ...(energyType ? { energyTypes: [energyType] } : {}),
+        guidance: 'Discard an Energy from this Pokémon (cost).',
+      },
+      ...steps,
+    ];
+  }
+
   // Ampharos Unseen Flash: "put 2 {L} Energy cards from your hand in the Lost Zone. If you do".
   const lostCost = lower.match(/you may put (\d+) \{([a-z])\} energy cards? from your hand in the lost zone\. if you do/);
   if (lostCost) {
     steps = [
       { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: ENERGY_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Tyrunt In Fighting (customcheck-012): the Benched Pokémon is the cost, so it runs before the draw.
+  if (/you may discard (?:a|1) benched pok[eé]mon and all cards attached to it in order to/.test(lower)) {
+    steps = [
+      { type: 'discardOwnBenchPokemon', count: 1, required: true, cost: true, guidance: 'Discard a Benched Pokémon and all cards attached to it (cost).' },
       ...steps,
     ];
   }
@@ -702,7 +739,16 @@ export function parseAbility(text = '') {
   }
 
   // ── 1. Search (deck → hand / bench) ─────────────────────────────────────
-  if (
+  // Karrablast Shell On (sm4-7): "search your deck for a card that evolves from this Pokémon and
+  // put it onto this Pokémon to evolve it" evolves the holder (trainer-steps searchEvolve).
+  const evolvesSelf = /search your deck for (?:a|an evolution) card that evolves from this pok[eé]mon and put it onto this pok[eé]mon/.test(lower);
+  if (evolvesSelf) {
+    steps.push({
+      type: 'searchEvolve',
+      ontoSource: true,
+      guidance: 'Once during your turn: search your deck for a card that evolves from this Pokémon and evolve it.',
+    });
+  } else if (
     lower.includes('search your deck') ||
     lower.includes('look through your deck') ||
     (lower.includes('find') && lower.includes('from your deck')) ||
@@ -710,6 +756,13 @@ export function parseAbility(text = '') {
     (lower.includes('from your deck') && lower.includes('into your hand'))
   ) {
     const parsed = parseAbilitySearchParams(lower);
+    // Steven's Metagross ex X-Boot: "a Basic {P} Energy card, a Basic {M} Energy card, or 1 of
+    // each" is up to 2 Basic Energy, at most one of each type.
+    const oneOfEach = lower.match(
+      /search your deck for an? basic \{([a-z])\} energy card, an? basic \{([a-z])\} energy card, or 1 of each/
+    );
+    const oneEachOf = oneOfEach ? [oneOfEach[1], oneOfEach[2]].map((l) => ENERGY_SYMBOL_TYPES[l]) : null;
+    if (oneEachOf) Object.assign(parsed, { what: `Basic ${oneEachOf.join(' or ')} Energy`, count: 2, upTo: true });
     const what = parsed.what;
     // "…and attach it to 1 of your Benched {D} Pokémon" (Sinister Surge), "…attach them to this
     // Pokémon", "…attach them to your Pokémon in any way you like": the searched cards go onto
@@ -736,6 +789,7 @@ export function parseAbility(text = '') {
       count,
       destination: dest,
       ...(attachTarget ? { attachTarget, attachDamage, ...(attachEach ? { attachEach } : {}) } : {}),
+      ...(oneEachOf ? { oneEachOf } : {}),
       upTo: parsed.upTo || false,
       reveal: textRevealsPicks(lower),
       guidance: `Once during your turn: search your deck for ${count > 1 || parsed.upTo ? `up to ${count} ` : ''}${what} → ${destLabel}, then shuffle.`,
@@ -804,6 +858,7 @@ export function parseAbility(text = '') {
       (lower.includes('benched') || lower.includes('bench')))
   ) {
     const typedBench = lower.match(/benched\s+\{([a-z])\}\s+pok/);
+    const typedActive = lower.match(/switch your active\s+\{([a-z])\}\s+pok/);
     const poisonNewActive =
       lower.includes('if you do') &&
       (lower.includes('now poisoned') || lower.includes('is now poisoned'));
@@ -822,7 +877,11 @@ export function parseAbility(text = '') {
     const ownSwitchFirst = /switch (?:your active pok[eé]mon with 1 of your benched|(?:it|this pok[eé]mon) with your active|1 of your benched [^.]*with your active)[^.]*[.,] if you do/.test(lower);
     // Mabosstiff Intimidating Howl, Shinx Big Roar, Iron Bundle Hyper Blower: the gust is the
     // whole effect and the opponent picks. The Active/Bench position gate lives in the executors.
-    const gustOnly = !opponentFollowUp && /you may switch out your opponent's active pok[eé]mon to the bench/.test(lower);
+    // Salamence Intimidating Roar (customhb): "you may have your opponent switch their Active
+    // Pokémon with 1 of their Benched Pokémon" — the same gust, the opponent picks.
+    const gustOnly =
+      !opponentFollowUp &&
+      /you may (?:switch out your opponent's active pok[eé]mon to the bench|have your opponent switch (?:their|his or her) active pok[eé]mon with 1 of (?:their|his or her) benched pok[eé]mon)/.test(lower);
     if (gustOnly) {
       steps.push({
         type: 'switchOpponentOut',
@@ -844,6 +903,7 @@ export function parseAbility(text = '') {
       // "switch it/this Pokémon with your Active" — the ability's own holder is the bench pick.
       selfSwap: /switch (?:it|this pok[eé]mon) with your active/.test(lower),
       pokemonType: typedBench ? parseEnergyTypeHint(`{${typedBench[1]}}`) : null,
+      ...(typedActive ? { activePokemonType: parseEnergyTypeHint(`{${typedActive[1]}}`) } : {}),
       exceptName: lower.match(/except any ([^.,]+)/)?.[1]?.trim().toLowerCase() || null,
       poisonNewActive,
       guidance: isOpponentBenchSwitch && !opponentFollowUp
@@ -885,7 +945,12 @@ export function parseAbility(text = '') {
     // "Heal all damage from 1 of your Pokémon" (Primarina Enriching Melody) lets the
     // player pick ANY of their Pokémon, unlike a self/Active-only heal. Flag it so the
     // interactive executor opens a target picker instead of healing the ability's owner.
-    const target = /from 1 of your pok[eé]mon/.test(lower) ? '1 of your Pokémon' : null;
+    // Miltank Milk Drink (customhb): "heal 10 damage from each of your Pokémon" heals every one.
+    const target = /from 1 of your pok[eé]mon/.test(lower)
+      ? '1 of your Pokémon'
+      : /heal \d+ damage from each of your pok[eé]mon/.test(lower)
+        ? 'each of your Pokémon'
+        : null;
     steps.push({
       type: 'healAbility',
       amount: amount ? Number(amount) : null,
@@ -971,6 +1036,7 @@ export function parseAbility(text = '') {
   if (
     !hasPromotionTrigger &&
     !lower.includes('knocked out') &&
+    !OPPONENT_ENERGY_TO_SELF.test(lower) &&
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     // Energy must be what moves: Adrena-Brain's "has any {D} Energy attached, … move
@@ -1161,6 +1227,10 @@ export function parseAbility(text = '') {
         onOpponent,
         ...(targetCount > 1 ? { targetCount } : {}),
         ...(fromOwn ? { fromOwn } : {}),
+        // Shadow Pain / Cursed Shadow / Six Feet Under: "… in any way you like", one counter per pick.
+        ...(!fromOwn && /in any way you like/.test(lower) ? { distribute: true } : {}),
+        // Gengar [UNM] Shadow Pain: "… on your opponent's Pokémon-GX and Pokémon-EX …".
+        ...(/opponent's pok[eé]mon-gx and pok[eé]mon-ex/.test(lower) ? { gxExOnly: true } : {}),
         ...(requiresAttachedEnergy ? { requiresAttachedEnergy } : {}),
         selfKnockOut: selfKoOnUse,
         guidance: count
@@ -1270,7 +1340,18 @@ export function parseAbility(text = '') {
   // Also excludes the opponent-facing evolve-lock wording ("your opponent can't
   // play any Pokémon from their hand to evolve their Pokémon", Primal Law):
   // without it a passive lock parsed as an activated evolve ability too.
-  if (
+  // Ditto Prism Star Almighty Evolution (sm8-154): "put any Stage 1 card from your hand onto this
+  // Pokémon to evolve it" — any Stage 1, whatever it evolves from.
+  const anyStageFromHand = /put any (stage 1|stage 2) card from your hand onto this pok[eé]mon to evolve it/.exec(lower);
+  if (anyStageFromHand) {
+    steps.push({
+      type: 'evolveSelfFromHand',
+      stage: anyStageFromHand[1] === 'stage 1' ? 'Stage 1' : 'Stage 2',
+      anyName: true,
+      guidance: `Once during your turn: put any ${anyStageFromHand[1]} card from your hand onto this Pokémon.`,
+    });
+  } else if (
+    !evolvesSelf &&
     lower.includes('evolve') &&
     (lower.includes('this pokémon') || lower.includes('onto this pokémon')) &&
     !/from (?:your|his or her|their) hand to evolve/.test(lower)
@@ -1913,6 +1994,7 @@ export function parseAbility(text = '') {
   if (
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
+    !OPPONENT_ENERGY_TO_SELF.test(lower) &&
     !steps.some((s) => s.type === 'moveEnergyAbility')
   ) {
     if (/from your opponent's active pok[eé]mon to/.test(lower)) {
@@ -1997,6 +2079,15 @@ export function parseAbility(text = '') {
     steps.push({
       type: 'transferStatusAbility',
       guidance: 'Once during your turn: move a Special Condition from your Pokémon to the Defending Pokémon (as described).',
+    });
+  }
+
+  // Swirlix Festival Lead (customhb).
+  if (/if a stadium in play has an effect that can be used only once per turn, you may discard this pok[eé]mon to use that effect 1 additional time/.test(lower)) {
+    steps.length = 0;
+    steps.push({
+      type: 'festivalLeadAbility',
+      guidance: "Discard this Pokémon to use the Stadium's once-per-turn effect 1 more time this turn.",
     });
   }
 
@@ -2365,6 +2456,11 @@ export function parseAbility(text = '') {
   // Transformative Start searches the deck itself; Buzzap / Battery attach the card itself.
   if (steps.some((step) => step.type === 'transformAbility' && step.source === 'deck')) {
     steps = steps.filter((step) => step.type !== 'searchAbility');
+  }
+  // A deck search that attaches its own cards: the generic attach branch only echoes it, and a
+  // source-less attach does nothing in the executor.
+  if (steps.some((step) => step.type === 'searchAbility' && step.destination === 'attach')) {
+    steps = steps.filter((step) => step.type !== 'attachAbility' || step.fromHand || step.fromDiscard);
   }
   if (steps.some((step) => step.type === 'selfAttachEnergyAbility')) {
     steps = steps.filter((step) => step.type !== 'attachAbility');

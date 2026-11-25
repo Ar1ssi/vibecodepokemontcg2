@@ -5,12 +5,15 @@
  */
 
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
-import { isPokemon } from '../cards.mjs';
+import { isEnergy, isPokemon } from '../cards.mjs';
 import { attachedTrainerMarkers } from '../rules/legacy-attached-trainer.mjs';
-import { sideContextFor } from '../rules/ability-combat.mjs';
+import { isAbilitySuppressed, sideContextFor } from '../rules/ability-combat.mjs';
+import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { pokemonHasType } from '../effects/trainer-steps.mjs';
 import { liveAttackMarkers } from '../rules/attack-markers.mjs';
-import { effectiveHp } from '../rules/stadium-effects.mjs';
+import { replaceSelfName } from '../rules/attack-text.mjs';
+import { effectiveHp, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
+import { attachedToolMarkers, toolTypeOverride } from '../rules/tool-combat.mjs';
 import { isGxCard, isVstarCard } from '../rules/card-classify.mjs';
 import { evolvedView } from '../rules/evolved-pokemon.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
@@ -51,9 +54,29 @@ export function activeAttackMarkers(draft, playerId, card) {
       sourceZoneCards: draft.players[otherId]?.zones?.active || [],
     }),
     ...restOfGameMarkers(draft, playerId, card),
+    ...usedAttackVulnerability(draft, card),
     // I224: PlusPower / Defender / Magnifier attached to it, read as the same marker kinds.
     ...attachedTrainerMarkers(active, card),
+    // Head Ringer / Jamming Net: its Tools tax its own attacks (Jamming Tower switches them off).
+    ...(isStadiumToolNegation(draft.stadium?.card || draft.stadium || null) ? [] : attachedToolMarkers(active, card)),
   ];
+}
+
+// Carracosta Shell Smash (customcheck-014): "This Pokémon takes 20 more damage from attacks for each
+// time you have used this attack" lasts while the Pokémon stays in play, so it is read from the
+// printed attack and the uses reduce/attack.mjs counted rather than from a timed marker.
+const USED_ATTACK_VULNERABILITY = /this pok[ée]mon takes (\d+) more damage from attacks for each time you have used this attack/;
+
+function usedAttackVulnerability(draft, card) {
+  const uses = card?.attackUses;
+  if (!uses) return [];
+  const view = inPlayView(draft, card);
+  return (view?.attacks || []).flatMap((attack) => {
+    const text = replaceSelfName(String(attack?.text ?? attack?.effect ?? '').replace(/[‘’]/g, "'"), view.name).toLowerCase();
+    const per = USED_ATTACK_VULNERABILITY.exec(text)?.[1];
+    const count = uses[attack.name] || 0;
+    return per && count > 0 ? [{ kind: 'incomingBonus', amount: Number(per) * count, afterWR: true }] : [];
+  });
 }
 
 // "For the rest of this game, …" (design 036 E) read as the marker kinds the damage path knows:
@@ -76,7 +99,30 @@ export function inPlayView(state, card) {
   if (!card) return card;
   const ref = findCard(state, card.instanceId);
   const zone = ref?.player?.zones?.[ref.zoneId];
-  return Array.isArray(zone) ? evolvedView(zone, card) : card;
+  return Array.isArray(zone) ? withTypeChange(state, evolvedView(zone, card), card, zone, ref.playerId) : card;
+}
+
+const MULTITYPE_RE = /this pok[ée]mon's type changes based on the most recently attached energy/i;
+
+/**
+ * The types an in-play Pokémon has right now, when an effect changes them: Zeraora ex Plasma
+ * Fists' `typeOverride` marker ("treated as a {L} type"), or Arceus ex Multitype ("This Pokémon's
+ * type changes based on the most recently attached Energy"; customhb).
+ */
+function withTypeChange(state, view, card, zone, ownerId) {
+  if (!view) return view;
+  const marker = liveAttackMarkers(card, { turnNumber: state.turn?.number, zoneCards: zone }).findLast(
+    (m) => m.kind === 'typeOverride'
+  );
+  if (marker?.type) return { ...view, types: [marker.type] };
+  const stadium = state.stadium?.card || state.stadium || null;
+  const toolType = toolTypeOverride({ ...view, instanceId: card.instanceId }, zone, { blockTools: isStadiumToolNegation(stadium), stadium });
+  if (toolType) return { ...view, types: [toolType[0].toUpperCase() + toolType.slice(1)] };
+  const abilities = Array.isArray(view.abilities) ? view.abilities : [];
+  if (!abilities.some((a) => MULTITYPE_RE.test(String(a?.text ?? a?.effect ?? '')))) return view;
+  const latest = zone.filter((c) => c.attachedTo === card.instanceId && isEnergy(c)).at(-1);
+  if (!latest || isAbilitySuppressed(view, sideContextFor(state, ownerId))) return view;
+  return { ...view, types: [resolveAttachedEnergyType(latest)] };
 }
 
 // Context a special Energy's provision conditions read (energy-effects
@@ -96,6 +142,14 @@ export function energyProvisionContext(state, playerId, host) {
     hostPokemon: inPlayView(state, host),
     attachedCards: host ? zone.filter((c) => c.attachedTo === host.instanceId) : [],
     board: {
+      // Zygarde Aura Break (customhb): "{Y} Energy attached to your Pokémon also count as {D}
+      // Energy, and {D} Energy … also count as {Y} Energy" — [from, to] pairs from live holders.
+      energyAlsoCounts: energyAlsoCountsPairs(state, playerId, roots),
+      // Typhlosion Blazing Energy (effects/attack-steps.mjs abilityEnergyTypeThisTurn).
+      allEnergyType:
+        player?.flags?.allEnergyType && player.flags.allEnergyTypeTurn === (state.turn?.number ?? null)
+          ? player.flags.allEnergyType
+          : null,
       ownPrizes: (player?.zones?.prizes || []).length,
       opponentPrizes: (state.players?.[opponentId]?.zones?.prizes || []).length,
       ownStage2InPlay: roots.filter(
@@ -103,6 +157,31 @@ export function energyProvisionContext(state, playerId, host) {
       ).length,
     },
   };
+}
+
+/** Whether `playerId` has exactly one Pokémon in play (Togepi Egg Shell). */
+export function onlyPokemonInPlay(state, playerId) {
+  const zones = state.players?.[playerId]?.zones || {};
+  return [...(zones.active || []), ...(zones.bench || [])].filter((c) => !c.attachedTo && isPokemon(c)).length === 1;
+}
+
+const ALSO_COUNTS_RE =
+  /\{([a-z])\} energy attached to your pok[eé]mon also counts? as \{([a-z])\} energy(?:, and \{([a-z])\} energy attached to your pok[eé]mon also counts? as \{([a-z])\} energy)?/;
+const LETTER_TYPE = { g: 'Grass', r: 'Fire', w: 'Water', l: 'Lightning', p: 'Psychic', f: 'Fighting', d: 'Darkness', m: 'Metal', y: 'Fairy', n: 'Dragon', c: 'Colorless' };
+
+function energyAlsoCountsPairs(state, playerId, roots) {
+  const pairs = [];
+  let ctx = null;
+  for (const view of roots) {
+    const text = String((view?.abilities || []).map((a) => a?.text ?? a?.effect ?? '').join(' ')).toLowerCase();
+    const m = ALSO_COUNTS_RE.exec(text);
+    if (!m) continue;
+    ctx = ctx || sideContextFor(state, playerId);
+    if (isAbilitySuppressed(view, ctx)) continue;
+    pairs.push([LETTER_TYPE[m[1]], LETTER_TYPE[m[2]]]);
+    if (m[3]) pairs.push([LETTER_TYPE[m[3]], LETTER_TYPE[m[4]]]);
+  }
+  return pairs;
 }
 
 export const cardText = (card) =>

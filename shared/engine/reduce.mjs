@@ -4,7 +4,13 @@
  * Enforces Invariants 2, 3, 6, 7, 8.
  */
 
-import { clearDetachedCardMarkers, cloneGameState, findCard, createGameState } from './state.mjs';
+import {
+  clearDetachedCardMarkers,
+  cloneGameState,
+  findCard,
+  createGameState,
+  returnOffBoardCardsToOwners,
+} from './state.mjs';
 import { validateCommandShape } from './commands.mjs';
 import { createRng, withForcedCoin, withForcedCoinOnce } from './rng.mjs';
 import { abilityForcesOpponentTails } from './rules/ability-combat.mjs';
@@ -12,13 +18,17 @@ import { settleFossilCards } from './rules/fossil.mjs';
 import { settleRevealedHandCards } from './rules/revealed-hand.mjs';
 import { settleOpeningDraw } from './rules/opening-draw.mjs';
 import { stampRevealedArt } from './rules/reveal-picks.mjs';
+import { stampShownPokemonNames } from './rules/shown-pokemon.mjs';
 import { settleSpecialEnergyPassives } from './effects/special-energy.mjs';
-import { abilitySideContext } from './reduce/shared.mjs';
+import { abilitySideContext, setGameEnded } from './reduce/shared.mjs';
+import { TIME_OUT_REASON } from './homebrew-clock.mjs';
 import { validateReferences, validateLegality } from './reduce/legality.mjs';
 import { attackCommand } from './reduce/attack.mjs';
 import {
   settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves, settleToolEnergyBenchMoves,
+  settleAttackerEnergyToHand,
   settleKoHandDiscards,
+  settleBenchLimits,
   settleKoToolCounters,
   settlePrizeEntitlements, resolveDamageCounterKnockouts, takePrizesCommand,
   takePrizesByIndexCommand, promoteCommand,
@@ -26,6 +36,8 @@ import {
 import {
   discardBenchedAttachedTrainers, setupCommand, takeTurnCommand, loadDeckCommand, cardStatsCommand,
   applyAbilitySleepLocks,
+  applyAbilityStatusImmunity,
+  trackEnergyDiscards,
   applyStadiumStatusImmunity,
 } from './reduce/turn.mjs';
 import { retreatCommand } from './reduce/retreat.mjs';
@@ -113,6 +125,13 @@ function undoCommand({ payload, state }) {
   };
 }
 
+// Design 090: the acting player's homebrew clock hit 0:00, so the opponent wins.
+function timeOutCommand({ draft, playerId, events }) {
+  const winner = Object.keys(draft.players || {}).find((id) => id !== playerId) || null;
+  draft.pendingChoice = null;
+  setGameEnded(draft, { winner, reason: TIME_OUT_REASON, events });
+}
+
 export function applyCommand(state, command, rng = null) {
   if (!state || typeof state !== 'object') {
     return {
@@ -157,8 +176,8 @@ export function applyCommand(state, command, rng = null) {
     };
   }
 
-  // Step 2: Turn gate / PendingChoice gate
-  if (state.pendingChoice) {
+  // Step 2: Turn gate / PendingChoice gate (a time-out, design 090, ends the game mid-prompt)
+  if (state.pendingChoice && type !== 'timeOut') {
     if (type !== 'resolveChoice') {
       return {
         state,
@@ -436,6 +455,9 @@ export function applyCommand(state, command, rng = null) {
       break;
     case 'undo':
       return undoCommand({ payload, state });
+    case 'timeOut':
+      timeOutCommand({ draft, playerId, events });
+      break;
 
     default:
       break;
@@ -444,6 +466,8 @@ export function applyCommand(state, command, rng = null) {
   if (draft.rulesEnabled) {
     settleSpecialEnergyPassives(draft, { events });
     applyAbilitySleepLocks(draft, { events });
+    applyAbilityStatusImmunity(draft, { events });
+    trackEnergyDiscards(draft);
     applyStadiumStatusImmunity(draft, { events });
     discardBenchedAttachedTrainers(draft, { events });
   }
@@ -451,14 +475,17 @@ export function applyCommand(state, command, rng = null) {
   // Knock Out effects (Energy moves) resolve before the replacement Active is promoted.
   settleKoEnergyMoves(draft, { events });
   settleToolEnergyBenchMoves(draft);
+  settleAttackerEnergyToHand(draft, { events });
   settlePromotionChoices(draft, { events });
   settleKoHandDiscards(draft, { events });
   settleKoToolCounters(draft);
   settlePrizeEntitlements(draft, { events });
+  if (draft.rulesEnabled) settleBenchLimits(draft);
   stampActivePromotions(state, draft);
   stampHealedPokemon(state, draft);
   clearFaceDownOffBoard(draft);
   clearDetachedCardMarkers(draft);
+  returnOffBoardCardsToOwners(draft);
   settleFossilCards(draft);
   settleOpeningDraw(draft, { events });
   settleRevealedHandCards(state, draft, events, findCard);
@@ -467,6 +494,7 @@ export function applyCommand(state, command, rng = null) {
   // Design 059: a public reveal carries each card's art, so the opponent can draw a card
   // their view still shows face down (the revealed card is in its owner's hand).
   stampRevealedArt(events, (instanceId) => findCard(draft, instanceId)?.card?.src);
+  stampShownPokemonNames(state, draft, events);
 
   // Will is consumed by the first flip; clear the marker once it fired.
   if (willPlayerId && willCoinUsed?.value) {

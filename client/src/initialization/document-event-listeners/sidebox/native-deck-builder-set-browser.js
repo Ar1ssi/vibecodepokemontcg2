@@ -19,6 +19,7 @@ import {
       filterCardsByName,
       filterCardsBySupertype,
       sortCardsWithinGroup,
+      sortCustomSetCards,
       GENERATIONS,
       OTHER_151_SET_ID,
       BLACK_BOLT_WHITE_FLARE_SET_ID,
@@ -87,6 +88,7 @@ import { escapeHtml } from './native-deck-builder-shared-logic.js';
       let supertypeFilter = null;
       let expandedSetId = null;
       let activeCategory = 'standard';
+      let customSetSort = 'set';
       const cardsBySet = new Map(); // setId -> Card[] (loaded lazily)
       const pendingBySet = new Map(); // setId -> Promise<Card[]>
       // The deck builder's shared TCG Live filters (design 050). filterMatches
@@ -121,6 +123,11 @@ import { escapeHtml } from './native-deck-builder-shared-logic.js';
         '  <div class="native-deck-builder-set-browser-controls">',
         '    <input class="native-deck-builder-set-browser-filter" type="text"',
         '      placeholder="Filter by card name..." aria-label="Filter cards by name" />',
+        '    <select class="native-deck-builder-search-select native-deck-builder-set-browser-sort" aria-label="Sort custom set cards" title="Card number stands in for date added" hidden>',
+        '      <option value="set">Set order</option>',
+        '      <option value="newest">Newest added</option>',
+        '      <option value="oldest">Oldest added</option>',
+        '    </select>',
         '    <button id="nativeDeckBuilderBrowseFiltersButton" class="native-deck-builder-filters-button" type="button" aria-controls="nativeDeckBuilderFilterDrawer" aria-expanded="false">Filters <span class="native-deck-builder-filters-count" data-filters-count hidden>0</span></button>',
         '  </div>',
         '</div>',
@@ -134,6 +141,7 @@ import { escapeHtml } from './native-deck-builder-shared-logic.js';
       const tabsEl = panelEl.querySelector('.native-deck-builder-set-browser-tabs');
       const resultsEl = panelEl.querySelector('.native-deck-builder-set-browser-results');
       const filterInput = panelEl.querySelector('.native-deck-builder-set-browser-filter');
+      const customSortSelect = panelEl.querySelector('.native-deck-builder-set-browser-sort');
 
       const showStatus = (message) => {
         statusEl.textContent = message;
@@ -345,11 +353,13 @@ import { escapeHtml } from './native-deck-builder-shared-logic.js';
                 if (expanded) {
                   const cardsHtml = filtered.length
                     ? renderCardsGrid(
-                        // These Other-tab sets arrive in their own order; number order would undo it. So does a custom
-                        // set: its set.json lists the cards in the order its editor wants them shown (ids stay).
-                        KEEP_FETCH_ORDER_SET_IDS.has(set.setId) || isCustomSetId(set.setId)
-                          ? filtered
-                          : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
+                        // These Other-tab sets arrive in their own order; number order would undo it. A custom set
+                        // keeps its set.json order (the editor's) unless the sort picker asks for newest/oldest added.
+                        isCustomSetId(set.setId)
+                          ? sortCustomSetCards(filtered, customSetSort)
+                          : KEEP_FETCH_ORDER_SET_IDS.has(set.setId)
+                            ? filtered
+                            : sortCardsWithinGroup(filtered, { sortBy: 'number', sortDirection: 'asc' }),
                         quantities,
                         owned
                       )
@@ -514,11 +524,16 @@ import { escapeHtml } from './native-deck-builder-shared-logic.js';
         filterTerm = filterInput.value;
         render();
       });
+      customSortSelect.addEventListener('change', () => {
+        customSetSort = customSortSelect.value;
+        render();
+      });
 
       const categoryPills = panelEl.querySelectorAll('.native-deck-builder-set-browser-series-tag[data-category]');
       const setCategory = (category) => {
         activeCategory = category;
         expandedSetId = null;
+        customSortSelect.hidden = category !== CUSTOM_CATEGORY && category !== HOMEBREW_SETS_CATEGORY;
         categoryPills.forEach((pill) => {
           pill.classList.toggle('active', pill.dataset.category === category);
         });

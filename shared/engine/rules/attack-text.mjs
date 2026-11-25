@@ -64,7 +64,8 @@ const TYPE_WORD_LIST = new RegExp(
   'gi'
 );
 // "Rotom's type is Water until …" (Type Shift), "can use the Double-Edge attack for Psychic".
-const TYPE_WORD_AFTER = new RegExp(`(?<=\\b(?:type is|type becomes|attack for) )(?:${TYPE_WORD})\\b`, 'gi');
+// Espurr Perplexing Eyes (TCGdex sm3-59): "Weakness is now Psychic".
+const TYPE_WORD_AFTER = new RegExp(`(?<=\\b(?:type is|type becomes|attack for|weakness is now|resistance is now) )(?:${TYPE_WORD})\\b`, 'gi');
 // Newer TCGdex printings (30th-109 Salamence ex) wrap each symbol in markup:
 // `<span class="energy-symbol Dragon" title="Dragon">Dragon</span>`.
 const ENERGY_SYMBOL_SPAN = new RegExp(`<span[^>]*energy-symbol[^>]*>\\s*(${TYPE_WORD})\\s*</span>`, 'gi');
@@ -76,8 +77,13 @@ const symbolOf = (word) => `{${TYPE_WORD_SYMBOLS[word.toLowerCase()]}}`;
  * reads one notation (ea389d92 did the same for special Energy). Case is kept.
  */
 export function symbolizeTypeWords(text) {
+  return symbolizeTypeWordsOnly(canonicalEffectWording(text));
+}
+
+/** symbolizeTypeWords without the wording canonicalization (readers keyed to printed phrasing). */
+export function symbolizeTypeWordsOnly(text) {
   const each = new RegExp(`(?:${TYPE_WORD})`, 'gi');
-  return canonicalEffectWording(text)
+  return String(text ?? '')
     .replace(ENERGY_SYMBOL_SPAN, (_, word) => symbolOf(word))
     .replace(TYPE_WORD_RUN, (run) => run.replace(each, symbolOf))
     .replace(TYPE_WORD_LIST, (list) => list.replace(each, symbolOf))

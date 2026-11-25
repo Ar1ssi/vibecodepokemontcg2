@@ -1180,6 +1180,59 @@ body.dark-mode-1 .public-room-format {
   font-size: 1.5vh;
   cursor: pointer;
 }
+/* Design 090: the homebrew clock — the pre-deal toggle, then both banks. */
+#homebrewClockPanel {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 2px solid #61cea4;
+  border-radius: 10px;
+  background: #eef8f4;
+  color: black;
+  font-size: 1.6vh;
+}
+#homebrewClockPanel[hidden] {
+  display: none;
+}
+#homebrewClockPanel[data-mode='clock'] {
+  display: flex;
+  gap: 8px;
+}
+.homebrew-clock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.homebrew-clock-hint {
+  margin: 4px 0 0;
+  font-size: 1.4vh;
+}
+.homebrew-clock-row {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 8px;
+  border-radius: 8px;
+  opacity: 0.6;
+}
+.homebrew-clock-row[data-running='true'] {
+  opacity: 1;
+  background: #61cea4;
+  font-weight: bold;
+}
+.homebrew-clock-row[data-low='true'] .homebrew-clock-time {
+  color: #9e3c53;
+}
+.homebrew-clock-row[data-out='true'] {
+  opacity: 1;
+  background: #f3c6d0;
+}
+.homebrew-clock-time {
+  font-variant-numeric: tabular-nums;
+}
 .room-format-blocked {
   margin: 6px 0 0;
   color: #9e3c53;
@@ -2744,6 +2797,11 @@ body.deck-builder-window #nativeDeckBuilderWorkspace .native-deck-builder-pane-s
 .card-picker-filter.is-active {
   background: #f5d547;
   color: #1a1a1a;
+}
+/* ALL tab: the rest of the pile is shown for reference but can't be picked. */
+.card-picker-slide.is-unpickable {
+  filter: grayscale(0.85) brightness(0.55);
+  cursor: not-allowed;
 }
 
 /* Browse mode (discard pile) — large cards, centered */
@@ -4904,10 +4962,11 @@ body.side-menu-collapsed .opp {
 }
 
 /* View Board (view-board-toggle.mjs): the menu turns see-through except its own
-   Back button; the overlay still blocks the board underneath. */
+   Back button, and clicks pass to the board, which only inspects while viewing. */
 .is-viewing-board,
 .is-viewing-board * {
   visibility: hidden;
+  pointer-events: none;
 }
 .card-picker-overlay.is-viewing-board,
 .choice-modal-overlay.is-viewing-board {
@@ -4917,6 +4976,7 @@ body.side-menu-collapsed .opp {
 }
 .is-viewing-board .view-board-button {
   visibility: visible;
+  pointer-events: auto;
 }
 
 /* Pending-choice overlays block the board, never the side menu: Reset, chat and

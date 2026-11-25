@@ -17,6 +17,8 @@
  */
 
 import { hasCardMarker } from './card-markers.mjs';
+import { printingIds } from './paradox-tags.mjs';
+import { isCustomCardId } from '../../custom-sets/custom-set-schema.mjs';
 
 const lower = (value) => String(value ?? '').toLowerCase();
 
@@ -54,8 +56,17 @@ export function isUltraBeastCard(card = {}) {
 // The printed suffix needs a separator ("Cetitan ex", "M Venusaur-EX") — a bare
 // `endsWith('ex')` also matched plain names like "Toxapex", mis-classifying them
 // as rule-box ex (App. 8). Same separator rule for GX for symmetry.
+// A custom-set (homebrew) card is any whose printing id is a custom id ("customhb-470").
+const isHomebrewCard = (card) => printingIds(card).some(isCustomCardId);
+
+// Homebrew VMAX is built as an ex: it counts as ex and takes 2 Prizes, not VMAX's 3.
+export function isHomebrewVmaxCard(card = {}) {
+  return isVmaxCard(card) && isHomebrewCard(card);
+}
+
 export function isExCard(card = {}) {
   if (hasSubtype(card, 'ex')) return true;
+  if (isHomebrewVmaxCard(card)) return true;
   return /(?:^|[\s-])ex$/i.test(nameOf(card));
 }
 
@@ -98,6 +109,9 @@ export function isVCard(card = {}) {
 
 export function isTeraCard(card = {}) {
   if (hasSubtype(card, 'tera')) return true;
+  // Homebrew Tera (customhb "TERAHB" stage, evolution.mjs): no printed id in the marker table, and
+  // the client's cardStats sends a Pokémon's stage but not its subtypes.
+  if (collapse(card?.stage) === 'terahb') return true;
   if (hasCardMarker(card, 'Tera')) return true;
   const text = textOf(card);
   if (
@@ -222,12 +236,12 @@ export function isRuleBoxPokemon(card = {}) {
 }
 
 // ── prizes ─────────────────────────────────────────────────────────────────
-// 3: VMAX / TAG TEAM / V-UNION / modern Mega Evolution Pokémon ex.  2: ex /
+// 3: VMAX (not homebrew VMAX: that is an ex) / TAG TEAM / V-UNION / modern Mega Evolution Pokémon ex.  2: ex /
 // GX / V / VSTAR / legacy Mega (Gen 6 "M …-EX") / homebrew Mega / LEGEND / Double Rare.
 // 1: everything else. (App. 1, 10, 14, 16, 19, 26.)
 export function prizesForKO(card = {}) {
   if (
-    isVmaxCard(card) ||
+    (isVmaxCard(card) && !isHomebrewVmaxCard(card)) ||
     isTagTeamCard(card) ||
     isVUnionCard(card) ||
     (isModernMegaCard(card) && !isHomebrewMegaCard(card))

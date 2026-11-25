@@ -387,3 +387,66 @@ test('SE13e: Growing Grass HP reads the evolved top card, not the Basic', () => 
   assert.equal(findCard(res.state, 1).card.damage, 120);
   assert.ok(res.state.players.p1.zones.active.some((c) => c.instanceId === 1), '120 damage < 130 HP: still in play');
 });
+
+// Temple of Sinnoh (customhb-577, set.json "effect" text): "All Special Energy attached to Pokémon
+// (both yours and your opponent's) provide {C} Energy and have no other effect." Found in the
+// 2026-11-21 public:1 log: Tapu Fini's Whirlpool (customhb-537, "Your opponent's Active Pokémon is
+// now Confused") left a Swinub holding Rocky Fighting Energy unconfused with Temple in play.
+const TEMPLE =
+  "All Special Energy attached to Pokémon (both yours and your opponent's) provide {C} Energy and have no other effect.";
+const ROCKY =
+  'As long as this card is attached to a Pokémon, it provides {F} Energy. Prevent all effects of attacks used by your opponent’s Pokémon done to the {F} Pokémon this card is attached to. (Existing effects are not removed. Damage is not an effect.)';
+const WHIRLPOOL = {
+  name: 'Whirlpool',
+  damage: 100,
+  cost: [],
+  text: "Your opponent's Active Pokémon is now Confused. During your opponent's next turn, the Defending Pokémon can't retreat .",
+};
+
+function whirlpoolIntoRocky({ stadium }) {
+  const state = game();
+  state.players.p1.zones.active.push(pokemon({ instanceId: 1, name: 'Tapu Fini', hp: 110, attacks: [WHIRLPOOL] }));
+  state.players.p2.zones.active.push(
+    pokemon({ instanceId: 9, name: 'Swinub', hp: 150, types: ['Fighting'] }),
+    specialEnergy({ instanceId: 10, name: 'Rocky Fighting Energy', text: ROCKY, attachedTo: 9 })
+  );
+  if (stadium) state.stadium = createCard({ instanceId: 20, name: 'Temple of Sinnoh', supertype: 'Trainer', trainerType: 'Stadium', text: TEMPLE });
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+  assert.equal(res.error, null);
+  return findCard(res.state, 9).card;
+}
+
+test('Temple of Sinnoh: Rocky Fighting Energy no longer shields its host from an attack’s Confusion', () => {
+  const defender = whirlpoolIntoRocky({ stadium: true });
+  assert.equal(defender.damage, 100);
+  assert.equal(hasCondition(defender, 'Confused'), true);
+});
+
+test('Rocky Fighting Energy still shields its host when no Temple of Sinnoh is in play', () => {
+  const defender = whirlpoolIntoRocky({ stadium: false });
+  assert.equal(defender.damage, 100, 'damage is not an effect');
+  assert.equal(hasCondition(defender, 'Confused'), false);
+});
+
+test('Temple of Sinnoh blanks every Special Energy modifier the helpers read', async () => {
+  const { stadiumBlanksSpecialEnergy, hasSpecialEnergyNoWeakness, hasSpecialEnergyFreeRetreat, getSpecialEnergyHpBonus } =
+    await import('../rules/special-energy-parse.mjs');
+  const temple = createCard({ instanceId: 20, name: 'Temple of Sinnoh', supertype: 'Trainer', trainerType: 'Stadium', text: TEMPLE });
+  assert.equal(stadiumBlanksSpecialEnergy(temple), true);
+  assert.equal(stadiumBlanksSpecialEnergy({ card: temple }), true, 'rules-state { card } wrapper');
+  assert.equal(stadiumBlanksSpecialEnergy(null), false);
+  assert.equal(stadiumBlanksSpecialEnergy(createCard({ name: 'Fighting Stadium', text: 'Fighting Pokémon get +30 HP.' })), false);
+
+  const host = pokemon({ instanceId: 1, name: 'Steelix', types: ['Metal'] });
+  const zone = [
+    host,
+    specialEnergy({ instanceId: 2, name: 'Coating Metal Energy', text: COATING, attachedTo: 1 }),
+    specialEnergy({ instanceId: 3, name: 'Magnetic Metal Energy', text: MAGNETIC, attachedTo: 1 }),
+    specialEnergy({ instanceId: 4, name: 'Growing Grass Energy', text: GROWING, attachedTo: 1 }),
+  ];
+  assert.equal(hasSpecialEnergyNoWeakness(host, zone), true);
+  assert.equal(hasSpecialEnergyNoWeakness(host, zone, temple), false);
+  assert.equal(hasSpecialEnergyFreeRetreat(host, zone), true);
+  assert.equal(hasSpecialEnergyFreeRetreat(host, zone, temple), false);
+  assert.equal(getSpecialEnergyHpBonus(host, zone, temple), 0);
+});

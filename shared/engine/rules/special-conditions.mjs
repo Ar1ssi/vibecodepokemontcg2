@@ -10,7 +10,7 @@
 // Older state can still hold 'Poisoned'/'Burned' in `specialCondition`; readers
 // treat that as the marker and every write here moves it into the marker key.
 
-import { abilityStatusImmune } from './ability-combat.mjs';
+import { abilityStatusImmune, abilityBouncesConditions } from './ability-combat.mjs';
 
 export const MARKER_KEYS = { Poisoned: 'poisoned', Burned: 'burned' };
 export const ROTATION_CONDITIONS = ['Asleep', 'Confused', 'Paralyzed'];
@@ -52,7 +52,13 @@ export function addCondition(card, condition) {
   // "This Pokémon can't be affected by any Special Conditions" (Garganacl ex,
   // Hoothoot, Pachirisu, Slowpoke, Dachsbun) refuses the write here, the one
   // place every effect path goes through (design 034 slice 3).
-  if (abilityStatusImmune(card, condition)) return false;
+  if (abilityStatusImmune(card, condition)) {
+    // Hatterene Magic Bounce (customhb): "If an effect would make this Pokémon <condition>, your
+    // opponent's Active Pokémon is affected by that Special Condition instead." addCondition has
+    // no board; the post-command sweep (reduce/turn.mjs applyMagicBounce) moves it across.
+    if (abilityBouncesConditions(card)) card.bouncedConditions = [...(card.bouncedConditions || []), condition];
+    return false;
+  }
   // Rare / Antique Fossils: "This card can't be affected by any Special Conditions."
   if (card.fossilNoConditions) return false;
   if (isMarker(condition)) {

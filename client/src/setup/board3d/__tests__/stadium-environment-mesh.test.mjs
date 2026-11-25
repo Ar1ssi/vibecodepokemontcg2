@@ -275,6 +275,40 @@ test('drawPlate redraws the plate only when it is stale: a time step, a camera, 
   environment.dispose();
 });
 
+test('the plate pass leaves the shadow map alone: a redraw the board frame asked for stays pending', async () => {
+  const three = await import('../../../vendor/three/three.module.min.js');
+  let target = null;
+  const shadowMap = { autoUpdate: false, needsUpdate: false };
+  const flagsWhilePlateDrawn = [];
+  const renderer = {
+    extensions: { has: () => true },
+    compile: () => {},
+    shadowMap,
+    getRenderTarget: () => target,
+    setRenderTarget: (next) => {
+      target = next;
+    },
+    render: () => {
+      if (target) flagsWhilePlateDrawn.push(shadowMap.autoUpdate || shadowMap.needsUpdate);
+    },
+    getPixelRatio: () => 1,
+    getDrawingBufferSize: (out) => out.set(1920, 1080),
+  };
+  const environment = createStadiumEnvironment({ three, renderer, parent: new three.Group(), isHidden: () => true });
+  const camera = new three.PerspectiveCamera();
+  environment.setLayout(layout);
+  environment.setKey('perilous-jungle');
+  environment.update(1000, camera);
+  environment.update(3000 + INTRO_MS + 400, camera);
+  // A card moved: the board asks for a shadow redraw, then draws the plate first.
+  shadowMap.needsUpdate = true;
+  environment.drawPlate(new three.Scene(), camera);
+  assert.ok(flagsWhilePlateDrawn.length > 0, 'the plate is drawn');
+  assert.ok(flagsWhilePlateDrawn.every((due) => !due), 'the plate (no cards on its layer) never redraws the shadow map');
+  assert.equal(shadowMap.needsUpdate, true, 'the board pass still redraws it, with the cards');
+  environment.dispose();
+});
+
 test('createStadiumEnvironment starts the reveal on the frame after the one that compiles its shaders', async () => {
   const three = await import('../../../vendor/three/three.module.min.js');
   let compiles = 0;

@@ -11,7 +11,7 @@ import { shuffleInPlace } from '../rng.mjs';
 import { formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { isAttachedAsTool, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isUltraBeastCard, isRuleBoxPokemon, isVCard, isVmaxCard } from '../rules/card-classify.mjs';
+import { isGxCard, isUltraBeastCard, isRuleBoxPokemon, isVCard, isVmaxCard } from '../rules/card-classify.mjs';
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
@@ -22,8 +22,8 @@ import {
   copyConditions,
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
-import { clearAttackMarkers, healLocked } from '../rules/attack-markers.mjs';
-import { stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
+import { clearAttackMarkers, healLocked, liveAttackMarkers } from '../rules/attack-markers.mjs';
+import { classifyStadiumEffect, stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   evolvedView,
   topPokemonCard as topOfStack,
@@ -151,13 +151,13 @@ export function zoneOfRoot(player, root) {
  * effects: 'effect' (Mist/Rocky/Wash/Wonder, attack effects) or 'ability'
  * (Fusion Strike, opponent Abilities). Reads the top of an evolution stack.
  */
-export function specialEnergyShielded(player, root, kind = 'effect') {
+export function specialEnergyShielded(player, root, kind = 'effect', stadium = null) {
   const zone = zoneOfRoot(player, root);
   if (!zone || !root) return false;
   const view = evolvedView(zone, root);
   return kind === 'ability'
-    ? hasSpecialEnergyAbilityShield(view, zone)
-    : hasSpecialEnergyEffectShield(view, zone);
+    ? hasSpecialEnergyAbilityShield(view, zone, stadium)
+    : hasSpecialEnergyEffectShield(view, zone, stadium);
 }
 
 /**
@@ -179,11 +179,16 @@ export function cardEffectSource(effectType, sourceCard) {
 /**
  * Origin Forme Dialga ex Temporal Freeze: "Trainer cards and Abilities can't affect either Active
  * Pokémon", for both sides until `effectFreezeUntilTurn`. Position-based, so a promoted Active is covered.
+ * Giratina ex Shadow Force (customhb) "This Pokémon can't be affected by Trainer cards or Abilities":
+ * a `cardEffectImmunity` marker on that Pokémon, live while it stays Active.
  */
 function freezeShields(draft, owner, root, source) {
   if (!owner || !root || !['Item', 'Supporter', 'Stadium', 'Ability'].includes(source)) return false;
-  if (!(owner.effectFreezeUntilTurn >= (draft?.turn?.number || 1))) return false;
-  return (owner.zones?.active || []).includes(root) && !root.attachedTo;
+  const active = owner.zones?.active || [];
+  if (!active.includes(root) || root.attachedTo) return false;
+  const turnNumber = draft?.turn?.number || 1;
+  if (owner.effectFreezeUntilTurn >= turnNumber) return true;
+  return liveAttackMarkers(root, { turnNumber, zoneCards: active }).some((m) => m.kind === 'cardEffectImmunity');
 }
 
 /** Whether an Ability on `owner`'s side shields its in-play `root` from `source` (I219). */
@@ -209,7 +214,7 @@ export function effectShieldBlocks(ctx, side, root) {
   // Card and Ability shields name the opponent's; Lunatone's "any Stadium" includes its own side's.
   // Temporal Freeze guards both Active Pokémon, the attacker's own included.
   if (side === ctx.player && source !== 'Stadium') return freezeShields(ctx.draft, side, root, source);
-  if (source === 'Ability' && specialEnergyShielded(side, root, 'ability')) return true;
+  if (source === 'Ability' && specialEnergyShielded(side, root, 'ability', ctx.draft.stadium)) return true;
   return cardEffectShielded(ctx.draft, { owner: side, root, source });
 }
 
@@ -407,8 +412,16 @@ export function rootMatchesTarget(player, root, target = '') {
   // "1 of your Pokémon V" (Melony) / "Pokémon VMAX" (Rose): isVCard covers V, VMAX, VSTAR, V-UNION.
   if (/\bpok[eé]mon vmax\b/.test(t) && !isVmaxCard(top)) return false;
   if (/\bpok[eé]mon v\b/.test(t) && !isVCard(top)) return false;
-  const typed = t.match(/\{([a-z])\}/);
-  if (typed && typed[1] !== 'c') return pokemonHasType(top, typed[1]);
+  // "your {P} Pokémon and {M} Pokémon" (X-Boot): a Pokémon of any listed type.
+  const typed = [...t.matchAll(/\{([a-z])\}/g)].map((m) => m[1]).filter((letter) => letter !== 'c');
+  // Archeops Primal Turbo (customcheck-017): "your {C} Pokémon" is the Colorless type, not any Pokémon.
+  const wantsColorless = /\{c\}\s+pok[eé]mon/.test(t);
+  if (typed.length > 0 || wantsColorless) {
+    return (
+      typed.some((letter) => pokemonHasType(top, letter)) ||
+      (wantsColorless && (top.types || []).some((type) => String(type).toLowerCase() === 'colorless'))
+    );
+  }
   return true;
 }
 
@@ -1467,6 +1480,15 @@ function returnOwnAttachedEnergy(ctx) {
 // Celadon City Gym: discard an Energy attached to a qualifying Pokémon to cure it.
 // `selfOnly`: an Ability's cost from its own Pokémon (Goodra Gooey Regeneration; `special`:
 // Porygon-Z-GX Troubleshooting).
+// Basic Energy carries its type in the printed name; some printings also set `types` (the same
+// reading as executor.mjs matchesEnergyTypeFilter, which this module cannot import).
+function energyMatchesTypes(card, energyTypes) {
+  if (!Array.isArray(energyTypes) || energyTypes.length === 0) return true;
+  const name = String(card?.name || '').toLowerCase();
+  const types = (Array.isArray(card?.types) ? card.types : []).map((t) => String(t).toLowerCase());
+  return energyTypes.some((type) => types.includes(type) || name.includes(type));
+}
+
 function discardOwnAttachedEnergy(ctx) {
   const { player, step } = ctx;
   const self = step.selfOnly ? sourceRoot(ctx) : null;
@@ -1475,7 +1497,13 @@ function discardOwnAttachedEnergy(ctx) {
   );
   const attached = hosts
     .flatMap((root) => attachedCards(player, root.instanceId))
-    .filter((card) => isEnergy(card) && (!step.special || isSpecialEnergy(card)));
+    .filter(
+      (card) =>
+        isEnergy(card) &&
+        (!step.special || isSpecialEnergy(card)) &&
+        (!step.basicOnly || isBasicEnergy(card)) &&
+        energyMatchesTypes(card, step.energyTypes)
+    );
 
   const applyDiscard = (energy) => {
     const host = hosts.find((root) => root.instanceId === energy.attachedTo);
@@ -1594,7 +1622,7 @@ function damageCounters(ctx) {
   // Energy prevents them on its host. Trainers keep the effect shield's own path.
   const shieldKind = step.abilityShield && onOpponent ? 'ability' : null;
   const shieldBlocks = (root) => {
-    if (!shieldKind || !specialEnergyShielded(side, root, shieldKind)) return false;
+    if (!shieldKind || !specialEnergyShielded(side, root, shieldKind, ctx.draft.stadium)) return false;
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: root.instanceId,
@@ -1603,14 +1631,19 @@ function damageCounters(ctx) {
     return true;
   };
   const targets = (/active/i.test(step.target || '') ? [activeOf(side)].filter(Boolean) : rootsOf(side)).filter(
-    (root) => !shieldBlocks(root) && !effectShieldBlocks(ctx, side, root)
+    (root) =>
+      (!step.gxExOnly || isGxOrEx(topPokemonCard(side, root) || root)) &&
+      !shieldBlocks(root) &&
+      !effectShieldBlocks(ctx, side, root)
   );
 
-  const apply = (card) => {
-    card.damage = (card.damage || 0) + amount;
+  const apply = (card, placed = amount) => {
+    card.damage = (card.damage || 0) + placed;
     ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage });
     markCountersPlaced(ctx, card, victimPlayerId, attackerPlayerId);
   };
+
+  if (step.distribute) return distributeDamageCounters(ctx, targets, (card) => apply(card, 10));
 
   // "choose 2 of your opponent's Pokémon and put 2 damage counters on each of them"
   const targetCount = step.targetCount || 1;
@@ -1620,7 +1653,7 @@ function damageCounters(ctx) {
   }
   if (targets.length === 0) return skip(ctx, 'no_target');
   if (targets.length <= targetCount) {
-    targets.forEach(apply);
+    targets.forEach((card) => apply(card));
     return null;
   }
   const which = targetCount > 1 ? `${targetCount} Pokémon` : 'a Pokémon';
@@ -1629,6 +1662,29 @@ function damageCounters(ctx) {
     options: targets,
     min: targetCount,
     max: targetCount,
+  });
+}
+
+const isGxOrEx = (card) => isGxCard(card) || /-EX$/.test(String(card?.name || ''));
+
+// "Put 6 damage counters on your opponent's Pokémon in any way you like": one counter per pick,
+// so the player splits them freely; `memo.remaining` carries the count across prompts.
+function distributeDamageCounters(ctx, targets, placeOne) {
+  let remaining = ctx.memo?.remaining ?? (ctx.step.count || 1);
+  if (ctx.selection) {
+    const [card] = pickById(targets, ctx.selection);
+    if (!card) return skip(ctx, 'target_not_found');
+    placeOne(card);
+    remaining -= 1;
+  }
+  if (remaining <= 0) return null;
+  if (targets.length === 0) return skip(ctx, 'no_target');
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Put a damage counter on 1 of your opponent's Pokémon (${remaining} left)`,
+    options: targets,
+    min: 1,
+    max: 1,
+    memo: { remaining },
   });
 }
 
@@ -1683,7 +1739,7 @@ function moveOwnDamageToOpponent(ctx) {
   // Fusion Strike Energy: the counters an opponent's Ability would place on its host
   // are prevented, so the host is not a legal destination.
   const destinations = rootsOf(opponent).filter((root) => {
-    if (!specialEnergyShielded(opponent, root, 'ability')) return !effectShieldBlocks(ctx, opponent, root);
+    if (!specialEnergyShielded(opponent, root, 'ability', ctx.draft.stadium)) return !effectShieldBlocks(ctx, opponent, root);
     ctx.events.push({
       type: 'damagePrevented',
       instanceId: root.instanceId,
@@ -1770,7 +1826,7 @@ function returnPokemonToHand(ctx) {
     const returnRoot = (root) => {
       for (const card of [root, ...attachedCards(opponent, root.instanceId)]) {
         removeFromZones(opponent, card);
-        card.attachedTo = null;
+        resetLeftPlay(card);
         opponent.zones.hand.push(card);
       }
       ctx.events.push({
@@ -1796,7 +1852,7 @@ function returnPokemonToHand(ctx) {
     });
   }
 
-  const roots = rootsOf(player);
+  const roots = rootsOf(player).filter((root) => returnLimitsAllow(player, root, step));
 
   if (ctx.memo?.phase === 'promote') return promoteChosenActive(ctx);
 
@@ -1806,7 +1862,8 @@ function returnPokemonToHand(ctx) {
     const wasActive = zoneIdOf(player, root) === 'active';
     for (const card of [root, ...attachedCards(player, root.instanceId)]) {
       removeFromZones(player, card);
-      card.attachedTo = null;
+      // Acerola: the Pokémon comes back to the hand as a fresh card, without its damage counters.
+      resetLeftPlay(card);
       const keep = step.keepAttached || isPokemon(card);
       if (keep) player.zones.hand.push(card);
       else discardCardToPlayerZone(player, card);
@@ -1816,7 +1873,7 @@ function returnPokemonToHand(ctx) {
   }
 
   // The Active may only be picked up when a Benched Pokémon can replace it.
-  const options = benchRootsOf(player).length > 0 ? roots : benchRootsOf(player);
+  const options = benchRootsOf(player).length > 0 ? roots : roots.filter((root) => zoneIdOf(player, root) === 'bench');
   if (options.length === 0) return skip(ctx, 'no_pokemon');
   return ctx.ask({
     prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your Pokémon to put into your hand`,
@@ -1831,6 +1888,22 @@ function promoteChosenActive(ctx) {
   const newActive = benchRootsOf(ctx.player).find((c) => c.instanceId === ctx.selection?.[0]);
   if (newActive) promoteToActive(ctx.player, newActive, ctx.events, ctx.draft?.turn?.number);
   return null;
+}
+
+// Pokémon SP carry their owner's mark after the name: G, GL, FB, C or 4 (Garchomp C LV.X).
+const POKEMON_SP_NAME = / (?:G|GL|FB|C|4)(?: LV\.X)?$/;
+
+const colorless = (card) => (card.types || []).some((type) => String(type).toLowerCase() === 'colorless');
+
+// The printed limits of a returnPokemonToHand step (trainer-effects.mjs returnPokemonLimits).
+function returnLimitsAllow(player, root, step) {
+  const top = topPokemonCard(player, root) || root;
+  if (step.damagedOnly && !(root.damage > 0)) return false;
+  if (step.basicOnly && stageOf(top) !== 'Basic') return false;
+  if (step.pokemonType && !(step.pokemonType === 'c' ? colorless(top) : pokemonHasType(top, step.pokemonType))) return false;
+  if (step.excludeVGx && (isVCard(top) || isGxCard(top))) return false;
+  if (step.spOnly && !POKEMON_SP_NAME.test(String(top.name || ''))) return false;
+  return true;
 }
 
 function promoteToActive(player, benchRoot, events, turnNumber = 1) {
@@ -2504,13 +2577,47 @@ function healPerHeads(ctx) {
   });
 }
 
-// Pokédex / New Pokédex — the player reorders the top N cards of their deck.
+// Pseudo-option ids for Rotom Dex's "put them back in any order or shuffle them into your deck".
+const REARRANGE_ORDER = -21;
+const REARRANGE_SHUFFLE = -22;
+
+// Pokédex / New Pokédex — the player reorders the top N cards of their deck. Rotom Dex—Poké Finder
+// Mode (sm3-122, `orShuffle`) may instead shuffle them into the deck.
 function rearrangeTop(ctx) {
   const { player, step } = ctx;
   const deck = player.zones.deck || [];
   const count = Math.min(step.count || 0, deck.length);
-  if (count <= 1) return null;
+  if (count <= 1 && !step.orShuffle) return null;
   const viewed = deck.slice(0, count);
+
+  if (step.orShuffle && !ctx.memo?.ordering) {
+    if (ctx.selection?.[0] === REARRANGE_SHUFFLE) {
+      if (ctx.activeRng) shuffleInPlace(ctx.activeRng, deck);
+      ctx.events.push({ type: 'deckShuffled', playerId: player.playerId });
+      return null;
+    }
+    if (ctx.selection?.[0] === REARRANGE_ORDER) {
+      if (count <= 1) return null;
+      return ctx.ask({
+        prompt: `${sourceName(ctx, 'Trainer')}: Choose the order of the top ${count} cards (first is on top)`,
+        options: viewed,
+        min: count,
+        max: count,
+        memo: { ordering: true },
+      });
+    }
+    if (count === 0) return null;
+    ctx.events.push({ type: 'cardsLookedAt', playerId: player.playerId, count });
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Put the top ${count} cards back in any order, or shuffle them into your deck?`,
+      options: [
+        { instanceId: REARRANGE_ORDER, name: 'Put back in any order', type: 'option' },
+        { instanceId: REARRANGE_SHUFFLE, name: 'Shuffle into deck', type: 'option' },
+      ],
+      min: 1,
+      max: 1,
+    });
+  }
 
   if (ctx.selection) {
     const byId = new Map(viewed.map((c) => [c.instanceId, c]));
@@ -2985,9 +3092,9 @@ function discardOwnBenchPokemon(ctx) {
   if (bench.length === 0) return skip(ctx, 'no_matching_bench');
   const count = Math.min(step.count || 1, bench.length);
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${count} Benched Pokémon to discard`,
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${step.required ? '' : 'up to '}${count} Benched Pokémon to discard`,
     options: bench,
-    min: 0,
+    min: step.required ? count : 0,
     max: count,
   });
 }
@@ -3963,6 +4070,25 @@ function winGameAbility(ctx) {
   return null;
 }
 
+/**
+ * Swirlix Festival Lead (customhb): "If a Stadium in play has an effect that can be used only once
+ * per turn, you may discard this Pokémon to use that effect 1 additional time." Discarding this
+ * Pokémon (and its attached cards) frees the player's Stadium use for this turn again.
+ */
+function festivalLeadAbility(ctx) {
+  const { player, draft } = ctx;
+  const stadium = draft.stadium?.card || draft.stadium;
+  if (!stadium || classifyStadiumEffect(stadium) !== 'once-per-turn') return skip(ctx, 'no_once_per_turn_stadium');
+  if (!player.flags?.stadiumUsedThisTurn) return skip(ctx, 'stadium_not_used');
+  const holder = rootsOf(player).find((c) => c.instanceId === ctx.sourceCard?.instanceId);
+  if (!holder) return skip(ctx, 'source_not_in_play');
+  const wasActive = findCard(draft, holder.instanceId)?.zoneId === 'active';
+  discardInPlayPokemon(player, holder, ctx.events);
+  if (wasActive) player.promotionPending = true;
+  player.flags.stadiumUsedThisTurn = false;
+  return null;
+}
+
 /** Genesect V Fusion Strike System: draw until the hand matches the tagged Pokémon in play. */
 function drawVariableAbility(ctx) {
   const { player, step } = ctx;
@@ -4196,8 +4322,21 @@ function swapInPlace(player, outgoing, incoming, events) {
     }
   }
   outgoing.attachedTo = null;
-  // The card leaving play keeps no once-per-turn marker; the incoming card is a different
-  // card, so its own Ability stays usable.
+  // "Any other effects remain on the new Pokémon": attack effects that end when the Pokémon
+  // evolves follow the new top card, and an Ability already used this turn stays used, so the
+  // new Aegislash cannot Stance Change straight back.
+  const root = incoming.attachedTo != null ? zone.find((c) => c.instanceId === incoming.attachedTo) : incoming;
+  if (Array.isArray(root?.attackMarkers)) {
+    root.attackMarkers = root.attackMarkers.map((m) =>
+      m.topId === outgoing.instanceId ? { ...m, topId: incoming.instanceId } : m
+    );
+  }
+  const used = player.flags?.abilitiesUsed || {};
+  if (outgoing.abilityUsed || used[outgoing.instanceId]) {
+    incoming.abilityUsed = true;
+    player.flags = { ...player.flags, abilitiesUsed: { ...used, [incoming.instanceId]: true } };
+  }
+  // The card leaving play keeps no once-per-turn marker.
   outgoing.abilityUsed = false;
   events.push({
     type: 'pokemonSwapped',
@@ -4229,6 +4368,9 @@ function transformAbility(ctx) {
       attachTo(player, incoming, root, ctx.events);
     } else if (step.keepState) {
       swapInPlace(player, outgoing, incoming, ctx.events);
+      // Deoxys Form Change (customhb): attached cards and damage counters move over; the
+      // Pokémon that went back to the hand took its Special Conditions with it.
+      if (step.keepConditions === false) clearConditions(incoming);
       if (step.source === 'hand') player.zones.hand.push(outgoing);
       // Deoxys Form Change, Castform Temperament: the old form goes back into the deck.
       else if (step.source === 'deck') player.zones.deck.unshift(outgoing);
@@ -4869,7 +5011,7 @@ function putHandBasicAsActive(ctx) {
 function opponentDiscardToLostZonePerPokemon(ctx) {
   const { player, opponent, step } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const symbol = String(step.energyType || '').match(/\{([a-z])\}/)?.[1];
+  const symbol = String(step.energyType || '').match(/\{([a-z])\}/i)?.[1]?.toLowerCase();
   const count = rootsOf(player).filter(
     (root) => !symbol || pokemonHasType(topPokemonCard(player, root), symbol)
   ).length;
@@ -6264,6 +6406,7 @@ export const EXTRA_STEP_HANDLERS = {
   selfLeavesAbility,
   // Design 034 slice 6 one-offs.
   winGameAbility,
+  festivalLeadAbility,
   drawVariableAbility,
   discardForDrawAbility,
   deckPlaceAbility,

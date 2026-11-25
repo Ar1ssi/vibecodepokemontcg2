@@ -369,6 +369,36 @@ export function applyToolDamageReduction(
   return total;
 }
 
+// Head Ringer / Jamming Net (PHF 97/98): a penalty on the holder's own attacks. Read wherever the
+// Tool sits, so a Tool moved by Trickster taxes its new holder.
+const TOOL_ATTACK_COST_MORE = /the attacks of the pok[eé]mon this card is attached to cost ((?:\{[a-z]\})+) more/;
+const TOOL_ATTACK_DO_LESS =
+  /the attacks of the pok[eé]mon this card is attached to do (\d+) less damage to (?:all )?defending pok[eé]mon(?: \(before applying weakness and resistance\))?/;
+
+/**
+ * The attack markers (attack-markers.mjs shapes) of the Tools attached to `root`: an
+ * `attackCostIncrease` and/or an `outgoingReduce` before Weakness and Resistance.
+ * The caller decides Tool negation (Jamming Tower).
+ */
+export function attachedToolMarkers(zoneCards, root) {
+  if (!root) return [];
+  return attachedTools(root, zoneCards || []).flatMap((tool) => {
+    const t = cardAbilityText(tool);
+    const source = tool.name || '';
+    const markers = [];
+    const cost = t.match(TOOL_ATTACK_COST_MORE);
+    if (cost) markers.push({ kind: 'attackCostIncrease', count: (cost[1].match(/\{[a-z]\}/g) || []).length, source });
+    const less = t.match(TOOL_ATTACK_DO_LESS);
+    if (less) markers.push({ kind: 'outgoingReduce', amount: Number(less[1]), afterWR: false, source });
+    // Weakness Policy (sm3-126) "… has no Weakness"; Metal Frying Pan (sm6-112) only for a {M} holder.
+    const noWeakness = t.match(/the (?:\{([a-z])\} )?pok[eé]mon this card is attached to [^.]*?has no weakness/);
+    if (noWeakness && (!noWeakness[1] || attackerTypes(holderView(root, zoneCards)).includes(TYPE_LETTER[noWeakness[1]]))) {
+      markers.push({ kind: 'noWeakness', source });
+    }
+    return markers;
+  });
+}
+
 /** Attacker-side damage bonus from attached Tools. */
 export function combinedToolAttackBonus(
   attacker,
@@ -442,7 +472,7 @@ export function combinedToolRetreatCost(
   baseRetreat,
   pokemon,
   zoneCards,
-  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null } = {}
+  { blockTools = false, stadium = null, benchCards = null, sideCards = null, opponentSideCards = null, turnNumber = null } = {}
 ) {
   let cost = baseRetreat || 0;
   const holder = holderView(pokemon, zoneCards);
@@ -452,6 +482,8 @@ export function combinedToolRetreatCost(
     benchCards,
     sideCards,
     opponentSideCards,
+    // Wimpod Wimp Out (sm3-16): "During your first turn, this Pokémon has no Retreat Cost."
+    turnNumber,
   });
   cost = applyRetreatCostModifier(cost, mod?.delta || 0);
   if (toolBlocked(blockTools, stadium)) return cost;
@@ -475,6 +507,48 @@ export function combinedToolRetreatCost(
 }
 
 /**
+ * Silvally-GX Memories (sm4-94 Fighting Memory, sm5-121 Electric Memory, …): "The Silvally-GX this
+ * card is attached to is a {F} Pokémon." The type word the holder becomes (lowercase), or null.
+ */
+export function toolTypeOverride(holder, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (!holder || toolBlocked(blockTools, stadium)) return null;
+  const squash = (v) => lower(v).replace(/[^a-z0-9]/g, '');
+  for (const tool of attachedTools(holder, zoneCards)) {
+    const match = cardAbilityText(tool).match(/(?:^|\.\s)the ([^.]+?) this card is attached to is an? \{([a-z])\} pok[eé]mon\.?(?:$|\s)/);
+    if (!match || squash(match[1]) !== squash(holder.name)) continue;
+    const type = TYPE_LETTER[match[2]];
+    if (type) return type;
+  }
+  return null;
+}
+
+/**
+ * Escape Board (sm5-122): "… and it can retreat even if it's Asleep or Paralyzed." The conditions
+ * an attached, live Tool lets `pokemon` retreat through (lowercase), or an empty list.
+ */
+export function toolRetreatIgnoresConditions(pokemon, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (toolBlocked(blockTools, stadium)) return [];
+  for (const tool of attachedTools(pokemon, zoneCards)) {
+    const match = cardAbilityText(tool)
+      .replace(/[\u2018\u2019]/g, "'")
+      .match(/can retreat even if it's (asleep|paralyzed)(?: or (asleep|paralyzed))?/);
+    if (match) return [match[1], match[2]].filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * Dashing Pouch (sm4-92): "If the Pokémon this card is attached to discards Energy for its Retreat
+ * Cost, put that Energy into your hand instead of the discard pile."
+ */
+export function toolRetreatEnergyToHand(pokemon, zoneCards, { blockTools = false, stadium = null } = {}) {
+  if (toolBlocked(blockTools, stadium)) return false;
+  return attachedTools(pokemon, zoneCards).some((tool) =>
+    /discards energy for its retreat cost, put that energy into your hand instead of the discard pile/.test(cardAbilityText(tool))
+  );
+}
+
+/**
  * If a Tool or Ability prevents this KO, return adjusted total damage.
  * Supports both counter units (legacy tests) and HP units (inHp: true).
  */
@@ -490,6 +564,8 @@ export function evaluateToolKoPrevention(
     inHp = false,
     // Focus Band flips a coin; called only for a coin-flip candidate.
     flipCoin = null,
+    // Togepi Egg Shell reads whether the defender is its player's only Pokémon in play.
+    onlyPokemonInPlay = false,
   } = {}
 ) {
   const isBlocked = toolBlocked(blockTools, stadium);
@@ -527,6 +603,7 @@ export function evaluateToolKoPrevention(
   let lastCoinFace = null;
   for (const { source, ko, isTool } of candidates) {
     if (ko.fullHpOnly && dmgCurrent > 0) continue;
+    if (ko.onlyPokemonInPlay && !onlyPokemonInPlay) continue;
     if (dmgTotal < hpThreshold) continue;
     let coinFace = null;
     if (ko.coinFlip) {

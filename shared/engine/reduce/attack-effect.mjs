@@ -4,6 +4,7 @@
  * public entry.
  */
 
+import { discardCurrentStadium } from '../effects/trainer.mjs';
 import { findCard, discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { flipCoin } from '../rng.mjs';
@@ -23,7 +24,16 @@ import { evaluateToolKoPrevention, attachedToolOnDamageEffects } from '../rules/
 import { stadiumAttackCoinModifier } from '../rules/stadium-triggers.mjs';
 import { turnDamageBonusAfterWR } from '../rules/turn-damage-bonus.mjs';
 import { getEnergyValue } from '../rules/retreat.mjs';
-import { abilityHandDiscardProtector, extraAttackAvailable, healBlockedByAbility } from '../rules/ability-combat.mjs';
+import {
+  abilityHandDiscardProtector,
+  extraAttackAvailable,
+  healBlockedByAbility,
+  abilityMirrorCounter,
+  abilityDamagedOwnBenchCounters,
+  abilityDamagedReturnsAttackerEnergy,
+  abilityLostZoneKnockouts,
+} from '../rules/ability-combat.mjs';
+import { isExCard, isGxCard } from '../rules/card-classify.mjs';
 import { parseOnDamageAbilities, parseOnDamageStatus, parseOnAttackedSwitch } from '../rules/ability-triggers.mjs';
 import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
@@ -45,6 +55,7 @@ import { parseAttackStatusBranches, statusesFromBranches, poisonCheckupCounters 
 import {
   benchTargets, discardCardFromPlayerZone, activeAttackMarkers, inPlayView, cardEffectiveHp,
   conditionsUpdatedEvent, isGameConcluded, abilitySideContext, shuffleDeckWithRng, rootsIn,
+  onlyPokemonInPlay,
 } from './shared.mjs';
 import {
   endTurnAfterFailedAttack, spendGxAttack, spendVstarAttack, withSelfNamedAttack, ninjaTrickSwitch,
@@ -96,8 +107,19 @@ const LOST_ZONE_KNOCKOUT =
 /** Per status branch: whether its printed board condition holds now (null for other branches). */
 function statusConditionResults(draft, ctx, branches) {
   if (!branches.some((branch) => branch.when?.condition)) return [];
+  const conditionCtx = statusConditionCtx(draft, ctx);
+  return branches.map((branch) =>
+    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
+  );
+}
+
+// "If you discarded a Pokémon Tool card in this way, … is now Paralyzed" (Pachirisu Overshort,
+// sm8-80) reads what this attack's before-damage step discarded, so it is read after that step.
+const READ_AFTER_BEFORE_STEPS = new Set(['discardedCardIs']);
+
+function statusConditionCtx(draft, ctx) {
   const { attacker, defender, attackerView, playerId, defenderPlayerId, coin, headsCount } = ctx;
-  const conditionCtx = buildServerAttackContext(draft, {
+  return buildServerAttackContext(draft, {
     attackerPlayerId: playerId,
     defenderPlayerId,
     attacker,
@@ -109,9 +131,6 @@ function statusConditionResults(draft, ctx, branches) {
     headsCount,
     optionalCostPaid: ctx.optionalCostPaid,
   });
-  return branches.map((branch) =>
-    branch.when?.condition ? attackConditionMet(branch.when.condition, conditionCtx) : null
-  );
 }
 
 const ENERGY_LETTER_TYPES = {
@@ -327,7 +346,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
   draft.__attackEffectPhase = true;
   // "If … would be Knocked Out by damage from this attack, put that Pokémon and all cards attached
   // to it in the Lost Zone instead of discarding it" (design 036 A12): read by handleKnockout.
-  if (LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name))) {
+  if (
+    LOST_ZONE_KNOCKOUT.test(normalizeAttackText(attack?.text, attackerView?.name || attacker?.name)) ||
+    abilityLostZoneKnockouts(attackerView, abilitySideContext(draft, playerId))
+  ) {
     draft.__attackLostZoneKnockouts = defenderPlayerId;
   }
 
@@ -654,7 +676,13 @@ export function resolveAttackEffectPhase(draft, ctx) {
       ? events
           .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
           .reduce((total, e) => total + e.cards.length, 0)
-      : undefined);
+      : // "Put any number of Basic Energy cards from your hand into the Lost Zone. This attack does 50
+        // damage for each card you discarded in this way": the Lost Zone move is the counted discard.
+        attackSteps.before.some((step) => step.countsForDamage && step.type === 'atkLostZoneFromHand')
+        ? events
+            .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
+            .reduce((total, e) => total + e.count, 0)
+        : undefined);
   const lostZoned =
     ctx.lostZoned ??
     (attackSteps.before.some((step) => step.countsForDamage)
@@ -977,6 +1005,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
           });
 
           const koHp = cardEffectiveHp(draft, defender, defenderPlayerId);
+          // Aegislash Ticking Knock Out: damaged by an attack while marked, it is Knocked Out.
+          if (koHp > 0 && defenderMarkers.some((m) => m.kind === 'koIfDamaged')) {
+            dmgDealt = Math.max(dmgDealt, koHp - (defender.damage || 0));
+          }
           const wouldKo = koHp > 0 && (defender.damage || 0) + dmgDealt >= koHp;
 
           if (wouldKo) {
@@ -989,6 +1021,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
                 baseHp: koHp,
                 stadium: draft.stadium,
                 inHp: true,
+                onlyPokemonInPlay: onlyPokemonInPlay(draft, defenderPlayerId),
                 // Focus Band: the flip is consumed only when a coin-flip candidate is
                 // actually evaluated, so seeded RNG streams stay untouched otherwise.
                 flipCoin: () => (activeRng.next() < 0.5 ? 'heads' : 'tails'),
@@ -1185,14 +1218,33 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
           // Thorns via the trigger reader: a suppressed holder contributes
           // nothing, and an Active-Spot-only wording is inert off the Active
-          // (the defender here is the opponent's Active, so isActive: true).
-          const defenderView = inPlayView(draft, defender);
+          // (the defender here is the opponent's Active, so isActive: true). Every on-damage Ability
+          // here reads the `defenderView` taken before the damage: a Knock Out has already moved the
+          // evolved card to the discard pile, and a fresh read would see only the Basic left behind.
           const thorns = parseOnDamageAbilities(defenderView, {
             ...abilitySideContext(draft, defenderPlayerId),
             isActive: true,
           });
           if (thorns?.count > 0 && (!thorns.koOnly || defenderKnockedOut)) {
             thornsDamage += thorns.count * 10;
+          }
+          const defenderSide = abilitySideContext(draft, defenderPlayerId);
+          const mirror = abilityMirrorCounter(defenderView, defenderSide);
+          const attackerTop = inPlayView(draft, attacker);
+          if (mirror && (!mirror.gxOrEx || isGxCard(attackerTop) || isExCard(attackerTop))) {
+            thornsDamage += dmgDealt;
+          }
+          const benchCounters = abilityDamagedOwnBenchCounters(defenderView, defenderSide);
+          for (const benched of benchCounters > 0 ? rootsIn(draft.players[defenderPlayerId]?.zones?.bench || []) : []) {
+            benched.damage = (benched.damage || 0) + benchCounters * 10;
+            events.push({
+              type: 'damageCountersPlaced',
+              instanceId: benched.instanceId,
+              victimPlayerId: defenderPlayerId,
+              attackerPlayerId: defenderPlayerId,
+              damage: benched.damage,
+              source: defenderView.name,
+            });
           }
 
           if (thornsDamage > 0) {
@@ -1228,11 +1280,25 @@ export function resolveAttackEffectPhase(draft, ctx) {
             let lands = true;
             if (onDamageStatus.coin) {
               const face = flipCoin(activeRng);
-              events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: onDamageStatus.source });
-              lands = face === 'heads';
+              const flipper = onDamageStatus.flipper === 'opponent' ? playerId : defenderPlayerId;
+              events.push({ type: 'coinFlipped', playerId: flipper, face, source: onDamageStatus.source });
+              lands = face === (onDamageStatus.landsOn || 'heads');
             }
             for (const cond of lands ? onDamageStatus.conditions : []) {
               if (addCondition(atkRef.card, cond)) events.push(conditionsUpdatedEvent(atkRef.card, cond));
+            }
+          }
+
+          // Lugia ex Silver Sparkle: on heads, the holder's owner returns an Energy card from the
+          // Attacking Pokémon to its owner's hand — picked at the command tail (settleAttackerEnergyToHand).
+          if (abilityDamagedReturnsAttackerEnergy(defenderView, defenderSide)) {
+            const face = flipCoin(activeRng);
+            events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: defenderView.name });
+            if (face === 'heads') {
+              draft.__attackerEnergyToHand = [
+                ...(draft.__attackerEnergyToHand || []),
+                { chooserId: defenderPlayerId, ownerId: playerId, attackerId: attacker.instanceId, source: defenderView.name },
+              ];
             }
           }
 
@@ -1319,7 +1385,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
             headsCount,
             flips,
             conditionMet: (condition) =>
-              statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
+              READ_AFTER_BEFORE_STEPS.has(condition?.kind)
+                ? attackConditionMet(condition, statusConditionCtx(draft, ctx))
+                : statusConditionsMet[statusBranches.findIndex((branch) => branch.when?.condition === condition)] === true,
           });
 
       if (defenderConditions.length > 0 && defender) {
@@ -1329,7 +1397,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
         const defMarkers = defRef ? activeAttackMarkers(draft, defRef.playerId, defRef.card) : [];
         const shielded =
           defRef &&
-          (hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone) ||
+          (hasSpecialEnergyEffectShield(inPlayView(draft, defRef.card), defZone, draft.stadium) ||
             markersPreventEffects(defMarkers, attackerView) ||
             abilityEffectShield(draft, defRef, attackerView));
         if (defRef && defRef.zoneId === 'active' && !shielded) {
@@ -1405,9 +1473,11 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
         const ref = attacker ? findCard(draft, attacker.instanceId) : null;
-        const energyCards = ref
-          ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
-          : 0;
+        const energyCards = attackTarget.amountPerEnergyType
+          ? attachedEnergyOfType(draft, attacker, attackTarget.amountPerEnergyType)
+          : ref
+            ? (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attacker.instanceId && isEnergy(c)).length
+            : 0;
         attackTarget = energyCards > 0 ? { ...attackTarget, amount: attackTarget.amount * energyCards } : null;
       }
       // Probopass Metal Bomber: as many picks as the attacker has Energy of the printed type.
@@ -1485,9 +1555,16 @@ export function resolveAttackEffectPhase(draft, ctx) {
       }
       let benchDealt = 0;
 
+      // Ting-Lu Ground Crasher (customhb): "If a Stadium is in play, this attack also does 30
+      // damage to each of your opponent's Benched Pokémon, and discard that Stadium."
+      const stadiumGatedSpread = /if a stadium is in play, this attack also does \d+ damage to each of your opponent's benched pok[ée]mon, and discard that stadium/i.test(
+        attack.text || ''
+      );
+      const spreadGateClosed = stadiumGatedSpread && !draft.stadium;
+
       // Spread damage: the same amount to EVERY benched Pokémon the defender has. The target
       // list is snapshotted first, because a KO inside the loop mutates the bench array.
-      if (spread > 0 && !spreadUnpaid) {
+      if (spread > 0 && !spreadUnpaid && !spreadGateClosed) {
         const targets = benchTargets(draft.players[defenderPlayerId]);
         if (targets.length === 0) {
           events.push({
@@ -1520,7 +1597,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // The Active takes the damage-each clause through Weakness and Resistance unless the
       // text waives them; the Bench never does.
       // Chingling Uproar: "If heads, this attack does 10 damage to each of your opponent's Pokémon."
-      if (eachDamage && (!eachDamage.gate || coin === eachDamage.gate)) {
+      // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
+      if (eachDamage?.perDiscard) eachDamage.amount *= energyDiscarded || 0;
+      if (eachDamage && eachDamage.amount > 0 && (!eachDamage.gate || coin === eachDamage.gate)) {
         const victimPlayer = draft.players[defenderPlayerId];
         const zones = victimPlayer?.zones || {};
         const roots = eachDamage.activeOnly
@@ -1563,6 +1642,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
 
       // Self-recoil spread ("This attack also does 30 damage to each of your Benched
       // Pokémon"): the attacker's own Bench, and a KO there gives the opponent Prizes.
+      if (stadiumGatedSpread && draft.stadium) discardCurrentStadium(draft, events, playerId);
       const ownSpread = ownBenchDamage(attack.text);
       if (ownSpread > 0) {
         for (const victim of benchTargets(draft.players[playerId])) {
@@ -1633,6 +1713,8 @@ export function resolveAttackEffectPhase(draft, ctx) {
               playerId,
               reason: 'attack-energy-discard',
             });
+            // "If you do, …" steps resumed from a later choice read it (executor.mjs).
+            draft.attackEnergyDiscarded = true;
           }
         }
       }
@@ -1641,6 +1723,7 @@ export function resolveAttackEffectPhase(draft, ctx) {
       const locks = parseNextTurnLock(effectiveAttack, {
         coin,
         headsCount,
+        flips,
         conditionHolds: (clause) => {
           const condition = parseConditionClause(normalizeAttackText(clause, attackerView?.name || attacker?.name));
           if (!condition) return false;
@@ -1684,6 +1767,9 @@ export function resolveAttackEffectPhase(draft, ctx) {
             name: locks.selfCannotUseAttackWhileActive,
             activeSince: attacker.movedToActiveTurn ?? 0,
           };
+        }
+        if (locks.selfCannotRetreat && attacker) {
+          attacker.cannotRetreatUntilTurn = (draft.turn.number || 1) + 2;
         }
         if (locks.oppCannotRetreat && defender) {
           const defRef = findCard(draft, defender.instanceId);
@@ -1763,6 +1849,8 @@ function discardScalePrompt(attack, discardScaling) {
   const per =
     /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
     /do (\d+) damage to it/i.exec(text)?.[1] ||
+    // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
+    /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
     parseInt(attack?.damage, 10) ||
     0;
   const verb = discardScaling.destination === 'deck' ? 'shuffle into your deck' : 'discard';

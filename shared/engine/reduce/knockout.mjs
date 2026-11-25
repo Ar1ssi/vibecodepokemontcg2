@@ -13,11 +13,12 @@ import { prizesForKO } from '../rules/ko-flow.mjs';
 import {
   toolPrizeCountAdjust, attachedToolOnKoEffects, attachedTools, isExCard, isTeraCard,
 } from '../rules/tool-combat.mjs';
-import { parsePrizeModify } from '../rules/ability-executors.mjs';
+import { parsePrizeModify, cardAbilityText } from '../rules/ability-executors.mjs';
+import { isAbilitySuppressed, sideContextFor, abilityBenchLimit } from '../rules/ability-combat.mjs';
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
-  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker,
+  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker, abilityKoCountersOnOpponent,
 } from '../rules/ability-combat.mjs';
 import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
@@ -321,6 +322,8 @@ export function handleKnockout(
       types: [...(top.types || [])],
       // "Knocked Out by damage from an attack" (Revenge, Orichalcum Fang) excludes Poison/ability KOs.
       byAttackDamage: Boolean(byAttack && byDamage),
+      // Mega Golisopod ex First Impression: "your Active Pokémon was Knocked Out by damage".
+      wasActive,
     };
     victimPlayer.flags = {
       ...victimPlayer.flags,
@@ -450,6 +453,8 @@ export function handleKnockout(
     .filter((marker) => prizeFilterMatches(marker.filter, prizeRuleBoxes(victimView)))
     .reduce((sum, marker) => sum + (marker.count || 0), 0);
   prizeCount += markerBonus;
+  // Poipole Knockout Reviver: "your opponent can't take any Prize cards for it".
+  if (activeAttackMarkers(draft, victimPlayerId, victim).some((marker) => marker.kind === 'noPrizesOnKo')) prizeCount = 0;
 
   if (attacker) {
     if (!attacker.flags) attacker.flags = {};
@@ -492,6 +497,17 @@ export function handleKnockout(
     hostZoneId: koZoneRef?.zoneId || (wasActive ? 'active' : 'bench'),
   });
 
+  // Ho-Oh Rebirth (customhb): "The first time this Pokémon is Knocked Out, move it and all cards
+  // attached to it into your hand." The Prize cards are still taken; the card remembers the use.
+  const victimTop = inPlayView(draft, victim);
+  const rebirth =
+    !victim.rebirthUsed &&
+    /the first time this pok[eé]mon is knocked out, move it and all cards attached to it into your hand/.test(
+      cardAbilityText(victimTop)
+    ) &&
+    !isAbilitySuppressed(victimTop, sideContextFor(draft, victimPlayerId));
+  if (rebirth) victim.rebirthUsed = true;
+
   if (targetZone) {
     for (let i = targetZone.length - 1; i >= 0; i--) {
       const c = targetZone[i];
@@ -504,7 +520,17 @@ export function handleKnockout(
         clearConditions(c);
         clearAttackMarkers(c);
         c.attachedTo = null;
-        if (attackLostZone) {
+        if (rebirth) {
+          victimPlayer.zones.hand.push(c);
+          events.push({
+            type: 'cardMoved',
+            instanceId: c.instanceId,
+            from: koZoneRef?.zoneId || 'active',
+            to: 'hand',
+            playerId: victimPlayerId,
+            reason: 'ability-rebirth',
+          });
+        } else if (attackLostZone) {
           if (!Array.isArray(victimPlayer.zones.lostZone)) victimPlayer.zones.lostZone = [];
           victimPlayer.zones.lostZone.push(c);
         } else if (lostCity && c.instanceId === victim.instanceId) {
@@ -701,7 +727,12 @@ export function stampHealedPokemon(prev, next) {
       delete card.__counterMoveOnly;
       if (counterMoveOnly) continue;
       const before = findCard(prev, card.instanceId)?.card;
-      if (before && (card.damage || 0) < (before.damage || 0)) card.healedTurn = turnNumber;
+      if (before && (card.damage || 0) < (before.damage || 0)) {
+        // Gardevoir ex Swelling Pulse reads a heal on the owner's previous turn; keep the last
+        // heal turn before this one too.
+        if (card.healedTurn != null && card.healedTurn !== turnNumber) card.healedPreviousTurn = card.healedTurn;
+        card.healedTurn = turnNumber;
+      }
     }
   }
 }
@@ -893,6 +924,62 @@ export function settleToolEnergyBenchMoves(draft) {
       cancellable: false,
       stateVersion: draft.stateVersion,
       resumeToken: { effectType: TOOL_ENERGY_BENCH_EFFECT, initiatorPlayerId: move.chooserId, move, remaining },
+    });
+    return;
+  }
+}
+
+export const ATTACKER_ENERGY_HAND_EFFECT = 'attackerEnergyToHand';
+
+/** The Energy cards still attached to the Attacking Pokémon `attackerId` (in play), or []. */
+function attackerEnergyCards(draft, { ownerId, attackerId }) {
+  const ref = findCard(draft, attackerId);
+  if (!ref || ref.playerId !== ownerId || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) return [];
+  return (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attackerId && isEnergy(c));
+}
+
+/** Puts `energyId`, if still on the Attacking Pokémon, into its owner's hand. */
+export function returnAttackerEnergyToHand(draft, { move, energyId, events }) {
+  const energy = attackerEnergyCards(draft, move).find((c) => c.instanceId === energyId);
+  if (!energy) return false;
+  const ref = findCard(draft, energy.instanceId);
+  const zone = ref.player.zones[ref.zoneId];
+  zone.splice(zone.indexOf(energy), 1);
+  energy.attachedTo = null;
+  draft.players[move.ownerId].zones.hand.push(energy);
+  events.push({ type: 'cardMoved', instanceId: energy.instanceId, from: 'inPlay', to: 'hand', playerId: move.ownerId, source: move.source });
+  return true;
+}
+
+/**
+ * Lugia ex Silver Sparkle (customhb-872): "choose an Energy card attached to the Attacking Pokémon
+ * and return it to your opponent's hand". Queued by the attack on heads, asked at the command tail
+ * (after the Knock Out of the holder settles); a single Energy card needs no choice.
+ */
+export function settleAttackerEnergyToHand(draft, { events }) {
+  if (draft.pendingChoice) return;
+  const pending = draft.__attackerEnergyToHand;
+  delete draft.__attackerEnergyToHand;
+  if (isGameConcluded(draft) || !Array.isArray(pending)) return;
+  const remaining = [...pending];
+  while (remaining.length > 0) {
+    const move = remaining.shift();
+    const options = attackerEnergyCards(draft, move);
+    if (options.length === 0) continue;
+    if (options.length === 1) {
+      returnAttackerEnergyToHand(draft, { move, energyId: options[0].instanceId, events });
+      continue;
+    }
+    draft.pendingChoice = createPendingChoice({
+      player: move.chooserId,
+      source: move.source,
+      prompt: `${move.source}: choose an Energy card attached to the Attacking Pokémon to return to your opponent's hand`,
+      options,
+      min: 1,
+      max: 1,
+      cancellable: false,
+      stateVersion: draft.stateVersion,
+      resumeToken: { effectType: ATTACKER_ENERGY_HAND_EFFECT, initiatorPlayerId: move.chooserId, move, remaining },
     });
     return;
   }
@@ -1399,6 +1486,16 @@ function applyKnockoutHolderAbilities(draft, { victim, victimPlayerId, wasActive
     ];
   }
 
+  // Final Hour: all the counters go on the one Pokémon the holder's owner picks.
+  const koCounters = wasActive && koByOpponentAttack ? abilityKoCountersOnOpponent(holder, ctx) : 0;
+  if (koCounters > 0) {
+    const opponentId = Object.keys(draft.players).find((id) => id !== victimPlayerId);
+    draft.__koToolCounters = [
+      ...(draft.__koToolCounters || []),
+      { playerId: victimPlayerId, targetPlayerId: opponentId, remaining: koCounters, perPick: koCounters, source: holder.name },
+    ];
+  }
+
   // The printed wording says "if this Pokémon is your Active Pokémon", so the Active check is here.
   if (wasActive && koByOpponentAttack && attackerActive && abilityKoConfusesAttacker(holder, ctx)) {
     for (const condition of ['Confused', 'Poisoned']) {
@@ -1449,6 +1546,52 @@ export function settleKoHandDiscards(draft, { events }) {
   else delete draft.__koHandDiscards;
 }
 
+export const BENCH_LIMIT_EFFECT = 'benchLimitTrim';
+
+/**
+ * Sudowoodo Roadblock: "If they have 5 or more Benched Pokémon, they discard Benched Pokémon until
+ * they have 4." The over-limit player picks which go, after any other pending choice.
+ */
+export function settleBenchLimits(draft) {
+  if (draft.pendingChoice) return;
+  for (const [playerId, player] of Object.entries(draft.players || {})) {
+    const bench = (player?.zones?.bench || []).filter((c) => !c.attachedTo);
+    const excess = bench.length - abilityBenchLimit(sideContextFor(draft, playerId));
+    if (excess <= 0) continue;
+    draft.pendingChoice = createPendingChoice({
+      player: playerId,
+      source: 'Roadblock',
+      prompt: `Your Bench holds too many Pokémon: discard ${excess} Benched Pokémon`,
+      options: bench,
+      min: excess,
+      max: excess,
+      stateVersion: draft.stateVersion || 0,
+      resumeToken: { effectType: BENCH_LIMIT_EFFECT, initiatorPlayerId: playerId, count: excess },
+    });
+    return;
+  }
+}
+
+/** Discards the chosen Benched Pokémon and everything attached to them. */
+export function resolveBenchLimitTrim(draft, { playerId, selection, count, events }) {
+  const player = draft.players?.[playerId];
+  if (!player) return;
+  const bench = player.zones.bench || [];
+  for (const id of [...new Set(selection || [])].slice(0, count)) {
+    const root = bench.find((c) => c.instanceId === id && !c.attachedTo);
+    if (!root) continue;
+    const stack = [root, ...bench.filter((c) => c.attachedTo === id)];
+    for (const card of stack) {
+      bench.splice(bench.indexOf(card), 1);
+      card.attachedTo = null;
+      discardCardToPlayerZone(player, card);
+    }
+    root.damage = 0;
+    clearConditions(root);
+    events.push({ type: 'cardsDiscarded', playerId, reason: 'bench-limit', cards: stack.map((c) => ({ instanceId: c.instanceId, name: c.name })) });
+  }
+}
+
 export const KO_TOOL_COUNTERS_EFFECT = 'koToolCounters';
 
 /**
@@ -1474,7 +1617,9 @@ export function settleKoToolCounters(draft) {
     draft.pendingChoice = createPendingChoice({
       player: entry.playerId,
       source: entry.source,
-      prompt: `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
+      prompt: entry.perPick
+        ? `${entry.source}: put ${entry.perPick} damage counters on 1 of your opponent's Pokémon`
+        : `${entry.source}: put a damage counter on 1 of your opponent's Pokémon (${entry.remaining} left)`,
       options,
       min: 1,
       max: 1,
@@ -1498,7 +1643,8 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
   if (!entry) return;
   const ref = findCard(draft, (selection || [])[0]);
   if (ref && ref.playerId === targetPlayerId && (ref.zoneId === 'active' || ref.zoneId === 'bench') && !ref.card.attachedTo) {
-    ref.card.damage = (ref.card.damage || 0) + 10;
+    const placed = Math.min(entry.perPick || 1, entry.remaining);
+    ref.card.damage = (ref.card.damage || 0) + placed * 10;
     events.push({
       type: 'damageCountersPlaced',
       instanceId: ref.card.instanceId,
@@ -1507,7 +1653,7 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
       damage: ref.card.damage,
       source: entry.source,
     });
-    entry.remaining -= 1;
+    entry.remaining -= placed;
   }
   if (!(entry.remaining > 0)) queue.shift();
   if (queue.length > 0) draft.__koToolCounters = queue;

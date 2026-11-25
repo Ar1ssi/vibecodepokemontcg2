@@ -16,12 +16,13 @@ import { isPokemon } from '../cards.mjs';
 import { getAttachedSpecialEnergies, parseSpecialEnergyEffects } from './special-energy-parse.mjs';
 import { isAncientTraitAbility } from './abilities.mjs';
 import { isRuleBoxPokemon, isTeraCard, isExCard, isGxCard, isVCard } from './card-classify.mjs';
-import { isDeltaSpecies } from './energy-effects.mjs';
-import { getSpecialEnergyHpBonus } from './special-energy-parse.mjs';
+import { isDeltaSpecies, resolveAttachedEnergyType } from './energy-effects.mjs';
+import { getSpecialEnergyHpBonus, stadiumBlanksSpecialEnergy } from './special-energy-parse.mjs';
 import { matchesSearch } from './search-match.mjs';
 import { cardPrintedText } from './trainer-card-text.mjs';
 import { SYMBOL_TO_TYPE, typeForSymbol } from './energy-symbols.mjs';
 import { isAttachedToHost } from './energy-attachment.mjs';
+import { symbolizeTypeWordsOnly } from './attack-text.mjs';
 //
 // Layers:
 //   - `classifyStadiumEffect` — buckets a card into an effect family.
@@ -51,7 +52,8 @@ const lower = (v) =>
 const subtypesOf = (card) =>
   (Array.isArray(card?.subtypes) ? card.subtypes : []).map(lower);
 
-const textOf = (card) => lower(cardPrintedText(card));
+// TCGdex spells Energy symbols as type words ("Basic Grass Pokémon", "Colorless more").
+const textOf = (card) => lower(symbolizeTypeWordsOnly(cardPrintedText(card)));
 
 /**
  * Battle Style (Single Strike) is printed as a name prefix ("Single Strike
@@ -139,12 +141,7 @@ export function isStadiumStatusPersistsOnEvolve(card) {
 
 /** Temple of Sinnoh: Special Energy provides {C} and has no other effect. */
 export function isStadiumSpecialEnergyColorless(card) {
-  const t = textOf(card);
-  return (
-    /special energy/.test(t) &&
-    /provide \{c\}/.test(t) &&
-    /no other effect/.test(t)
-  );
+  return stadiumBlanksSpecialEnergy(card);
 }
 
 /** Crystal Beach: Special Energy providing ≥2 now provides only 1 {C}. */
@@ -1063,6 +1060,22 @@ export function parseStadiumOncePerTurn(card) {
       typeFilter: 'lightning',
     };
   }
+  // Life Forest ◇ (sm8-180): "heal 60 damage and remove all Special Conditions from 1 of their
+  // Grass Pokémon" — any of the player's Pokémon of that type, Active or Benched.
+  const healCure = t.match(
+    /heal (\d+) damage and remove all special conditions from 1 of (?:his or her|their|your) ((?:\{[a-z]\} )?)pok[eé]mon/
+  );
+  if (healCure) {
+    const letter = healCure[2].match(/\{([a-z])\}/)?.[1];
+    return {
+      ...base,
+      kind: 'heal',
+      n: parseInt(healCure[1], 10),
+      target: 'any',
+      cure: true,
+      ...(letter ? { types: [SUBJECT_TYPE_WORDS[letter]] } : {}),
+    };
+  }
   // Pokémon Center: "heal 20 damage from 1 of his or her Benched Pokémon".
   const healBench = t.match(
     /heal (\d+) damage from 1 of (?:his or her|their|your) benched pok[eé]mon/
@@ -1393,7 +1406,7 @@ export function stadiumFilterMatches(card, stadiumCard) {
     const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
     if (stage && stage !== 'stage2') return false;
   }
-  if (/basic pokémon/.test(t)) {
+  if (/basic (?:\{[a-z]\} )?pokémon/.test(t)) {
     const stage = lower(card?.stage || '').replace(/[^a-z0-9]/g, '');
     if (stage && stage !== 'basic') return false;
   }
@@ -1710,7 +1723,11 @@ export function effectiveHp(
   let total = base + getStadiumHpBonus(targetPlayer, pokemon, stadiumOverride);
   // Special-energy +HP modifiers (Growing Grass, Heat, …): taxonomy §F Gap #4c.
   if (zoneCards?.length && pokemon) {
-    total += getSpecialEnergyHpBonus(pokemon, zoneCards);
+    total += getSpecialEnergyHpBonus(
+      pokemon,
+      zoneCards,
+      stadiumOverride || (rulesState.enabled ? getStadium() : null)
+    );
   }
   const blockTools = stadiumOverride
     ? isStadiumToolNegation(stadiumOverride.card || stadiumOverride)
@@ -1841,14 +1858,21 @@ export function getStadiumRetreatCost(
   baseRetreat,
   pokemon,
   targetPlayer,
-  stadiumOverride = null
+  stadiumOverride = null,
+  zoneCards = null
 ) {
   const stadium = stadiumOverride || (rulesState.enabled ? getStadium() : null);
   const card = stadium?.card || stadium;
   if (!card) return baseRetreat;
   const delta = parseStadiumRetreatModifier(card);
   if (delta === 0) return baseRetreat;
-  if (!stadiumFilterMatches(pokemon, card)) return baseRetreat;
+  // Altar of the Moone: "each Pokémon … that has any {P} or {D} Energy attached to it" is an
+  // Energy filter, not a Pokémon type filter.
+  const energyClause = textOf(card).match(/that has any ((?:\{[a-z]\}(?: or |, )?)+) energy attached/);
+  if (energyClause) {
+    const types = [...energyClause[1].matchAll(/\{([a-z])\}/g)].map((m) => SUBJECT_TYPE_WORDS[m[1]]).filter(Boolean);
+    if (!types.some((type) => hasAttachedEnergy(pokemon, zoneCards || [], { type }))) return baseRetreat;
+  } else if (!stadiumFilterMatches(pokemon, card)) return baseRetreat;
   const scope = stadiumTargetScope(card);
   const stadiumUser = stadium?.user ?? stadium?.playedBy;
   if (scope === 'opponent' && targetPlayer === stadiumUser) return baseRetreat;
@@ -2042,6 +2066,20 @@ function stadiumSubjectPredicate(segment) {
   return (card) => Boolean(card) && preds.some((p) => p(card));
 }
 
+// Sky Pillar (customhb): "All {N} Pokémon in play take 20 less damage from Pokémon with {W}, {F} or {P}
+// Energy attached." The attacker must have an Energy of a named type attached.
+const ENERGY_ATTACKER_REDUCTION =
+  /^(?:all|each) ([^.]*?pok[eé]mon)(?: in play)? take \d+ less damage from pok[eé]mon with ((?:\{[a-z]\}(?:,? (?:or|and) |, )?)+) energy attached/;
+
+function energyAttackerReductionApplies(match, defender, attacker, attackerZoneCards) {
+  const matchesDefender = stadiumSubjectPredicate(match[1]);
+  if (!matchesDefender || !matchesDefender(defender) || !attacker) return false;
+  const wanted = [...match[2].matchAll(/\{([a-z])\}/g)].map((m) => SUBJECT_TYPE_WORDS[m[1]]).filter(Boolean);
+  return (attackerZoneCards || [])
+    .filter((c) => c?.attachedTo === attacker.instanceId && /energy/i.test(String(c.supertype || c.category || c.type || '')))
+    .some((c) => wanted.includes(lower(resolveAttachedEnergyType(c))));
+}
+
 const BOTH_SIDES_RE = /\s*\(both yours and your opponent'?s\)/;
 
 /**
@@ -2049,13 +2087,26 @@ const BOTH_SIDES_RE = /\s*\(both yours and your opponent'?s\)/;
  * opponent's Pokémon (after applying Weakness and Resistance)" (Full Metal Lab, Granite Cave,
  * Circhester Bath). Damage to `defender` is reduced by N; 0 when it does not apply.
  */
-export function stadiumAttackDamageReductionFor(stadiumCard, defender) {
+export function stadiumAttackDamageReductionFor(stadiumCard, defender, { attacker = null, attackerZoneCards = [] } = {}) {
   const amount = parseStadiumDamageReduction(stadiumCard);
   if (amount <= 0 || !defender) return 0;
   const t = textOf(stadiumCard);
+  const fromEnergy = t.match(ENERGY_ATTACKER_REDUCTION);
+  if (fromEnergy) {
+    return energyAttackerReductionApplies(fromEnergy, defender, attacker, attackerZoneCards) ? amount : 0;
+  }
   const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+takes?\s+\d+\s+less damage/);
   const matches = m ? stadiumSubjectPredicate(m[1]) : null;
   return matches && matches(defender) ? amount : 0;
+}
+
+// Pokémon-EX (XY/BW, uppercase) — not the lowercase Pokémon ex. TCGdex names them "Lucario EX"
+// with suffix "EX" and no subtypes (xy3-54); other sources write "Lucario-EX".
+function isLegacyPokemonEx(card) {
+  if (!card) return false;
+  if (card.suffix === 'EX') return true;
+  if (Array.isArray(card.subtypes) && card.subtypes.map(String).includes('EX')) return true;
+  return /[\s-]EX$/.test(String(card.name || ''));
 }
 
 /**
@@ -2067,18 +2118,17 @@ export function stadiumAttackDamageBonusFor(stadiumCard, attacker, defender, { d
   const bonus = parseStadiumAttackDamageBonus(stadiumCard);
   if (bonus <= 0 || !attacker) return 0;
   const t = textOf(stadiumCard);
-  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+do\s+\d+\s+more damage to the ([^(.]*)/);
+  const m = t.match(/(?:^|\.\s+)([^.]*?)\s*\(both yours and your opponent'?s\)\s+do\s+\d+\s+more damage to (?:the )?([^(.]*)/);
   if (!m) return 0;
   const matches = stadiumSubjectPredicate(m[1]);
   if (!matches || !matches(attacker)) return 0;
   const target = m[2].trim();
   if (!defenderIsActive) return 0;
   if (/pok[eé]mon-ex$/.test(target)) {
-    const name = String(defender?.name || '');
-    const subtypes = Array.isArray(defender?.subtypes) ? defender.subtypes.map(String) : [];
-    return /-EX$/.test(name) || subtypes.includes('EX') ? bonus : 0;
+    return isLegacyPokemonEx(defender) ? bonus : 0;
   }
-  return /^(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
+  // Devoured Field (sm4-93) prints "to the opponent's Active Pokémon".
+  return /^(?:your )?(?:opponent'?s active pok[eé]mon|defending pok[eé]mon)$/.test(target) ? bonus : 0;
 }
 
 /**

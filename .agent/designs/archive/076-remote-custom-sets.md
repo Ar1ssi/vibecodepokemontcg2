@@ -121,7 +121,7 @@ live-reloads them from there."
 Exports:
 - `CUSTOM_SETS_INDEX_FORMAT = 'ptcg-sim.custom-sets-index'`, `CUSTOM_SETS_INDEX_VERSION = 1`.
 - `PUBLISHED_FILE_RE = /^(set\.json|foil\.json|CHANGELOG\.md|[0-9]{3}\/(high|low)\.webp|foil\/[0-9]{3}-[a-z]{2,8}\.webp)$/`.
-- `MAX_INDEX_BYTES = 4 << 20`, `MAX_PUBLISHED_SETS = 50`, `MAX_FILES_PER_SET = 4000`,
+- `MAX_INDEX_BYTES = 4 << 20`, `MAX_PUBLISHED_SETS = 50`, `MAX_FILES_PER_SET = 8000`,
   `MAX_BLOB_BYTES = 16 << 20`, `MAX_SET_BYTES = 512 << 20` (sum of a set's sizes).
 - `validateCustomSetsIndex(json) → {ok: boolean, errors: string[], index}`. Rules: format and version exact;
   `sets` is a plain object with ≤ MAX_PUBLISHED_SETS keys, each `isCustomSetId`. Each set has `files`, a plain

@@ -10,6 +10,7 @@ import { isBasicPokemon, isPokemon, isEnergy, isAttachedAsTool } from '../cards.
 import { isExCard, isGxCard, isVCard, isVmaxCard, isTeraCard } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
 import { rewriteLegacyPowerWording, parseLegacyDamageModifier } from './legacy-power-wording.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 
 const lower = (v) =>
   String(v ?? '')
@@ -36,7 +37,13 @@ function modernWording(text) {
   let rewritten = legacyRewriteCache.get(text);
   if (rewritten === undefined) {
     // Custom-set prints say "in your Active slot" for "in the Active Spot" (customhb Neutralizing Gas).
-    rewritten = rewriteLegacyPowerWording(text).replace(/\bin (?:your|the) active slot\b/g, 'in the active spot');
+    // Hand-typed wordings read as their printed spelling first (effect-wording.mjs), and TCGdex's
+    // type words ("any Water Energy", "Colorless more", "GrassGrass") as the {X} symbols every
+    // reader matches (symbolizeTypeWords also applies canonicalEffectWording).
+    rewritten = rewriteLegacyPowerWording(symbolizeTypeWords(text).toLowerCase()).replace(
+      /\bin (?:your|the) active (?:slot|spot)\b/g,
+      'in the active spot'
+    );
     legacyRewriteCache.set(text, rewritten);
   }
   return rewritten;
@@ -56,6 +63,27 @@ export const cardAbilityText = (card) =>
   );
 
 const textOf = cardAbilityText;
+
+// "You can't use more than 1 Quick Search Ability each turn" (Pidgeot ex, Dudunsparce): every copy
+// shares the limit, where the once-per-turn flag is each Pokémon's own. Meowth ex's wording
+// covers every Ability with "Last-Ditch" in its name. Printed as `each turn` or `during your turn`.
+const ABILITY_NAME_LIMIT =
+  /you can't use more than 1 (?:ability that has ["\u201c]([^"\u201c\u201d]+)["\u201d] in its name|([^.]+?) ability) (?:each|during your) turn/;
+
+/** The flag key every copy of a name-limited Ability shares (`text` is the Ability's own text), or null. */
+export function abilityNameLimitKey(text) {
+  const match = ABILITY_NAME_LIMIT.exec(lower(text));
+  const name = (match?.[1] ?? match?.[2])?.trim();
+  return name ? `abilityName:${name}` : null;
+}
+
+/** `abilityNameLimitKey` for one of a card's Abilities, read the way executeAbility reads its text. */
+export function abilityNameLimitKeyFor(card, abilityIndex = 0) {
+  const ability = card?.abilities?.[abilityIndex];
+  return abilityNameLimitKey(
+    typeof ability === 'string' ? ability : ability?.text || card?.abilityText || card?.text || card?.effect || ''
+  );
+}
 
 // --- position ----------------------------------------------------------
 
@@ -98,6 +126,14 @@ const HAND_ACTIVATION_CLAUSE =
 
 export function isHandActivatedAbility(card) {
   return HAND_ACTIVATION_CLAUSE.test(textOf(card));
+}
+
+// Darkrai-GX Restoration (sm3-88) / Giratina Distortion Door (sm8-97): "if this Pokémon is in your
+// discard pile, you may put it onto your Bench" — used from the discard pile.
+const DISCARD_ACTIVATION_CLAUSE = /if this pok[eé]mon is in your discard pile, you may put it onto your bench/;
+
+export function isDiscardActivatedAbility(card) {
+  return DISCARD_ACTIVATION_CLAUSE.test(textOf(card));
 }
 
 // Marshadow Resetting Hole: "if this Pokémon is on your Bench, you may …".
@@ -166,12 +202,12 @@ export function isBenchPlayedTrigger(card) {
 // Out…", "Whenever your opponent attaches…") that must never run from the ability button.
 // Checked over the full corpus (S266): every non-matching text is a passive or trigger.
 const ACTIVATED_ABILITY_CLAUSE =
-  /once during your turn|during your (?:first )?turn\b[^.]*?\byou may\b|at any time during your turn|once during a game on your turn|you may use this ability|as often as you like|once per turn|when you play [^.]*?from your hand/;
+  /once during your turn|during your (?:first )?turn\b[^.]*?\byou may\b|at any time during your turn|once during a game on your turn|you may use this ability|as often as you like|once per turn|when you play [^.]*?from your hand|you may move [^.]*energy[^.]*from your opponent's active pok[eé]mon to this pok[eé]mon/;
 
 export function isActivatedAbility(card, abilityIndex = 0) {
   const ability = Array.isArray(card?.abilities) ? card.abilities[abilityIndex] : null;
   const text = typeof ability === 'string' ? ability : ability?.text;
-  return ACTIVATED_ABILITY_CLAUSE.test(text != null ? lower(text) : textOf(card));
+  return ACTIVATED_ABILITY_CLAUSE.test(text != null ? modernWording(lower(text)) : textOf(card));
 }
 
 // --- passive -----------------------------------------------------------
@@ -601,6 +637,8 @@ const parseNumber = (m) => (m?.[1] ? parseInt(m[1], 10) || 0 : 0);
 export function parseDamageReduction(card) {
   const t = textOf(card);
   if (!t || parseLegacyDamageModifier(t)) return { reduce: 0 };
+  // Jamming Net: the holder's own attacks do less damage — a penalty, not damage it takes less of.
+  if (/the attacks of the pok[eé]mon this card is attached to do \d+ less damage/.test(t)) return { reduce: 0 };
   const matches =
     t.includes('less damage') ||
     t.includes('reduce damage') ||
@@ -995,13 +1033,18 @@ export function parseKoPrevention(card) {
         t.includes('flip'))) ||
     (t.includes('full hp') &&
       t.includes('would be knocked out') &&
-      t.includes('not knocked out'));
+      t.includes('not knocked out')) ||
+    // Togepi Egg Shell (customhb): "… would be Knocked Out by an attack, this Pokémon is not
+    // Knocked Out. Instead, it remains in play with 10 HP remaining."
+    (t.includes('would be knocked out') && t.includes('not knocked out') && /remains in play/.test(t));
   if (!matches) return out;
   out.fullHpOnly = t.includes('full hp');
   out.coinFlip = /flip a coin/.test(t);
+  // "… has 10 HP remaining instead" (Ribombee Survival of the Cutest), "… with 10 HP remaining".
   const survive =
-    t.match(/remaining hp becomes?\s+(\d+)/) || t.match(/hp becomes?\s+(\d+)/);
+    t.match(/remaining hp becomes?\s+(\d+)/) || t.match(/hp becomes?\s+(\d+)/) || t.match(/(\d+)\s*hp remaining/);
   if (survive) out.surviveHp = parseInt(survive[1], 10);
+  if (/if this pok[ée]mon is your only pok[ée]mon in play/.test(t)) out.onlyPokemonInPlay = true;
   return out;
 }
 

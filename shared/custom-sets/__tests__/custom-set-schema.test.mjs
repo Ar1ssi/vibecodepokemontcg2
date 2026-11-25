@@ -54,6 +54,13 @@ test('set id, folder, code and name rules', () => {
 
 test('card identity: localId, id, image, duplicates', () => {
   assert.match(validateCustomSet(withCard({ localId: '1' })).errors.join(), /localId: three digits/);
+  assert.match(validateCustomSet(withCard({ localId: '0001', id: 'customhbw-0001' })).errors.join(), /localId: three digits/);
+  assert.deepEqual(
+    validateCustomSet(withCard({ localId: '1000', id: 'customhbw-1000', image: '/src/assets/custom-sets/customhbw/1000' })).errors,
+    [],
+  );
+  assert.equal(isCustomCardId('customhbw-1000'), true);
+  assert.equal(isCustomCardId('customhbw-0999'), false);
   assert.match(validateCustomSet(withCard({ id: 'customhbw-009' })).errors.join(), /id: expected "customhbw-001"/);
   assert.match(validateCustomSet(withCard({ image: 'https://x/y' })).errors.join(), /image: expected/);
   const dup = sampleSet();
@@ -127,8 +134,8 @@ test("Energy rules: kind, a Special Energy's effect; a Basic Energy needs none",
 
 test('too many cards and printed decklist codes are refused', () => {
   const big = sampleSet();
-  big.cards = Array.from({ length: 1000 }, () => big.cards[0]);
-  assert.match(validateCustomSet(big).errors.join(), /cards: at most 999/);
+  big.cards = Array.from({ length: 5001 }, () => big.cards[0]);
+  assert.match(validateCustomSet(big).errors.join(), /cards: at most 5000/);
   assert.match(
     validateCustomSet(sampleSet({ id: 'customsvi', code: 'SVI', cards: [] }), { reservedCodes: ['SVI'] }).errors.join(),
     /code: SVI is a printed set's decklist code/

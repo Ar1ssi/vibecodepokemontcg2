@@ -8,6 +8,7 @@ import { createRng } from '../rng.mjs';
 import { applyCommand } from '../reduce.mjs';
 import { parseAttackSteps } from '../rules/attack-steps.mjs';
 import { eachPokemonDamage } from '../rules/damage-parser.mjs';
+import { classifyDamagePlan } from '../../../client/src/setup/netcode/mat-fx/combat-pose.mjs';
 
 const steps = (text, selfName = 'Yveltal') => {
   const parsed = parseAttackSteps(text, { selfName });
@@ -120,6 +121,21 @@ test('Corrosive Winds: counters only on the Pokémon that already had damage', (
   assert.equal(damageOf(state, 'p2', 20), 0);
   assert.equal(damageOf(state, 'p2', 21), 50);
   assert.equal(damageOf(state, 'p2', 22), 0);
+});
+
+test('Corrosive Winds: the counters are reported as dealt, so the client never plays a heal', () => {
+  const res = applyCommand(
+    board({
+      text: "Put 2 damage counters on each of your opponent's Pokémon that has any damage counters on it.",
+      opponent: [{ instanceId: 20, name: 'Active', hp: 200 }, { instanceId: 21, name: 'Hurt', hp: 200, damage: 30 }],
+    }),
+    { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' },
+    createRng(5)
+  );
+  const updates = res.events.filter((e) => e.type === 'damageUpdated');
+  assert.deepEqual(updates.map((e) => [e.instanceId, e.damage, e.dealt]), [[21, 50, 20]]);
+  // The client remembers a total from an earlier game or an undone turn; the event still reads as a hit.
+  assert.deepEqual(classifyDamagePlan(updates[0], new Map([[21, 120]])), { kind: 'hit', amount: 20, weakness: false });
 });
 
 test('Night Roam: a Knock Out on your own Bench gives your opponent the Prize', () => {

@@ -6,6 +6,7 @@
  */
 
 import { cloneCard } from './cards.mjs';
+import { choiceForChooser } from './choice-zone-view.mjs';
 
 /**
  * Strips all hidden card information, returning only identity.
@@ -86,18 +87,36 @@ function redactOwnerZones(player) {
 }
 
 /**
+ * Setup is still open: the starter's turn-1 draw is owed and some player has no Starting Active
+ * yet (rules/opening-draw.mjs). The Starting Active is placed face down until then, so neither
+ * player sees the other's choice before committing their own.
+ *
+ * @param {object} state
+ * @returns {boolean}
+ */
+function openingSetupHidden(state) {
+  if (state?.openingDrawPending == null) return false;
+  return Object.values(state.players || {}).some((player) => !(player?.zones?.active || []).length);
+}
+
+// A face-down Starting Active keeps `attachedTo` so a rules-off game's attachments still lay out.
+const faceDownInPlay = (card) =>
+  card?.attachedTo != null ? { ...redactCard(card), attachedTo: card.attachedTo } : redactCard(card);
+
+/**
  * Redacts a player's zones for the opponent ('them').
  *
  * @param {object} player
+ * @param {{ setupHidden?: boolean }} [options] hide the Starting Active while setup is open
  * @returns {object} Redacted zones
  */
-function redactOpponentZones(player) {
+function redactOpponentZones(player, { setupHidden = false } = {}) {
   const zones = player.zones || {};
   return {
     deck: { count: (zones.deck || []).length },
     hand: (zones.hand || []).map((c) => (c.revealed ? sanitizeCard(c) : redactCard(c))),
     prizes: prizeCards(player),
-    active: (zones.active || []).map(sanitizeCard),
+    active: (zones.active || []).map(setupHidden ? faceDownInPlay : sanitizeCard),
     bench: (zones.bench || []).map(sanitizeCard),
     discard: (zones.discard || []).map(sanitizeCard),
     lostZone: (zones.lostZone || []).map(sanitizeCard),
@@ -182,7 +201,7 @@ export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } =
   let pendingChoice = null;
   if (state.pendingChoice) {
     if (!isSpectator && state.pendingChoice.player === playerId) {
-      pendingChoice = JSON.parse(JSON.stringify(state.pendingChoice));
+      pendingChoice = choiceForChooser(state, state.pendingChoice);
     } else {
       pendingChoice = redactPendingChoiceForOpponent(state.pendingChoice);
     }
@@ -245,7 +264,7 @@ export function viewFor(state, playerId, { attackExtrasFor, costDiscountsFor } =
           username: opponent.username,
           deckFormat: opponent.deckFormat,
           flags: playerFlags(opponent),
-          zones: redactOpponentZones(opponent),
+          zones: redactOpponentZones(opponent, { setupHidden: openingSetupHidden(state) }),
         }
       : null,
   };
@@ -315,7 +334,7 @@ export function viewForSolo(state, nearId, { attackExtrasFor, costDiscountsFor }
     ...view,
     solo: true,
     choiceSeat,
-    pendingChoice: choiceSeat ? JSON.parse(JSON.stringify(choice)) : view.pendingChoice,
+    pendingChoice: choiceSeat ? choiceForChooser(state, choice) : view.pendingChoice,
     them: far
       ? {
           ...view.them,

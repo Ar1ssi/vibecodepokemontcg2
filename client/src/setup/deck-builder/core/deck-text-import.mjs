@@ -31,6 +31,49 @@ export const PTCGL_SET_IDS = {
   PBL: 'me05',
   MEP: 'mep',
   SVP: 'svp',
+  // Sun & Moon and Sword & Shield, as printed on Limitless / JustInBasil lists.
+  SUM: 'sm1',
+  GRI: 'sm2',
+  BUS: 'sm3',
+  SLG: 'sm3.5',
+  CIN: 'sm4',
+  UPR: 'sm5',
+  FLI: 'sm6',
+  CES: 'sm7',
+  DRM: 'sm7.5',
+  LOT: 'sm8',
+  TEU: 'sm9',
+  DET: 'det1',
+  UNB: 'sm10',
+  UNM: 'sm11',
+  HIF: 'sm115',
+  CEC: 'sm12',
+  'PR-SM': 'smp',
+  SSH: 'swsh1',
+  RCL: 'swsh2',
+  DAA: 'swsh3',
+  CPA: 'swsh3.5',
+  VIV: 'swsh4',
+  SHF: 'swsh4.5',
+  BST: 'swsh5',
+  CRE: 'swsh6',
+  EVS: 'swsh7',
+  CEL: 'cel25',
+  FST: 'swsh8',
+  BRS: 'swsh9',
+  ASR: 'swsh10',
+  PGO: 'swsh10.5',
+  LOR: 'swsh11',
+  SIT: 'swsh12',
+  CRZ: 'swsh12.5',
+  'PR-SW': 'swshp',
+};
+
+// Older lists abbreviate the three-type Unit Energy cards; TCGdex spells them out.
+const UNIT_ENERGY_TYPES = {
+  fdy: 'FightingDarknessFairy',
+  grw: 'GrassFireWater',
+  lpm: 'LightningPsychicMetal',
 };
 
 const ENERGY_SYMBOLS = {
@@ -44,19 +87,37 @@ const ENERGY_SYMBOLS = {
   M: 'Metal',
 };
 
-const SECTION_HEADER_RE = /^(pok[eé]mon|trainers?|energy|deck|total cards?)\b[^a-z]*$/i;
+const SECTION_HEADER_RE = /^(pok[eé]mon|trainers?( cards?)?|energy( cards?)?|deck|total cards?)\b[^a-z]*$/i;
 const COMMENT_RE = /^(#|\/\/)/;
 // "4 Pikachu ex SVI 57", "4x Pikachu ex (SVI) 57", "4 Pikachu ex"
 const LINE_RE = /^(\d{1,3})\s*x?\s+(.+)$/i;
-const SET_SUFFIX_RE = /^(.*?)\s+\(?([A-Z][A-Z0-9.-]{1,5})\)?\s+([A-Za-z]{0,4}\d+[a-z]?)$/;
+// The set code is 2-6 capitals, or a "SWSHEnergy"-style energy-series code.
+const SET_SUFFIX_RE =
+  /^(.*?)\s+\(?([A-Z][A-Z0-9.-]{1,5}|[A-Z]{2,5}Energy)\)?\s+([A-Za-z]{0,4}\d+[a-z]?)$/;
 
+// Lists and TCGdex spell the same card differently: "{*}" vs "◇" (Prism Star), "Zoroark-GX" vs
+// "Zoroark GX", straight vs curly apostrophes, "Unit Energy FDY" vs its spelled-out type list.
+// Both sides of a name comparison go through this, so any spelling matches any other.
 const normalize = (value = '') =>
   String(value)
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
+    .replace(/\{\*\}/g, '◇')
+    .replace(/[‘’]/g, "'")
+    .replace(/-(?=(gx|ex)\b)/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/^unit energy (fdy|grw|lpm)\b/, (_, abbr) => `unit energy ${UNIT_ENERGY_TYPES[abbr].toLowerCase()}`);
+
+/** The TCGdex name-search term for a list name: the card's base name, spelled the way TCGdex does. */
+export const searchTermFor = (name = '') =>
+  String(name)
+    .replace(/\s*(\{\*\}|◇)\s*$/, '')
+    .replace(/-(?=(GX|EX)\b)/g, ' ')
+    .replace(/'/g, '’')
+    .replace(/^(Unit Energy)\s+(FDY|GRW|LPM)\b.*$/i, (_, base, abbr) => `${base} ${UNIT_ENERGY_TYPES[abbr.toLowerCase()]}`)
+    .trim();
 
 const stripLeadingZeros = (number = '') => String(number).replace(/^0+(?=\d)/, '');
 
@@ -188,7 +249,7 @@ export async function resolveEntry(entry, deps) {
   }
 
   try {
-    const candidates = await deps.searchByName(entry.name);
+    const candidates = await deps.searchByName(searchTermFor(entry.name));
     const card = chooseCandidate(
       (candidates || []).filter((candidate) => candidate?.image),
       entry,

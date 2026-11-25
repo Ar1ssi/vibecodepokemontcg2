@@ -8,11 +8,11 @@ import { discardCardToPlayerZone } from '../state.mjs';
 import { isEnergy, getRetreatCostCount } from '../cards.mjs';
 import { flipCoin } from '../rng.mjs';
 import { expandEnergyEntries, canPayAttackCost } from '../rules/attack-engine.mjs';
-import { combinedToolRetreatCost } from '../rules/tool-combat.mjs';
+import { combinedToolRetreatCost, toolRetreatEnergyToHand } from '../rules/tool-combat.mjs';
 import { teamNoRetreatCostForActive } from '../rules/ability-executors.mjs';
 import { stadiumRetreatCoin } from '../rules/stadium-triggers.mjs';
 import { applyStadiumSwitchTriggers } from '../effects/stadium-trigger-apply.mjs';
-import { abilityRetreatCost } from '../rules/ability-combat.mjs';
+import { abilityNoRetreatCost, abilityRetreatCost, opponentRetreatConditions } from '../rules/ability-combat.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
 import { clearAttackMarkers } from '../rules/attack-markers.mjs';
 import {
@@ -20,9 +20,9 @@ import {
 } from '../rules/special-energy-parse.mjs';
 import { getStadiumRetreatCost, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
-import { clearConditions } from '../rules/special-conditions.mjs';
+import { addCondition, clearConditions } from '../rules/special-conditions.mjs';
 import {
-  activeAttackMarkers, inPlayView, energyProvisionContext, markerCount, abilitySideContext,
+  activeAttackMarkers, inPlayView, energyProvisionContext, markerCount, abilitySideContext, conditionsUpdatedEvent,
 } from './shared.mjs';
 
 // Effective retreat cost including printed base stats, top evolution, attached Tools, Bench abilities, and Stadium modifiers.
@@ -47,7 +47,9 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   );
   if (isActive && teamNoRetreatCostForActive(inPlayView(state, card), benchViews, activeZone)) return 0;
   // Magnetic Metal / Hiding Darkness / Holon WP Energy (audit SE6): "has no Retreat Cost".
-  if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone)) return 0;
+  if (hasSpecialEnergyFreeRetreat(inPlayView(state, card), activeZone, state.stadium)) return 0;
+  // Giratina Dimension Breach, Wimpod Punk Out (customhb).
+  if (abilityNoRetreatCost(inPlayView(state, card), { ...abilitySideContext(state, playerId), zone: zoneId, isActive })) return 0;
 
   // 1. Tool retreat cost modifier + self ability modifier
   const blockTools = isStadiumToolNegation(stadium?.card || stadium);
@@ -65,6 +67,7 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
     benchCards: player?.zones?.bench || [],
     sideCards,
     opponentSideCards,
+    turnNumber: state.turn?.number ?? null,
   });
 
   // 2. In-play ability retreat modifiers: the own-bench "your Active's Retreat
@@ -78,13 +81,13 @@ export function computeEffectiveRetreatCost(state, card, playerId, { zoneId = 'a
   });
 
   // 3. Stadium retreat modifier (e.g. Beach Court)
-  cost = getStadiumRetreatCost(cost, card, playerId, stadium);
+  cost = getStadiumRetreatCost(cost, card, playerId, stadium, activeZone);
 
   // 4. "Its Retreat Cost is {C} more" attack markers (Mawile, Grimer).
   cost += markerCount(activeAttackMarkers(state, playerId, card), 'retreatDelta', 'amount');
 
   // 5. Mystery Energy: "Retreat Cost is {C}{C} less".
-  cost -= getSpecialEnergyRetreatReduction(inPlayView(state, card), activeZone);
+  cost -= getSpecialEnergyRetreatReduction(inPlayView(state, card), activeZone, state.stadium);
 
   return Math.max(0, cost);
 }
@@ -181,6 +184,17 @@ export function applyRetreatSwap(
   const active = player?.zones?.active?.find((c) => !c.attachedTo);
   if (!player || !active) return;
   const costN = computeEffectiveRetreatCost(draft, active, playerId);
+  const stadiumCard = draft.stadium?.card || draft.stadium || null;
+  const toHand = toolRetreatEnergyToHand(active, player.zones.active, {
+    blockTools: isStadiumToolNegation(stadiumCard),
+    stadium: stadiumCard,
+  });
+  const payEnergy = (card) => {
+    card.attachedTo = null;
+    if (!toHand) return discardCardToPlayerZone(player, card);
+    player.zones.hand.push(card);
+    return 'hand';
+  };
 
   // Discard energy cost
   if (Array.isArray(discardEnergyIds) && discardEnergyIds.length > 0) {
@@ -188,8 +202,7 @@ export function applyRetreatSwap(
       const idx = player.zones.active.findIndex((c) => c.instanceId === id);
       if (idx >= 0) {
         const [discarded] = player.zones.active.splice(idx, 1);
-        discarded.attachedTo = null;
-        const to = discardCardToPlayerZone(player, discarded);
+        const to = payEnergy(discarded);
         events.push({
           type: 'cardMoved',
           instanceId: id,
@@ -209,8 +222,7 @@ export function applyRetreatSwap(
       const card = player.zones.active[i];
       if (card.attachedTo === active.instanceId && isEnergy(card)) {
         player.zones.active.splice(i, 1);
-        card.attachedTo = null;
-        const to = discardCardToPlayerZone(player, card);
+        const to = payEnergy(card);
         discardedCount++;
         events.push({
           type: 'cardMoved',
@@ -285,6 +297,9 @@ export function applyRetreatSwap(
       promotedId: benchPokemon.instanceId,
       playerId,
     });
+    for (const { condition } of opponentRetreatConditions(abilitySideContext(draft, playerId))) {
+      if (addCondition(benchPokemon, condition)) events.push(conditionsUpdatedEvent(benchPokemon, condition));
+    }
   }
 }
 

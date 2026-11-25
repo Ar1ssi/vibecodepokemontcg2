@@ -211,6 +211,9 @@ export function parseToolCondition(card) {
   if (attachedToType && !out.holderType && TYPE_WORDS[attachedToType[1]]) {
     out.holderType = TYPE_WORDS[attachedToType[1]];
   }
+  // Crystal Edge / Crystal Wall: "If this card is attached to White Kyurem-EX, …" names the holder.
+  const attachedToName = t.match(/\bif this card is attached to (?!an?\b|1\b|anything\b|the\b|your\b)([^,{]+?), /);
+  if (attachedToName && !out.holderNames) out.holderNames = [attachedToName[1].trim()];
 
   if (/doesn'?t have a rule box|does not have a rule box/.test(t)) {
     out.holderNoRuleBox = true;
@@ -281,7 +284,8 @@ export function parseToolCondition(card) {
     /your opponent'?s active ([^.]*?)(?: is knocked out|\.|$)/
   );
   if (defenderClause) {
-    const segment = defenderClause[1];
+    // "…has any {F} Energy attached" (Orthworm Earth Eater) names an Energy, not the defender's type.
+    const segment = defenderClause[1].replace(/\bhas (?:any|an?) (?:\{[a-z]\} )?energy(?: cards?)? attached\b/g, '');
     const types = [...segment.matchAll(/\{([a-z])\}/g)]
       .map((m) => TYPE_WORDS[m[1]])
       .filter(Boolean);
@@ -410,6 +414,10 @@ export function holderView(pokemon, zoneCards) {
 /** Gated HP bonus of one Tool (0 when its printed condition fails). */
 export function toolHpBonusFor(tool, ctx = {}) {
   if (!toolConditionMet(parseToolCondition(tool), ctx)) return 0;
+  // Crystal Wall: "its maximum HP is 300" sets the holder's printed HP to that number.
+  const setHp = textOf(tool).match(/\bits maximum hp is (\d+)\b/);
+  const printedHp = Number(ctx.holder?.hp) || 0;
+  if (setHp && printedHp) return Number(setHp[1]) - printedHp;
   return parseHpBonus(tool).bonus || 0;
 }
 

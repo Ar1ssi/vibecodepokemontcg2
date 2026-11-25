@@ -66,6 +66,7 @@ export function isEvolvePlayedTriggerCard(card) {
 export async function computeActionAffordances({
   activeCard = null,
   attachedEnergyCards = [],
+  attachedCards = null,
   benchCards = [],
   handCards = [],
   stadiumCard = null,
@@ -100,6 +101,7 @@ export async function computeActionAffordances({
     } = await resolveAttackContext({
       activeCard,
       attachedEnergyCards,
+      attachedCards,
       ensureCardData,
       stadiumCard,
       abilityUsed: isAbilityUsed,

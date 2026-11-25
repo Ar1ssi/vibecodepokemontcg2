@@ -286,8 +286,10 @@
 /* ── Default sparkle ───────────────────────────────────────────────────
    Fine foil grain is the strongest "real foil" cue. Two iridescent grain
    layers sized relative to the card slide opposite ways as the light moves
-   and cross-fade, so specks twinkle. Rarities with their own glitter keep it. */
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter {
+   and cross-fade, so specks twinkle. Rarities with their own glitter keep it.
+   TCG Live foil cards (data-rarity="tcgl") are excluded here: this selector outranks
+   tcgl-foil.css's hide rule, and its dark color-dodge grain painted over the foil shader. */
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]):not([data-rarity="tcgl"]) .card__glitter {
   --shift: 6%;
   display: grid;
   mix-blend-mode: color-dodge;
@@ -297,8 +299,8 @@
   opacity: .7;
 }
 
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter:before,
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter:after {
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]):not([data-rarity="tcgl"]) .card__glitter:before,
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]):not([data-rarity="tcgl"]) .card__glitter:after {
   content: "";
   background-image: var(--iri8);
   background-size: var(--glitter-tile-size);
@@ -309,7 +311,7 @@
   opacity: var(--pointer-from-left);
 }
 
-.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]) .card__glitter:after {
+.card[data-rarity]:not([data-rarity="hyper rare"]):not([data-rarity="special illustration rare"]):not([data-rarity="double rare"]):not([data-rarity$="reverse holo"]):not([data-rarity="shiny rare"]):not([data-rarity="break rare"]):not([data-rarity="legend rare"]):not([data-rarity="lvx rare"]):not([data-rarity="gold star"]):not([data-rarity="ace spec rare"]):not([data-rarity="tcgl"]) .card__glitter:after {
   background-image: var(--iri7);
   background-position:
     calc(50% - var(--pointer-from-left) * var(--shift))

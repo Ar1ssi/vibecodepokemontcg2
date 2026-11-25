@@ -17,6 +17,7 @@ import { clearBoardCounters } from '../counters/clear-board-counters.mjs';
 import { updateCount } from './count.js';
 import { clearReady } from './ready.js';
 import { resetDealOrder } from '../../setup/netcode/deal-order.js';
+import { resetDamageBaselines } from '../../setup/netcode/mat-fx/damage-hit.mjs';
 
 export const reset = (
   user,
@@ -31,6 +32,8 @@ export const reset = (
   }
 
   resetDealOrder();
+  // Instance ids restart each game: a remembered total from the last one would read as a heal.
+  resetDamageBaselines();
   cancelPrizeTake();
 
   const stadium = getZone('neutral', 'stadium');

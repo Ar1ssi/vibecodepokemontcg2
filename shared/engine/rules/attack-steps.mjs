@@ -32,6 +32,8 @@ function countOf(word) {
 // Card kinds a printed play lock names ("Pokémon Tool, Special Energy, or Stadium") → the
 // kinds reduce.mjs playLockReason compares against. No list is "any card".
 const PLAY_LOCK_KINDS = {
+  // Chimecho Bell of Silence (sm4-43): "any Pokémon that has an Ability" (played or evolved).
+  'pokémon that has an ability': ['pokemonWithAbility'],
   item: ['item'],
   supporter: ['supporter'],
   stadium: ['stadium'],
@@ -86,7 +88,8 @@ const GATES = [
   // Hypno Spiral Aura.
   [/^if your opponent's active pokémon isn't knocked out by the damage from this attack, /, { requiresDefenderSurvived: true }],
   // Scizor Accelerate.
-  [/^if your opponent's active pokémon is knocked out by (?:damage from )?this attack, /, { requiresDefenderKnockedOut: true }],
+  // Corviknight Accelerate (customhb) says "your opponent's Pokémon".
+  [/^if your opponent's (?:active )?pokémon is knocked out by (?:damage from )?this attack, /, { requiresDefenderKnockedOut: true }],
   [/^after your attack, /, {}],
   [/^after doing damage, /, {}],
   [/^then, /, {}],
@@ -135,6 +138,15 @@ function leadingExtraEnergy(sentence) {
     energyType: r[2] ? r[2].toUpperCase() : null,
   }));
   return requirements.length > 0 ? { length: m[0].length, requirements } : null;
+}
+
+// Paldean Tauros Jet Headbutt (customhb-672): a leading "If this Pokémon has any {F} Energy
+// attached, …" gates the rest of the sentence. A damage clause behind it ("this attack does …")
+// belongs to the damage parser (reduce/attack-effect.mjs), not to a step.
+const ATTACHED_ENERGY_PREFIX = /^if this pokémon has any \{([a-z])\} energy attached(?: to it)?, (?!this attack does)/;
+function leadingAttachedEnergy(sentence) {
+  const m = ATTACHED_ENERGY_PREFIX.exec(sentence);
+  return m ? { length: m[0].length, energyType: m[1].toUpperCase() } : null;
 }
 
 const ENERGY_TYPE = String.raw`(?:basic )?(?:\{([a-z])\} )?(?:basic )?`;
@@ -212,6 +224,18 @@ const TEMPLATES = [
       window: 'opponentNextTurn',
       marker: { kind: 'deferredCounters', count: Number(m[1]) },
     }),
+  ],
+  // Giratina ex Shadow Force (customhb): whichever Pokémon is Active then takes the damage
+  // (turn.mjs resolveDeferredKnockouts).
+  [
+    /^at the end of your opponent's next turn, (?:(?:their|your opponent's) active pokémon takes|this attack does) (\d+) damage(?: to their active pokémon)?$/,
+    (m) => ({ type: 'atkDeferredActiveDamage', amount: Number(m[1]) }),
+  ],
+  // Jirachi Wish (custom set): the heal waits for the end of the attacker's next turn
+  // (turn.mjs applyDeferredActiveHeal); damage-parser.mjs leaves it out of the immediate heal.
+  [
+    /^at the end of your next turn, heal (\d+) damage from your active pokémon$/,
+    (m) => ({ type: 'atkDeferredActiveHeal', amount: Number(m[1]) }),
   ],
   // Unown Hidden Power (Unseen Forces I): after its switch, "The new Defending Pokémon is now
   // Burned and Confused."
@@ -313,6 +337,11 @@ const TEMPLATES = [
       ...energyFilter(m[1], s),
     }),
   ],
+  // Orthworm Earth Eater (custom set): the opponent's Active Energy onto this Pokémon.
+  [
+    new RegExp(String.raw`^(?:you may )?move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to this pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'self', count: 1, ...energyFilter(m[1], s) }),
+  ],
   // Opponent Energy between their own Pokémon.
   [
     new RegExp(String.raw`^move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to (?:1 of (?:their|your opponent's) benched pokémon|another of (?:their|your opponent's) pokémon)$`),
@@ -397,7 +426,18 @@ const TEMPLATES = [
     new RegExp(String.raw`^for each of your opponent's pokémon in play, attach an? ${ENERGY_TYPE}energy card from your discard pile to your pokémon in any way you like$`),
     (m, s) => ({ type: 'atkAttach', source: 'discard', countFrom: 'opponentInPlay', ...energyFilter(m[1], s), target: 'any', spread: true }),
   ],
+  // Alolan Marowak Dance of Flames (sm4-12).
+  [
+    new RegExp(String.raw`^for each energy attached to your opponent's pokémon, attach an? ${ENERGY_TYPE}energy card from your discard pile to your pokémon in any way you like$`),
+    (m, s) => ({ type: 'atkAttach', source: 'discard', countFrom: 'opponentEnergy', ...energyFilter(m[1], s), target: 'any', spread: true }),
+  ],
   // Shuffle clauses.
+  // Flabébé Secret Blessings (sm6-84): "Shuffle 3 in any combination of Pokémon and basic Energy
+  // cards from your discard pile into your deck."
+  [
+    /^shuffle (up to \d+|\d+) in any combination of pokémon and basic energy cards from your discard pile into your deck$/,
+    (m) => ({ type: 'atkShuffleFromDiscard', ...attachCount(m[1]), what: 'Pokémon or Basic Energy' }),
+  ],
   [
     new RegExp(String.raw`^shuffle (up to \d+|\d+|an?) ((?:basic )?(?:\{[a-z]\} )?(?:basic )?energy|item|trainer|pokémon)?\s?cards? from your discard pile into your deck$`),
     (m, s) => ({
@@ -408,7 +448,7 @@ const TEMPLATES = [
     }),
   ],
   [
-    /^(?:your opponent shuffles their active pokémon and all attached cards into their deck|shuffle your opponent's active pokémon and all cards attached to it into their deck)$/,
+    /^(?:your opponent shuffles their active pokémon and all (?:attached cards|cards attached to it) into their deck|shuffle your opponent's active pokémon and all cards attached to it into their deck)$/,
     () => ({ type: 'atkShuffleOppActive' }),
   ],
   [
@@ -457,6 +497,11 @@ const TEMPLATES = [
 
   // Self Energy discard behind the attack's own coin (design 032); parseAttackSteps drops
   // the ungated form, which parseAttackEnergyDiscard runs.
+  // Latias Mist Ball (SM135): "If tails, discard a {R} Energy and a {P} Energy from this Pokémon."
+  [
+    /^discard an? \{([a-z])\} energy and an? \{([a-z])\} energy from this pokémon$/,
+    (m) => ({ type: 'atkDiscardSelfEnergy', count: 2, energyPair: [m[1].toUpperCase(), m[2].toUpperCase()] }),
+  ],
   [
     /^discard (an?|\d+|all) (?:\{([a-z])\} )?energy(?: cards?)? (?:from|attached to) this pokémon$/,
     (m) => ({
@@ -470,11 +515,21 @@ const TEMPLATES = [
   // Disaster, Desert Hurricane, Somersault Dive): the damage parser reads the bonus, this
   // clears the Stadium after damage. (Flygon Desert Geyser's conditional wording is a BLOCK.)
   [/^discard that stadium(?: card)?$/, () => ({ type: 'atkDiscardStadium', owner: 'any' })],
+  // Single Strike Urshifu Field Crush (customhb).
+  // Bergmite Break Open (sm6-29): with a status that reads the discard ("If you discarded a
+  // Stadium in this way, …", attack-conditions.mjs discardedCardIs), it goes before damage.
+  [
+    /^if your opponent has a stadium in play, discard it$/,
+    (m, rest, context) =>
+      context?.fullText && /if you discarded a stadium in this way, [^.]*\bis now\b/.test(context.fullText)
+        ? { type: 'atkDiscardStadium', owner: 'opponent', beforeDamage: true, countsForDamage: true }
+        : { type: 'atkDiscardStadium', owner: 'opponent' },
+  ],
   // Great Tusk ex Bedrock Breaker, Kingdra-EX Big Storm, Lugia VSTAR Tempest Dive ("You may …"),
   // Brock's Primeape Mega Thrash / Light Piloswine Knock Over ("If there is a Stadium card in
   // play, [you may] discard it").
   [
-    /^(you may )?discard (?:a|any) stadium(?: card)? in play$/,
+    /^(you may )?discard (?:a|any|the) stadium(?: card)? in play$/,
     (m) => ({ type: 'atkDiscardStadium', owner: 'any', ...(m[1] ? { optional: true } : {}) }),
   ],
   [
@@ -509,6 +564,79 @@ const TEMPLATES = [
       { type: 'atkDiscardOppEnergy', scope: 'active', count: 1, special: true },
     ],
   ],
+  // Giratina Distortion Door (sm8-97), via effect-wording.mjs: "put 1 damage counter on 2 of your
+  // opponent's Benched Pokémon" reads as choosing the 2 first.
+  [
+    /^choose (\d+) of your opponent's (benched )?pokémon and put (\d+) damage counters? on each of them$/,
+    // Attacks place these counters through the damage parser's target clause (attackTargetClause).
+    (m, rest, context) =>
+      context?.forAbility
+        ? { type: 'atkCountersOnChosen', targets: Number(m[1]), count: Number(m[3]), scope: m[2] ? 'bench' : 'all' }
+        : null,
+  ],
+  // Marshadow Let Loose (sm3.5-45).
+  [
+    /^have each player shuffle their hand into their deck and draw (\d+) cards$/,
+    (m) => ({ type: 'ionoShuffle', drawCount: Number(m[1]) }),
+  ],
+  // Banette Red Eyes (sm7-65).
+  [
+    /^put a basic pokémon from your opponent's discard pile onto their bench$/,
+    () => ({ type: 'atkBenchFromAnyDiscard', side: 'opponent' }),
+  ],
+  // Ninjask Molting (sm8-30): a named Pokémon.
+  [
+    /^put an? ([a-z][a-z'’ -]*?) from your discard pile onto your bench$/,
+    (m) => (/pokémon|card/.test(m[1]) ? null : { type: 'atkBenchFromDiscard', count: 1, name: m[1].trim() }),
+  ],
+  // Darkrai-GX Restoration / Giratina Distortion Door: the Ability's own card, from the discard.
+  [/^put it onto your bench$/, () => ({ type: 'atkSourceFromDiscardToBench' })],
+  // Gengar Netherworld Gate (SWSH241): "If you do, put 3 damage counters on this Pokémon."
+  // Attacks read self-counters through the damage parser, so only an Ability takes this step.
+  [
+    /^put (\d+) damage counters? on this pokémon$/,
+    (m, rest, context) => (context?.forAbility ? { type: 'selfDamageAbility', count: Number(m[1]) } : null),
+  ],
+  // Wishiwashi Cowardice (sm1-44): an Ability's effect.
+  [/^discard all cards attached to this pokémon and return it to your hand$/, () => ({ type: 'atkReturnSelfToHand' })],
+  // Florges Wondrous Gift (sm6-86), after "Flip a coin. If heads,".
+  [
+    /^put an? (item|supporter|pokémon tool|trainer) card from your discard pile on top of your deck$/,
+    (m) => ({ type: 'atkRecover', count: 1, what: recoverWhat(m[1]), to: 'deckTop' }),
+  ],
+  // Typhlosion Blazing Energy (sm8-42): every attached Energy provides {R} this turn.
+  [
+    /^all energy attached to your pokémon are \{([a-z])\} energy instead of their usual type until the end of your turn$/,
+    (m) => ({ type: 'abilityEnergyTypeThisTurn', energyType: m[1].toUpperCase() }),
+  ],
+  // Patrat Glance (sm2-107), Chinchou Searching Light (sm1-49), Porygon Code Check (sm3-103),
+  // Poipole Eye Opener (sm8-107): the attacker sees the card(s), privately.
+  [
+    /^look at 1 of your (opponent's )?face-down prize cards$/,
+    (m) => ({ type: 'atkLookAt', source: m[1] ? 'oppPrize' : 'ownPrize' }),
+  ],
+  [/^look at your face-down prize cards$/, () => ({ type: 'atkLookAt', source: 'ownPrize', all: true })],
+  // Espurr Energy Teaser (sm6-44).
+  [
+    /^move an? energy from 1 of your opponent's benched pokémon to another of (?:their|your opponent's) pokémon$/,
+    () => ({ type: 'atkMoveEnergy', from: 'opponentBenchAny', to: 'opponentAny', count: 1 }),
+  ],
+  // Watchog Scrutinize (sm2-108).
+  [
+    /^look at the top (\d+) cards of your opponent's deck, discard (\d+) of them, and put the other cards? back$/,
+    (m) => ({ type: 'atkOppDeckTopDiscard', look: Number(m[1]), discard: Number(m[2]) }),
+  ],
+  // Tapu Lele Magical Swap (sm5-94).
+  [
+    /^move any number of damage counters on your opponent's pokémon to their other pokémon in any way you like$/,
+    () => ({ type: 'atkMoveOppCountersAnyWay' }),
+  ],
+  // Masquerain Surprising Pattern (sm7-16) / Skarmory Metallic Sound (sm1-88, both sides).
+  [
+    /^discard all special energy from each of your opponent's pokémon$/,
+    () => ({ type: 'atkDiscardOppEnergy', scope: 'any', all: true, special: true }),
+  ],
+  [/^discard all special energy from each pokémon$/, () => ({ type: 'atkDiscardAllSpecialEnergy' })],
   // Mega Dragalge ex Corrosive Liquid.
   [
     /^discard all pokémon tools and special energy from all of your opponent's pokémon$/,
@@ -585,6 +713,11 @@ const TEMPLATES = [
     /^if your opponent has \d+ o[rf] more cards in their hand, (?:discard a number of cards without looking|your opponent discards a number of cards) until your opponent has (\d+) cards left in their hand$/,
     (m) => ({ type: 'atkDiscardOppHand', leaveCount: Number(m[1]), random: /without looking/.test(m[0]) }),
   ],
+  // Purugly Toss Aside (sm5-109): random cards until the hand holds N.
+  [
+    /^discard random cards from your opponent's hand until they have (\d+) cards in their hand$/,
+    (m) => ({ type: 'atkDiscardOppHand', leaveCount: Number(m[1]), random: true }),
+  ],
   // Glaceon Ice Bind.
   [
     new RegExp(String.raw`^if your opponent doesn't discard a card from their hand, your opponent's active pokémon is now (${CONDITION})$`),
@@ -609,6 +742,11 @@ const TEMPLATES = [
   [
     /^discard any number of supporter cards? from your hand$/,
     () => ({ type: 'atkDiscardOwnHand', count: 'any', what: 'Supporter' }),
+  ],
+  // Snubbull Make a Mess (sm8-137): its damage counts the discard (parseAttackSteps moves it first).
+  [
+    /^discard up to (\d+) trainer cards? from your hand$/,
+    (m) => ({ type: 'atkDiscardOwnHand', count: Number(m[1]), upTo: true, what: 'Trainer' }),
   ],
   [
     /^discard up to (\d+) cards? from your hand$/,
@@ -645,6 +783,12 @@ const TEMPLATES = [
   [
     /^your opponent discards the top (?:(\d+) cards|card) (?:of|from) their deck$/,
     (m) => ({ type: 'atkMill', side: 'opponent', count: m[1] ? Number(m[1]) : 1 }),
+  ],
+  // Joltik Jolting Charge (customhb): "For each Energy card attached, discard a card from the top
+  // of your deck." — the cards this attack attached.
+  [
+    /^for each energy card attached(?: in this way)?, discard a card from the top of your deck$/,
+    () => ({ type: 'atkMill', side: 'self', perAttachedThisEffect: true }),
   ],
   // Dialga-EX Fast Forward.
   [
@@ -711,6 +855,21 @@ const TEMPLATES = [
   [
     /^put all (.+?) cards? from your discard pile into your hand$/,
     (m) => ({ type: 'atkRecover', all: true, what: m[1].trim() }),
+  ],
+  // Mareanie / Keldeo Bail Out (sm2-39, sm3.5-26): "Put a [Water] Pokémon from your discard pile
+  // into your hand" (no "card").
+  [
+    /^put (up to \d+|an?|\d+) ((?:basic )?(?:\{[a-z]\} )?)pokémon from your discard pile into your hand$/,
+    (m) => ({
+      type: 'atkRecover',
+      ...attachCount(m[1]),
+      what: `${m[2].replace(/\{([a-z])\}/, (_, l) => `{${l.toUpperCase()}}`).replace(/^basic/, 'Basic')}Pokémon`,
+    }),
+  ],
+  // Oranguru Resource Management (sm5-114).
+  [
+    /^put (\d+) cards from your discard pile on the bottom of your deck(?: in any order)?$/,
+    (m) => ({ type: 'atkRecover', count: Number(m[1]), what: null, to: 'deckBottom' }),
   ],
   // Any card: Dialga-EX Reverse Edge, Xatu Warp Hole, Unown Hidden Power; Azurill Delivery
   // ("Put any 1 card …").
@@ -787,6 +946,12 @@ const TEMPLATES = [
   [
     /^put (an?|\d+) cards? from your opponent's discard pile in the lost zone$/,
     (m) => ({ type: 'atkLostZoneOppDiscard', count: countOf(m[1]) }),
+  ],
+  // Custom-set Make It Rain: "Put any number of Basic Energy cards from your hand into the Lost
+  // Zone. This attack does 50 damage for each card you discarded in this way."
+  [
+    new RegExp(String.raw`^put any number of ${ENERGY_TYPE}energy cards? from your hand (?:in|into) the lost zone$`),
+    (m, s) => ({ type: 'atkLostZoneFromHand', anyNumber: true, what: 'energy', ...energyFilter(m[1], s) }),
   ],
   [/^put this pokémon and all (?:attached cards|cards attached to it) in the lost zone$/, () => ({ type: 'atkLostZoneSelf' })],
   [
@@ -876,6 +1041,27 @@ const TEMPLATES = [
   // Leave play
   [/^shuffle this pokémon and all (?:attached cards|cards attached to it) (?:back )?into your deck$/, () => ({ type: 'atkShuffleSelf' })],
   [/^shuffle your hand into your deck$/, () => ({ type: 'atkShuffleHandIntoDeck' })],
+  [/^shuffle all energy attached to this pokémon into your deck$/, () => ({ type: 'atkShuffleSelfEnergy' })],
+  // Magearna Change Clothes / Genesect ex Drive Change (customhb).
+  [
+    /^put a pokémon tool(?: card)? attached to (this pokémon|1 of your pokémon) into your hand$/,
+    (m) => ({ type: 'atkToolToHand', from: m[1] === 'this pokémon' ? 'self' : 'any' }),
+  ],
+  // Lucario Precognitive Aura (customhb): the opponent picks the Trainer card to show.
+  [/^have your opponent reveal a trainer card in their hand$/, () => ({ type: 'atkOppRevealsKind', kind: 'Trainer' })],
+  // Jellicent Deep Sea Draw (customhb): after "Draw a card. If you do, …".
+  [/^put a card from your hand on the bottom of your deck$/, () => ({ type: 'atkHandToDeckBottom', count: 1 })],
+  [
+    /^each player shuffles (a|an|\d+) cards? from their hand into their deck$/,
+    (m) => ({ type: 'atkEachShuffleHandCards', count: countOf(m[1]) }),
+  ],
+  // After a switch: Clefable Baton Pass "Transfer all attached cards from this Pokémon to the new
+  // Active Pokémon"; Origin Forme Palkia ex Spacial Rend "Move all cards attached from that
+  // Pokémon to the new Active Pokémon" (customhb).
+  [
+    /^(?:transfer|move) all (?:attached cards|cards attached) from (this|that) pokémon to the new active pokémon$/,
+    (m) => ({ type: 'atkMoveAttachedToNewActive', side: m[1] === 'this' ? 'self' : 'opponent' }),
+  ],
   // Shaymin-EX Sky Return; Team Rocket's Crobat ex ("… into your hand", its reminder discards
   // the attached cards); Revavroom ex / Weezing ("Discard this Pokémon …"); Uxie Psychic Restore.
   [/^return this pokémon and all cards attached to it to your hand$/, () => ({ type: 'atkPutSelf', to: 'hand', attached: 'hand' })],
@@ -990,6 +1176,45 @@ const TEMPLATES = [
     /^your opponent returns your opponent's active pokémon and all cards attached to it to their hand$/,
     () => ({ type: 'atkBounceOppActive' }),
   ],
+  // Phanpy Endure / Meditite Bide (sm7-72, sm7-76), after "If heads,".
+  [
+    /^if this pokémon would be knocked out by damage from an attack during your opponent's next turn, it is not knocked out, and its remaining hp becomes 10$/,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'surviveKnockOutHp10' } }),
+  ],
+  // Dragonair Dragon's Wish (sm1-95): reduce/legality.mjs lifts the one-Energy rule next turn.
+  [
+    /^during your next turn, you may attach any number of energy cards from your hand to your pokémon$/,
+    () => ({ type: 'atkUnlimitedAttachNextTurn' }),
+  ],
+  // Plusle Draw for Everybody (sm7-53): "draw a card for each Benched Pokémon (both yours and your
+  // opponent's)" — the reminder is stripped before templates read the sentence.
+  [/^draw a card for each benched pokémon$/, () => ({ type: 'atkDrawPerBench', sides: 'both' })],
+  // Pinsir Roof Fling (TCGdex sm1-6): "put your opponent's Active Pokémon and all cards attached
+  // to it into your opponent's hand".
+  [
+    /^put your opponent's active pokémon and all cards attached to it into (?:your opponent's|their) hand$/,
+    () => ({ type: 'atkBounceOppActive' }),
+  ],
+  // Pelipper Courier (sm1-38): one Benched Pokémon back to your hand.
+  [
+    /^put (1|a) of your benched pokémon and all cards attached to it into your hand$/,
+    () => ({ type: 'atkBounceOwnInPlay', count: 1, scope: 'bench' }),
+  ],
+  // Milotic TLC (sm4-27): only a damaged Benched Pokémon.
+  [
+    /^shuffle 1 of your opponent's benched pokémon that has any damage counters on it and all cards attached to it into their deck$/,
+    () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'bench', damagedOnly: true }),
+  ],
+  // Azelf Psychic Abduction (sm6-43).
+  [
+    /^shuffle 1 of your opponent's benched pokémon and all cards attached to it into their deck$/,
+    () => ({ type: 'atkShuffleOppBench', count: 1, scope: 'bench' }),
+  ],
+  // Alomomola Borne Ashore (sm2-36) / Marshadow Shadowy Echoes (SM93).
+  [
+    /^put a basic pokémon from (either|each) player's discard pile onto its owner's bench$/,
+    (m) => ({ type: 'atkBenchFromAnyDiscard', each: m[1] === 'each' }),
+  ],
   // Sylveon-GX Plea-GX / Greninja-GX Dark Mist-GX (design 048).
   [
     /^put (a|an|\d+) of your opponent's benched pokémon and all cards attached to (?:it|them) into your opponent's hand$/,
@@ -1066,9 +1291,19 @@ const TEMPLATES = [
     /^devolve each of your opponent's evolved pokémon (?:by putting|and put) the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'all', to: 'hand' }),
   ],
+  // Archeops Ancient Wing (corpus: White Flare 132; customhb-881): the player picks 1 of the opponent's Evolved Pokémon.
+  [
+    /^devolve 1 of your opponent's evolved pokémon by putting the highest stage evolution card on it into your opponent's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'chooseOpponent', to: 'hand' }),
+  ],
   [
     /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'active', to: 'hand' }),
+  ],
+  // Shining Jirachi Stellar Reign (sm3.5-42): every Evolution card, back to the Basic.
+  [
+    /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting all of the evolution cards on it into your opponent's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'active', to: 'hand', toBasic: true }),
   ],
 
   // Alolan Exeggutor ex Swinging Sphene
@@ -1298,6 +1533,22 @@ const BLOCKS = [
       { type: 'atkOppHandToDeck', count: 1, perHeads: true, chooser: 'attacker', bottom: true },
     ],
   ],
+  // Giratina ex Alpha Rage (customhb): one of the opponent's Pokémon attacks another of theirs
+  // (effects/attack-steps.mjs atkOpponentAttacksOwn).
+  [
+    /choose 1 of your opponent's pokémon\. that pokémon attacks 1 of your opponent's other pokémon\./g,
+    () => ({ type: 'atkOpponentAttacksOwn' }),
+  ],
+  // Gardevoir Telekinesis (customhb): damage to a chosen opposing Pokémon, then an Energy moves
+  // from it to another of their Pokémon (effects/attack-steps.mjs atkSnipeMoveEnergy).
+  [
+    /this attack does (\d+) damage to 1 of your opponent's pokémon\. move an energy from that pokémon to another of their pokémon\.(?: this attack's damage isn't affected by weakness or resistance\.)?/g,
+    (m) => ({
+      type: 'atkSnipeMoveEnergy',
+      amount: Number(m[1]),
+      immunity: /isn't affected by weakness or resistance/.test(m[0]) ? { ignoreWeakness: true, ignoreResistance: true } : null,
+    }),
+  ],
   // Dragapult Dragon Launcher: discard Benched Dreepy, then 100 damage to a different Pokémon of
   // the opponent's for each one discarded (see effects/attack-steps.mjs atkBenchDiscardDamageEach).
   [
@@ -1330,6 +1581,11 @@ const BLOCKS = [
   [
     /you may discard any number of (?:\{([a-z])\} )?energy cards attached to this pokémon when you use this attack\. if you do, discard that many cards from the top of your opponent's deck\./g,
     (m) => ({ type: 'atkDiscardSelfEnergyMillOpp', ...(m[1] ? { energyType: m[1].toUpperCase() } : {}) }),
+  ],
+  // Magneton [Skyridge 19] Electric Blast: all the {L} Energy, paid back as counters on the Bench.
+  [
+    /you may discard all (?:\{([a-z])\} )?energy cards attached to this pokémon when you use this attack\. if you do, put damage counters equal to the amount of energy cards removed in this way on any number of your opponent's benched pokémon in the way you like\./g,
+    (m) => ({ type: 'atkDiscardAllSelfEnergyBenchCounters', optional: true, ...(m[1] ? { energyType: m[1].toUpperCase() } : {}) }),
   ],
   // customhb Regigigas ex Creation: the Wildfire discard, paid back in draws.
   [
@@ -1397,7 +1653,7 @@ const BLOCKS = [
   // Deck-top Energy attach: Lapras ex Larimar Rain, Dragonite VSTAR Draconic Star ("{W} or {L}"),
   // Ampharos-EX Thunder Rod, Hatterene V Horoscope ("put the other cards back in any order").
   [
-    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like)\. (shuffle the other cards back into your deck|put the other cards back in any order)\./g,
+    /look at the top (\d+) cards of your deck(?: and|\. you may) attach (?:any number of|as many) ((?:\{[a-z]\}(?: or \{[a-z]\})? )?)energy cards you find there (?:as you like )?to (this pokémon|your pokémon in any way you like|1 of your pokémon)\. (shuffle the other cards back into your deck|put the other cards back in any order|discard the other cards)\./g,
     (m) => {
       const types = [...m[2].matchAll(/\{([a-z])\}/g)].map((t) => t[1].toUpperCase());
       return {
@@ -1407,10 +1663,37 @@ const BLOCKS = [
         anyNumber: true,
         ...(types.length ? { energyTypes: types } : {}),
         target: m[3] === 'this pokémon' ? 'self' : 'any',
-        ...(m[3] === 'this pokémon' ? {} : { spread: true }),
-        rest: /shuffle/.test(m[4]) ? 'shuffle' : 'keep',
+        // Heatran Steelworks (sm7-98): "to 1 of your Pokémon" — every card to the one Pokémon.
+        ...(m[3] === 'your pokémon in any way you like' ? { spread: true } : {}),
+        // Hydreigon Tri Howl (customhb): "Discard the other cards."
+        rest: /shuffle/.test(m[4]) ? 'shuffle' : /discard/.test(m[4]) ? 'discard' : 'keep',
       };
     },
+  ],
+  // Dunsparce Strike and Run (sm7-110): the Bench search runs as a step so the switch after it can
+  // read whether it put a Pokémon onto the Bench (executor.mjs attackBenchedFromDeck).
+  [
+    /search your deck for up to (\d+) basic pokémon and put them onto your bench\. then, shuffle your deck\. if you put any pokémon onto your bench in this way, you may switch this pokémon with 1 of your benched pokémon\./g,
+    (m) => [
+      { type: 'searchAbility', what: 'Basic Pokémon', count: Number(m[1]), destination: 'bench', upTo: true, reveal: false },
+      { type: 'atkSwitchSelf', optional: true, requiresBenchedThisAttack: true },
+    ],
+  ],
+  // Thwackey Jungle Opener (customhb, via effect-wording.mjs): one Basic Energy of a type from the
+  // top of the deck to a Benched Pokémon.
+  [
+    /look at the top (\d+) cards of your deck and attach an? (basic )?\{([a-z])\} energy card you find there to 1 of your benched pokémon\. shuffle the other cards back into your deck\./g,
+    (m) => ({
+      type: 'atkAttach',
+      source: 'deckTop',
+      look: Number(m[1]),
+      count: 1,
+      upTo: true,
+      ...(m[2] ? { basic: true } : {}),
+      energyTypes: [m[3].toUpperCase()],
+      target: 'bench',
+      rest: 'shuffle',
+    }),
   ],
   // Gengar Hurl into Darkness.
   [
@@ -1454,13 +1737,19 @@ const BLOCKS = [
     (m) => ({ type: 'atkBenchFromDeckTop', look: Number(m[1]) }),
   ],
   [
-    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone)\./g,
+    // Drakloak Recon Directive: "Put the other card on the bottom of your deck."
+    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone|put the other cards? on the bottom of your deck)\./g,
     (m) => ({
       type: 'atkLookTopTake',
       look: Number(m[1]),
       take: m[2] ? Number(m[2]) : m[3] === 'it' ? 1 : Number(m[3]),
-      rest: /lost zone/.test(m[4]) ? 'lostZone' : 'shuffle',
+      rest: /lost zone/.test(m[4]) ? 'lostZone' : /bottom/.test(m[4]) ? 'bottom' : 'shuffle',
     }),
+  ],
+  // Dialga ex Time Twister (customhb set.json, the user's custom set): no shuffle afterward.
+  [
+    /look at the top and bottom cards of your deck\. put one into your hand and discard the other\./g,
+    () => ({ type: 'atkLookTopTake', look: 'topAndBottom', take: 1, rest: 'discard' }),
   ],
   [
     /choose (\d+) of your opponent's benched pokémon\. shuffle those pokémon and all attached cards into your opponent's deck\./g,
@@ -1494,6 +1783,60 @@ const BLOCKS = [
   [
     /discard 1 of your prize cards\. if it's an energy card, attach it to 1 of your pokémon\./g,
     () => ({ type: 'atkDiscardPrize', count: 1, attachIfEnergy: true }),
+  ],
+  // Cinccino Amazing Plea (sm4-86): the opponent's "no" is read by the damage parser's base swap.
+  [
+    /choose (\d+) cards from your discard pile\. then, ask your opponent if you may put them into your hand\. if yes, put those cards into your hand\. if no, this attack does \d+ damage to your opponent's active pokémon\./g,
+    (m) => ({ type: 'atkPleaRecover', count: Number(m[1]), beforeDamage: true }),
+  ],
+  // Patrat Glance (sm2-107): only as the whole attack text, so an Ability's "look at the top card
+  // of your opponent's deck. If you do, …" (Malamar Psychic Insight) keeps its own reader.
+  [/^look at the top card of your opponent's deck\.$/g, () => ({ type: 'atkLookAt', source: 'oppDeckTop', count: 1 })],
+  // Meganium Quick-Ripening Herb (sm8-8): a Stage 2 from the hand onto a chosen Basic.
+  [
+    /choose 1 of your basic pokémon in play\. if you have a stage 2 card in your hand that evolves from that pokémon, put that card onto the basic pokémon to evolve it\./g,
+    () => ({ type: 'abilityStage2OntoBasic' }),
+  ],
+  // Trumbeak Mountain Pass (sm8-165), from the hand: this card to the Lost Zone, and the opponent's
+  // top card too when it is a Supporter.
+  [
+    /reveal it\. if you do, look at the top card of your opponent's deck and put this pokémon in the lost zone\. if that card is a supporter card, you may put it in the lost zone\./g,
+    () => ({ type: 'atkLostZoneSourceAndOppTopSupporter' }),
+  ],
+  // Nuzleaf Clear the Room (sm7-13).
+  [
+    /your opponent reveals their hand\. choose a supporter card you find there\. your opponent shuffles that card into their deck\./g,
+    () => ({ type: 'atkRevealOppHand', then: { action: 'deckShuffle', count: 1, filter: 'supporter' } }),
+  ],
+  // Slowking Memory Melt (sm8-55).
+  [
+    /look at your opponent's hand and put a card you find there in the lost zone\./g,
+    () => ({ type: 'atkRevealOppHand', then: { action: 'lostZone', count: 1 } }),
+  ],
+  // Mawile Mining (sm7-91): an Item to the hand; a Pokémon Tool may be attached instead.
+  [
+    /search your deck for an item card, reveal it, and put it into your hand\. then, shuffle your deck\. if that card is a pokémon tool card, instead of putting it into your hand, you may attach it to 1 of your pokémon that doesn't already have a pokémon tool attached to it\./g,
+    () => ({ type: 'atkSearchItemToolOption' }),
+  ],
+  // Pachirisu Snuggly Generator (sm5-49).
+  [
+    /for each of your benched pokémon that has the (.+?) attack, search your deck for an? \{([a-z])\} energy card and attach it to that pokémon\. then, shuffle your deck\./g,
+    (m) => ({ type: 'atkAttachEachBench', source: 'deck', withAttack: m[1], energyType: m[2].toUpperCase() }),
+  ],
+  // Delibird Happy Delivery (sm8-57).
+  [
+    /choose any number of your benched pokémon that don't already have a pokémon tool attached to them\. for each of those pokémon, search your deck for a pokémon tool card and attach it to that pokémon\. then, shuffle your deck\./g,
+    () => ({ type: 'atkAttachEachBench', source: 'deck', what: 'tool', anyNumber: true, noTool: true }),
+  ],
+  // Guzzlord-GX Eat Sloppily (sm4-63) / Torkoal Flaming Honk (sm7-29): the milled Energy is attached.
+  [
+    /discard the top (\d+) cards of your deck\. if any of those cards are (?:\{([a-z])\} )?energy cards, attach them to (this pokémon|your pokémon in any way you like)\./g,
+    (m) => ({
+      type: 'atkMillAttachMatching',
+      count: Number(m[1]),
+      ...(m[2] ? { energyType: m[2].toUpperCase() } : {}),
+      target: m[3] === 'this pokémon' ? 'self' : 'any',
+    }),
   ],
   // Magcargo-GX Crushing Charge (design 048): mill the deck top, attach it if it is a Basic
   // Energy. The block consumes both sentences so the plain atkMill template cannot drop the
@@ -1595,6 +1938,13 @@ const BLOCKS = [
   [
     /(?:during your opponent's next turn, if your opponent's active pokémon tries to (?:use an )?attack|if your opponent's active pokémon tries to attack during your opponent's next turn), your opponent flips a coin\. if tails, (?:that|this) attack (?:doesn't happen|does nothing)\./g,
     () => ({ type: 'atkAddMarker', target: 'opponentActive', window: 'opponentNextTurn', marker: { kind: 'attackFlipOrFail' } }),
+  ],
+  // Dragonite ex Fly (customhb): "During your opponent's next turn, if their Active Pokémon tries
+  // to attack, your opponent flips a coin. If tails, this Pokémon takes no damage." The marker sits
+  // on this Pokémon; the attack command flips when the opponent attacks (reduce/attack.mjs).
+  [
+    /during your opponent's next turn, if (?:their|your opponent's) active pokémon tries to attack, your opponent flips a coin\. if tails, this pokémon takes no damage\./g,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'flipOrTakeNoDamage' } }),
   ],
   // Machamp LV.X Strong-Willed: the printed name is the attacker's short name, so any name.
   [
@@ -1767,13 +2117,20 @@ function searchEnergyParams(body) {
 
 // "… up to 2 Basic {G} Energy cards and up to 2 Basic {L} Energy cards and attach them …"
 // (Joltik, Jolting Charge) is one search per Energy type; the single-type reader sees only the first.
-const MULTI_TYPE_SEARCH = /^(search your deck for )(up to \d+ [^.]*?energy cards?) and (up to \d+ [^.]*?energy cards?)( and attach (?:it|them) to [^.]*)$/;
+// Two kinds in one search: "up to 2 {G} Energy cards and up to 2 {L} Energy cards" (Joltik), or
+// one card each, "a Basic Energy card and a Pokémon Tool card," (Tyranitar Tyrant's Roar, customhb).
+const SEARCH_KIND = String.raw`(?:up to \d+|an?) [^.,]*?(?:energy(?: cards?)?|pokémon tool(?: cards?)?)`;
+const MULTI_TYPE_SEARCH = new RegExp(String.raw`^(search your deck for )(${SEARCH_KIND}),? and (${SEARCH_KIND}),?( and attach (?:it|them) to [^.]*)$`);
+// One card of a split two-kind search is attached as "it".
+const singleAttach = (kind, tail) => (/^an? /.test(kind) ? tail.replace(/ attach them /, ' attach it ') : tail);
 
 function searchAttachStep(clause, gate, optional) {
   const multi = MULTI_TYPE_SEARCH.exec(clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '').replace(/\.(?: then,? shuffle your deck\.)?$/, ''));
   if (multi) {
     const [, lead, first, second, tail] = multi;
-    const steps = [`${lead}${first}${tail}.`, `${lead}${second}${tail}.`].map((part) => searchAttachStep(part, gate, optional));
+    const steps = [`${lead}${first}${singleAttach(first, tail)}.`, `${lead}${second}${singleAttach(second, tail)}.`].map((part) =>
+      searchAttachStep(part, gate, optional)
+    );
     return steps.every(Boolean) ? steps : null;
   }
   const body = clause.replace(/^(?:if heads|for each heads), /, '').replace(/^you may /, '');
@@ -1816,18 +2173,31 @@ const ABILITY_PREAMBLE =
  *   the holder must be for the Ability to work, when the text says so.
  */
 export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
-  const normalized = normalizeAttackText(text, selfName).replace(/\s*\([^)]*\)/g, '');
-  if (!ABILITY_PREAMBLE.test(normalized)) return { steps: [], holderZone: null };
+  const normalized = normalizeAttackText(text, selfName)
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(PASSIVE_LEAD, '');
+  if (!ABILITY_PREAMBLE.test(normalized) && !UNLIMITED_ENERGY_STEAL.test(normalized)) {
+    return { steps: [], holderZone: null };
+  }
   let effect = normalized.replace(ABILITY_PREAMBLE, '');
   // "if this Pokémon is in the Active Spot / on your Bench, …" is the one condition read.
   let holderZone = null;
   const position = HOLDER_POSITION.exec(effect);
   if (position) {
-    holderZone = /bench/.test(position[1]) ? 'bench' : 'active';
+    holderZone = /bench/.test(position[1])
+      ? 'bench'
+      : /discard/.test(position[1])
+        ? 'discard'
+        : /hand/.test(position[1])
+          ? 'hand'
+          : 'active';
     effect = effect.slice(position[0].length);
   }
+  // Milk Drink's "if this Pokémon was healed during this turn" is its activation gate
+  // (ability-combat.mjs abilityActivationBlockReason).
+  effect = effect.replace(/^if this pokémon was healed during this turn, (?:you may )?/, '');
   if (/^if /.test(effect)) return { steps: [], holderZone: null };
-  const parsed = parseAttackSteps(abilityRevealVoice(effect));
+  const parsed = parseAttackSteps(abilityRevealVoice(effect), { forAbility: true });
   return { steps: [...parsed.before, ...parsed.after], holderZone };
 }
 
@@ -1842,8 +2212,15 @@ function abilityRevealVoice(effect) {
     .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2');
 }
 
+// Orthworm Earth Eater (custom set): a passive shield sentence ahead of the activated move; the
+// damage code (ability-combat.mjs sourceConditionMet) enforces it, the templates read the move.
+const PASSIVE_LEAD =
+  /^if your opponent's active pokémon has any \{[a-z]\} energy attached, prevent all damage done to this pokémon by attacks from your opponent's pokémon\. /;
+const UNLIMITED_ENERGY_STEAL =
+  /^you may move (?:an?|1) [^.]*energy[^.]* from your opponent's active pokémon to this pokémon\.?$/;
+
 const HOLDER_POSITION =
-  /^if this pokémon is (in the active spot|your active pokémon|on your bench), (?:you may )?/;
+  /^if this pokémon is (in the active spot|your active pokémon|on your bench|in your discard pile|in your hand), (?:you may )?/;
 
 /**
  * Applies a coin result to gated steps: "If heads/tails" steps are dropped on the other face
@@ -1883,6 +2260,10 @@ function isAttachStep(step) {
 
 // Sentences that only make sense after an attach: "it" / "that Pokémon" is the Pokémon the
 // Energy went to.
+// Steps whose "If you do, …" runs only when they happened (a switch, Distortion Door's return).
+// Rayquaza-GX Stormy Winds (sm7-109): "discard the top 3 cards of your deck. If you do, attach …".
+const SWITCH_STEP_TYPES = new Set(['atkGust', 'atkSwitchSelf', 'atkSourceFromDiscardToBench', 'atkMill']);
+
 const CHAIN_TEMPLATES = [
   [/^switch it with 1 of your benched pokémon$/, () => ({ type: 'atkSwitchSelf' })],
   [
@@ -1899,7 +2280,18 @@ const CHAIN_TEMPLATES = [
  *   `handlesSearch` means a deck search-and-attach was emitted here, so the attack
  *   phase's own search clause must not run it again.
  */
-export function parseAttackSteps(text, { selfName = '' } = {}) {
+// "If <condition>, <effect>" split at the comma after which a template reads the effect. The
+// condition may hold commas of its own (Guzzlord Lord's Valley: "exactly 2, 4, or 6 Prize cards").
+function splitBoardGate(sentence, templates) {
+  if (!/^if /.test(sentence)) return null;
+  for (let at = sentence.indexOf(', '); at > 0; at = sentence.indexOf(', ', at + 2)) {
+    const effect = sentence.slice(at + 2);
+    if (templates.some(([re]) => re.test(effect))) return [sentence, sentence.slice(3, at), effect];
+  }
+  return null;
+}
+
+export function parseAttackSteps(text, { selfName = '', forAbility = false } = {}) {
   const result = { before: [], after: [], handlesSearch: false };
   // EX-era "Pokémon-ex" (Deoxys ex) and XY-era "Pokémon-EX" differ only by case, which the
   // normalizer drops; the lowercase printing keeps an explicit marker for attacker filters.
@@ -1924,7 +2316,12 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
       const placeholders = [];
       for (const step of [].concat(built)) {
         blockSteps.push(step);
-        if (step.type === 'searchAbility' || step.type === 'searchEvolve' || step.type === 'atkSearchDeckFallback') {
+        if (
+          step.type === 'searchAbility' ||
+          step.type === 'searchEvolve' ||
+          step.type === 'atkSearchDeckFallback' ||
+          step.type === 'atkSearchItemToolOption'
+        ) {
           result.handlesSearch = true;
         }
         placeholders.push(`@block${blockSteps.length - 1}.`);
@@ -1968,7 +2365,10 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     }
     const block = /^@block(\d+)$/.exec(sentence);
     if (block) {
-      result.after.push(...[blockSteps[Number(block[1])]].flat());
+      // A block step marked `beforeDamage` (Cinccino Amazing Plea) runs ahead of the damage.
+      for (const { beforeDamage, ...built } of [blockSteps[Number(block[1])]].flat()) {
+        (beforeDamage ? result.before : result.after).push(built);
+      }
       continue;
     }
     // "If you do, …" / "If you attached Energy in this way, …" after an attach: the executor
@@ -1976,7 +2376,9 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     const wrOrder = /<wr:(before|after)>/.exec(sentence)?.[1];
     const plain = sentence.replace(/\s*<wr:(?:before|after)>/g, '');
     const extra = leadingExtraEnergy(plain);
-    const body = extra ? plain.slice(extra.length) : plain;
+    const attached = extra ? null : leadingAttachedEnergy(plain);
+    const gate = extra || attached;
+    const body = gate ? plain.slice(gate.length) : plain;
     const chained = ATTACH_CHAIN.exec(body);
     const previous = result.after[result.after.length - 1];
     // "Discard a card from your hand. If you do, draw 3 cards." runs only when the hand paid.
@@ -1990,17 +2392,38 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
     // it …" runs only when the printed discard moved an Energy (requiresEnergyDiscard).
     const discardChain =
       Boolean(chained) && IF_YOU_DO.test(body) && ENERGY_DISCARD_SENTENCE.test((sentences[index - 1] || '').trim());
-    if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain) continue;
-    const { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
+    // Floette Swirling Petals / Donphan Rapid Spin (sm6-85, sm7-73): "Switch …. If you do, switch …"
+    // — the first switch is the cost; with no Benched Pokémon to switch, nothing follows.
+    const switchChain =
+      Boolean(chained) && IF_YOU_DO.test(body) && !optionalChain && SWITCH_STEP_TYPES.has(previous?.type);
+    if (switchChain) previous.cost = true;
+    if (chained && !handChain && !isAttachStep(previous) && !optionalChain && !discardChain && !switchChain) continue;
+    let { rest, flags } = stripGates(chained ? body.slice(chained[0].length) : body);
     if (extra) flags.requiresExtraEnergy = extra.requirements;
+    if (attached) flags.requiresAttachedEnergy = attached.energyType;
     if (handChain) flags.requiresHandCost = true;
     else if (discardChain) flags.requiresEnergyDiscard = true;
-    else if (chained && !optionalChain) flags.requiresAttach = true;
-    const templates = chained && !handChain && !optionalChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    else if (chained && !optionalChain && !switchChain) flags.requiresAttach = true;
+    const templates = chained && !handChain && !optionalChain && !switchChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
+    // Ariados Spider Trap (sm7-6): a status printed after a switch of the opponent's Active lands on
+    // the new Active, so it runs as a step after the switch (attack-status.mjs leaves it alone).
+    const afterGust = previous?.type === 'atkGust' && /^your opponent's active pokémon is now (.+)$/.exec(rest);
+    if (afterGust) {
+      result.after.push(...conditionList(afterGust[1]).map((condition) => ({ type: 'atkApplyCondition', condition })));
+      continue;
+    }
+    // "If <board condition>, <effect>" (Paldean Tauros Jet Headbutt: "If this Pokémon has any {F}
+    // Energy attached, discard a random card from your opponent's hand"): the executor runs the
+    // effect only when the condition holds (attack-conditions.mjs reads it).
+    const boardGate = !templates.some(([re]) => re.test(rest)) && splitBoardGate(rest, templates);
+    if (boardGate) {
+      rest = boardGate[2];
+      flags = { ...flags, boardCondition: boardGate[1] };
+    }
     for (const [re, build] of templates) {
       const m = re.exec(rest);
       if (!m) continue;
-      const step = build(m, rest, { wrOrder });
+      const step = build(m, rest, { wrOrder, fullText: normalized, forAbility });
       if (!step) break;
       // One sentence, several steps (Scizor V Hack Off: a Tool and a Special Energy).
       if (Array.isArray(step)) {
@@ -2011,7 +2434,10 @@ export function parseAttackSteps(text, { selfName = '' } = {}) {
         break;
       }
       if (step.type === 'atkMill' && millHandled) break;
-      if (step.type === 'atkDiscardSelfEnergy' && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
+      // Hydreigon Dark Destruction (sm4-62): "You may discard an Energy from this Pokémon. If you
+      // do, <effect>." — the optional discard is the step the next sentence's cost gate reads.
+      const optionalCostDiscard = flags.optional && /^if you do,/.test(sentences[index + 1]?.trim() || '');
+      if (step.type === 'atkDiscardSelfEnergy' && !optionalCostDiscard && !(selfDiscardOpen && (flags.gate || flags.perHeads))) break;
       if (step.type === 'atkDiscardOwnHand' && (step.upTo || step.what) && !handScaled) break;
       const { before, ...stepFlags } = flags;
       const { beforeDamage, ...built } = step;

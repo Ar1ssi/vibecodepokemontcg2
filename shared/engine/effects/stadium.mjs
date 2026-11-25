@@ -361,8 +361,9 @@ export function executeStadium(draft, {
       steps.push({
         type: 'healAmount',
         amount: opt.n || 10,
-        target: opt.target === 'bench' ? 'Benched Pokémon' : 'Active Pokémon',
+        target: opt.target === 'bench' ? 'Benched Pokémon' : opt.target === 'any' ? 'Pokémon' : 'Active Pokémon',
         ...(opt.cure ? { cure: true } : {}),
+        ...(opt.types ? { types: opt.types } : {}),
       });
     } else if (opt.kind === 'discard-draw') {
       steps.push(discardCostStep(opt.cost));

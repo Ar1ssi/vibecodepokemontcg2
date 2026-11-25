@@ -5,7 +5,7 @@
 
 import { findCard } from '../state.mjs';
 import { parseAbility, rewriteLegacyPowerWording, automaticEvolveSteps } from '../rules/abilities.mjs';
-import { cardAbilityText } from '../rules/ability-executors.mjs';
+import { abilityNameLimitKeyFor, cardAbilityText } from '../rules/ability-executors.mjs';
 import { planAbilitySteps } from '../rules/ability-step-plan.mjs';
 import { parseAbilityEffectSteps, resolveCoinGates } from '../rules/attack-steps.mjs';
 import { executeSteps, isExecutableStepType } from './executor.mjs';
@@ -95,6 +95,10 @@ export function executeAbility(draft, {
     // instanceId first: two Pokémon sharing a name must not share one used-flag
     // slot, or using one blocks the other's separate ability (I48).
     player.flags.abilitiesUsed[card.instanceId != null ? card.instanceId : card.name] = true;
+    // "You can't use more than 1 Quick Search Ability each turn": a second copy is spent too,
+    // including when this one left play (Dudunsparce).
+    const limitKey = abilityNameLimitKeyFor(card, abilityIndex);
+    if (limitKey) player.flags.abilitiesUsed[limitKey] = true;
   };
 
   const ability = card.abilities?.[abilityIndex];
@@ -215,6 +219,20 @@ function modernPowerText(text) {
   return rewritten === lowered ? text : rewritten;
 }
 
+// TCGdex drops "during your turn" from some when-played triggers (sm3-67 Rhyperior Toppling
+// Wind); a Pokémon played from the hand is always played on its owner's turn. Read only when the
+// parser found no effect, so printings it already reads (Crawdaunt Unruly Claw) keep its steps.
+const WHEN_PLAYED_NO_WINDOW =
+  /^(when you play this pok[eé]mon from your hand (?:to evolve 1 of your pok[eé]mon|(?:on)?to your bench)),/i;
+
+function templateEffectSteps(text, actionable, { selfName }) {
+  const template = parseAbilityEffectSteps(text, { selfName });
+  const parserReadEffect = actionable.some((step) => step.type !== 'whenPlayedAbility');
+  const trimmed = String(text || '').trim();
+  if (template.steps.length > 0 || parserReadEffect || !WHEN_PLAYED_NO_WINDOW.test(trimmed)) return template;
+  return parseAbilityEffectSteps(trimmed.replace(WHEN_PLAYED_NO_WINDOW, '$1 during your turn,'), { selfName });
+}
+
 /**
  * The steps an activated ability runs: the parser's actionable (non-passive) steps, or the
  * shared effect templates when the parser reads none or leaves one without an executor (I89)
@@ -228,10 +246,19 @@ export function resolveAbilitySteps(rawText, { selfName } = {}) {
   const actionable = planAbilitySteps(steps, { mode: 'interactive' })
     .filter((p) => p.action !== 'skip')
     .map((p) => p.step);
-  const { steps: templateSteps, holderZone } = parseAbilityEffectSteps(text, { selfName });
+  const { steps: templateSteps, holderZone } = templateEffectSteps(text, actionable, { selfName });
   const parserFallsShort =
     actionable.length === 0 || actionable.some((step) => !isExecutableStepType(step.type));
-  if (parserFallsShort && templateSteps.length > 0) {
+  // The attack templates read more of the text than the parser did (Buggy Turbo's tails branch,
+  // Vikavolt Strong Charge's second Energy, Ninetales Exploding Energy's Knock Out). VSTAR Powers
+  // and "When you play this Pokémon" triggers keep their parser steps (their own gates).
+  // "Look at the top N cards" without the rest of the sentence read (lookAtTopAbility only
+  // offers a card): the template's reading names what happens to every card looked at
+  // (Drakloak Recon Directive, Hydreigon Tri Howl, Premonition).
+  const templateReadsMore =
+    (templateSteps.length > actionable.length || actionable.some((step) => step.type === 'lookAtTopAbility')) &&
+    !/vstar power|^when you play/i.test(String(text || '').trim());
+  if ((parserFallsShort || templateReadsMore) && templateSteps.length > 0) {
     return { source: 'template', steps: templateSteps, holderZone, parsedSteps: steps };
   }
   // "When you play this Pokémon …" is the trigger, not an effect — abilityActivationBlockReason

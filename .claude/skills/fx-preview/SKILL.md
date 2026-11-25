@@ -38,20 +38,22 @@ Playwright is a devDependency. Install its browser once per machine:
 Both scripts need `CARD_IMG`: a local PNG/JPG of any card face, or a card image URL. Write
 output under `.agent/scratch/`, which is not committed.
 
-**Entry animations** (the Tera and Mega scenes, mat-fx/tera-entry.js and mega-entry.js):
+**Entry animations** (the Tera and Mega scenes: mat-fx/entry.js draws tera-crystal.mjs, mega-orb.mjs and
+mega-vortex.mjs on canvas stages through the stage-post.js bloom pass; the Mega hex field is DOM/CSS):
 
 ```powershell
 $env:CARD_IMG = "C:\path\to\card.png"; $env:TYPE = "Fire"
-node .claude/skills/fx-preview/capture-entry.mjs tera .agent/scratch/tera-fire 100 2600
-node .claude/skills/fx-preview/capture-entry.mjs mega .agent/scratch/mega
+node .claude/skills/fx-preview/capture-entry.mjs tera .agent/scratch/tera-fire 100 3000
+node .claude/skills/fx-preview/capture-entry.mjs mega .agent/scratch/mega 100 3200
 ```
 
-The script puts a real Tera / Mega card in the Active Spot, plays its entry on a frozen scene clock
-and writes `t<ms>.png` every `stepMs` over `durationMs`, cropped round the card at 2× density.
+The script puts a real Tera / Mega card in the Active Spot, plays its entry on a frozen clock (the
+scene's and the entry's own animations) and writes `t<ms>.png` every `stepMs` over `durationMs`,
+cropped round the card at 2× density (`PAD` card heights each side, default 1.7; the scenes reach ~3.5).
 `TIMES=0,400,1300,…` shoots chosen times instead, `SIDE=opp` the far seat, `GPU=1` runs on the
 machine's own GPU (seconds instead of minutes; judge final frames on SwiftShader too). Read a
 handful of them (the Read tool shows images), or tile them into one sheet with ffmpeg `tile`.
-The burst is at 1300 ms (Tera) / 1350 ms (Mega), after a 70 ms hit stop the pieces leave.
+The burst is at 2490 ms (Tera, the card shows at 2640) / 1600 ms (Mega, the vortex runs to ~3100).
 
 **Persistent board looks** (Tera crystal skin, anything drawn from card state):
 

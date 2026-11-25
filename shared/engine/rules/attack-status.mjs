@@ -164,6 +164,7 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
   const branches = [];
   let sawConditional = false;
   let previousWasOptionalCost = false;
+  let afterOpponentSwitch = false;
   for (const raw of normalized.split(/(?<=\.)\s+/)) {
     const sentence = raw.trim().replace(/\.$/, '');
     if (!sentence) continue;
@@ -180,6 +181,10 @@ export function parseAttackStatusBranches(text, { selfName = '' } = {}) {
         continue;
       }
     }
+    // A status after a switch of the opponent's Active (Ariados Spider Trap) is attack-steps.mjs's
+    // atkApplyCondition step, run after the switch on the new Active Pokémon.
+    if (afterOpponentSwitch && /^your opponent's active pokémon is now /.test(sentence)) continue;
+    afterOpponentSwitch = /\bswitch\b[^.]*\byour opponent's (?:benched|active) pokémon\b/.test(sentence);
     const gate = sentenceGate(sentence);
     if (!gate && /^if\b/.test(sentence)) {
       const condition = conditionBranch(sentence);

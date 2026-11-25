@@ -113,6 +113,14 @@ test('Fighting Stadium: a {F} attacker does 20 more to a Pokémon-EX only', () =
   assert.equal(p2Active(attack(board({ p1: { active: [hitter('A', 'Fire')] }, p2: { active: [mon('Lucario-EX', 'Fire', { subtypes: ['EX'] })] }, stadium }))).damage, 50, 'non-{F} attacker');
 });
 
+test('Fighting Stadium: a Pokémon-EX named the TCGdex way ("Lucario EX", suffix EX, no subtypes; xy3-54) takes the bonus, a Pokémon ex does not', () => {
+  const stadium = trainer('Fighting Stadium', 'Stadium', FIGHTING_STADIUM);
+  const hit = (defender) => p2Active(attack(board({ p1: { active: [hitter('A', 'Fighting')] }, p2: { active: [defender] }, stadium }))).damage;
+  assert.equal(hit(mon('Lucario EX', 'Fighting', { suffix: 'EX' })), 70, 'TCGdex suffix');
+  assert.equal(hit(mon('Lucario EX', 'Fighting')), 70, 'TCGdex name only');
+  assert.equal(hit(mon('Koraidon ex', 'Fighting', { subtypes: ['ex'] })), 50, 'Pokémon ex is not Pokémon-EX');
+});
+
 test('Steel Shelter: a {M} Active is never left Poisoned and takes no Checkup damage', () => {
   const stadium = trainer('Steel Shelter', 'Stadium', STEEL_SHELTER);
   const poisoner = "Your opponent's Active Pokémon is now Poisoned.";

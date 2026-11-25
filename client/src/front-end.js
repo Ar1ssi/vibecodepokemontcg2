@@ -7,6 +7,7 @@ import { initializeSocketEventListeners } from './initialization/socket-event-li
 import { initializeMatLayout } from './setup/sizing/apply-mat-layout.js';
 import { installE2eApi } from './setup/general/e2e-api.js';
 import { initializeRoomFormatPanel } from './setup/general/room-format-panel.js';
+import { initializeHomebrewClockPanel } from './setup/general/homebrew-clock-panel.js';
 import { applyFxSettings, watchFxSettingTargets } from './setup/image-logic/fx-settings.js';
 import { initializeHoverPreview } from './setup/image-logic/hover-preview.js';
 import { loadFoilManifest } from './setup/foil/tcgl-foil-store.js';
@@ -20,6 +21,7 @@ loadFoilManifest();
 watchFxSettingTargets();
 initializeSocketEventListeners();
 initializeRoomFormatPanel();
+initializeHomebrewClockPanel();
 initializeDOMEventListeners();
 initializeMutationObservers();
 initializeMatLayout();

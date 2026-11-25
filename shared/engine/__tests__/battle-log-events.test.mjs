@@ -289,3 +289,97 @@ test('a passed turn announces the next player', () => {
     `turn line missing for p2: ${JSON.stringify(p2Lines)}`
   );
 });
+
+// An evolved Pokémon is stored as its Basic with the Evolutions attached under it, so its id is
+// the Basic's. The log must name the card on top of the stack (rules/shown-pokemon.mjs).
+const evolvedStack = (rootId, names) =>
+  names.map((name, i) =>
+    createCard({
+      instanceId: rootId + i,
+      name,
+      hp: 60 + 40 * i,
+      types: ['Fire'],
+      stage: ['Basic', 'Stage 1', 'Stage 2'][i],
+      evolvesFrom: i ? names[i - 1] : undefined,
+      enteredPlayTurn: 1,
+      ...(i ? { attachedTo: rootId } : {}),
+    })
+  );
+
+test('a Stage 2 evolving names the Stage 1 it went onto, not the Basic', () => {
+  const state = makeState();
+  state.turn.number = 3;
+  state.players.p1.zones.active.push(...evolvedStack(30, ['Charmander', 'Charmeleon']));
+  state.players.p1.zones.hand.push(
+    createCard({ instanceId: 32, name: 'Charizard', hp: 170, types: ['Fire'], stage: 'Stage 2', evolvesFrom: 'Charmeleon' })
+  );
+
+  const res = applyCommand(state, {
+    type: 'attachCard',
+    payload: { instanceId: 32, targetInstanceId: 30 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  const names = { 30: 'Charmander', 31: 'Charmeleon', 32: 'Charizard' };
+  const lines = res.events.flatMap((e) => serverBattleLogLines(e, 'p1', (id) => names[id] || null));
+  assert.deepEqual(lines, ['✨ Charizard evolved onto Charmeleon.']);
+});
+
+test('a Knocked Out evolved Pokémon is named by its top card', () => {
+  const state = makeState();
+  state.players.p1.zones.active.push(
+    createCard({
+      instanceId: 1,
+      name: 'Pikachu',
+      hp: 60,
+      types: ['Lightning'],
+      attacks: [{ name: 'Thunder', cost: [], damage: 200 }],
+    })
+  );
+  state.players.p2.zones.active.push(...evolvedStack(40, ['Charmander', 'Charmeleon', 'Charizard']));
+  state.players.p2.zones.bench.push(createCard({ instanceId: 20, name: 'Blastoise', hp: 140, types: ['Water'] }));
+  state.players.p1.zones.prizes.push(
+    ...Array.from({ length: 6 }, (_, i) => createCard({ instanceId: 100 + i, name: `Prize ${i}` }))
+  );
+
+  const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' }, createRng(2));
+
+  assert.equal(res.error, null);
+  const ko = res.events.find((e) => e.type === 'pokemonKnockedOut');
+  assert.ok(ko, 'the Knock Out is emitted');
+  // After the command the stack is in the discard pile; the registry only knows the Basic there.
+  const lines = serverBattleLogLines(ko, 'p2', (id) => ({ 40: 'Charmander' })[id] || null);
+  assert.deepEqual(lines, ['💀 Your Charizard was Knocked Out.']);
+});
+
+test('retreating an evolved Active names both Pokémon by their top cards', () => {
+  const state = makeState();
+  state.players.p1.zones.active.push(...evolvedStack(30, ['Charmander', 'Charmeleon']));
+  state.players.p1.zones.bench.push(...evolvedStack(50, ['Squirtle', 'Wartortle']));
+
+  const res = applyCommand(state, {
+    type: 'retreat',
+    payload: { benchInstanceId: 50 },
+    playerId: 'p1',
+  });
+
+  assert.equal(res.error, null);
+  const basics = { 30: 'Charmander', 50: 'Squirtle' };
+  const lines = res.events.flatMap((e) => serverBattleLogLines(e, 'p1', (id) => basics[id] || null));
+  assert.ok(
+    lines.includes('🔄 Charmeleon retreated — Wartortle promoted to the Active Spot.'),
+    `got: ${JSON.stringify(lines)}`
+  );
+});
+
+test('an unevolved Pokémon\'s events carry no shown names', () => {
+  const state = makeState();
+  state.players.p1.zones.active.push(createCard({ instanceId: 1, name: 'Pikachu', hp: 60, types: ['Lightning'] }));
+  state.players.p1.zones.bench.push(createCard({ instanceId: 3, name: 'Squirtle', hp: 60, types: ['Water'] }));
+
+  const res = applyCommand(state, { type: 'retreat', payload: { benchInstanceId: 3 }, playerId: 'p1' });
+
+  assert.equal(res.error, null);
+  assert.ok(res.events.every((e) => e.pokemonNames === undefined));
+});

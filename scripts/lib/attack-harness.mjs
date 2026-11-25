@@ -243,7 +243,7 @@ export function runAttackOnce(holder, attackIndex, seed, costPool, mutate) {
   };
 }
 
-export function runAttackRich(holder, attackIndex, { seeds = DEFAULT_SEEDS, costPool } = {}) {
+export function runAttackRich(holder, attackIndex, { seeds = DEFAULT_SEEDS, costPool, mutate } = {}) {
   const tags = new Set();
   const errors = new Set();
   const eventTypes = new Set();
@@ -255,7 +255,7 @@ export function runAttackRich(holder, attackIndex, { seeds = DEFAULT_SEEDS, cost
   let oppDrew = false;
   const prizeEvents = [];
   for (const seed of seeds) {
-    const r = runAttackOnce(holder, attackIndex, seed, costPool);
+    const r = runAttackOnce(holder, attackIndex, seed, costPool, mutate);
     if (r.error) {
       errors.add(r.error);
       continue;

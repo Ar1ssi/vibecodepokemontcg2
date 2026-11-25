@@ -3,7 +3,7 @@
      Every stale line here taxes every session. History belongs to git log (commit messages are the
      journal). Contradicts git log? Trust git: rebuild from `git log -20 main`. -->
 
-Focus: 089 VFX pass (D248/D249: attacks before their switch, riffle shuffle, Prize/heal/block/fizzle FX, tone roll-off) and Tera/Mega FX scenes (D250); unified logging (088-unified-logging, D254–D257);
+Focus: 089 VFX pass (D248/D249: attacks before their switch, riffle shuffle, Prize/heal/block/fizzle FX, tone roll-off) and Tera/Mega entries (D259: the old canvas scenes, bloom pass); unified logging (088-unified-logging, D254–D257);
   code-health pass: admin UI/CORS locked down (D251), lockfile 71 → 14 advisories, Stadium boards by card name (D252), CI on PRs and main (D253).
 Active: Render: set ADMIN_PASSWORD or the admin UI stays off. Localhost checks — log export (Options → Export full log; `node tools/log.mjs summary <file>`); 089 look (12 attacks, a Prize take, a shuffle, a switching attack); Tera/Mega
   entries (both seats); the 22 restored Stadium boards (`?stadiumEnv=<key>`); deck box deal (073 rev B); 085; first custom-set publish; 088 `Client: bundle`, `KEEP_AWAKE`; I266, 074.

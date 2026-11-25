@@ -505,6 +505,7 @@ export const moveCard = async (
       oZoneId,
       dZoneId,
       zoneArray: oZone.array,
+      stadium: getStadium(),
       attackExecuting: rulesState.attackExecuting,
     });
     if (redirect) {

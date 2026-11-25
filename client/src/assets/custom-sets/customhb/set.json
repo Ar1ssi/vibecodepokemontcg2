@@ -24905,7 +24905,7 @@
        ],
        "name": "First Impression",
        "damage": "140",
-       "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn."
+       "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn, or if your Active Pokémon was Knocked Out by damage from an attack during your opponent's last turn."
       },
       {
        "cost": [
@@ -24953,7 +24953,7 @@
       "Grass"
      ],
      "name": "First Impression",
-     "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn.",
+     "effect": "You can use this attack only if this Pokémon moved into your Active Spot this turn, or if your Active Pokémon was Knocked Out by damage from an attack during your opponent's last turn.",
      "damage": 140
     },
     {
@@ -55893,6 +55893,62 @@
    "energyType": "Special",
    "rarity": "Uncommon",
    "effect": "As long as this card is attached to a Pokémon, it provides {C} Energy.\n\nWhen you attach this card from your hand to 1 of your Pokémon, heal 30 damage from that Pokémon."
+  },
+  {
+   "id": "customhb-691",
+   "localId": "691",
+   "name": "Giratina ex",
+   "image": "/src/assets/custom-sets/customhb/691",
+   "illustrator": "",
+   "regulationMark": "F",
+   "legal": {
+    "standard": false,
+    "expanded": false
+   },
+   "category": "Pokemon",
+   "hp": 140,
+   "types": [
+    "Dragon"
+   ],
+   "stage": "Basic",
+   "attacks": [
+    {
+     "cost": [
+      "Psychic",
+      "Fire"
+     ],
+     "name": "Shadow Strike",
+     "effect": "This attack does 40 damage to 2 of your opponent's Pokémon. (Don't apply Weakness and Resistance for Benched Pokémon.)",
+     "damage": ""
+    },
+    {
+     "cost": [
+      "Psychic",
+      "Fire",
+      "Colorless",
+      "Colorless"
+     ],
+     "name": "Shadow Force",
+     "effect": "During your opponent's next turn, this Pokémon takes no damage and isn't affected by any effects of Trainer cards or Abilities. At the end of your opponent's next turn, this attack does 150 damage to their Active Pokémon. This Pokémon can't use Shadow Force during your next turn. This Pokémon can't retreat during your next turn.",
+     "damage": ""
+    }
+   ],
+   "abilities": [],
+   "weaknesses": [
+    {
+     "type": "Darkness",
+     "value": "×2"
+    }
+   ],
+   "resistances": [
+    {
+     "type": "Water",
+     "value": "-30"
+    }
+   ],
+   "retreat": 2,
+   "rarity": "Double rare",
+   "suffix": "ex"
   }
  ]
 }

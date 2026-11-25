@@ -3730,6 +3730,12 @@ import test from 'node:test';
     });
 
     // ── §D multi-target family (allBenchDamage) ──
+    // customhb Tyranitar (Tyrant's Quake): the parenthetical names Benched Pokémon but is not a spread clause;
+    // reading it as one hit the Bench twice (log ptcg-log_public_1_20261121-204124, game 6 n=82).
+    test('allBenchDamage: a Weakness/Resistance parenthetical is not a Bench spread clause', () => {
+      assert.equal(allBenchDamage("This attack does 20 damage to each of your opponent's Pokémon (Do not apply Weakness and Resistance to Benched Pokémon)."), 0);
+      assert.equal(allBenchDamage("This attack does 10 damage to each Benched Pokémon (both yours and your opponent's)."), 10);
+    });
     test('allBenchDamage: extracts per-Pokémon amount from "to each/every/all … Benched Pokémon"', () => {
       assert.equal(allBenchDamage("Do 10 damage to each of your opponent's Benched Pokémon."), 10);
       assert.equal(allBenchDamage("20 damage to all of your opponent's Benched Pokémon"), 20);

@@ -20,13 +20,15 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
 import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
-import { isGxCard, isVCard } from '../rules/card-classify.mjs';
-import { cardEffectiveHp } from '../reduce/shared.mjs';
+import { isExCard, isGxCard, isVCard } from '../rules/card-classify.mjs';
+import { cardEffectiveHp, inPlayView } from '../reduce/shared.mjs';
+import { parseConditionClause, attackConditionMet } from '../rules/attack-conditions.mjs';
+import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
 import { effectTextFor, stepRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   healLocked, addAttackMarker, markerFromTurn, markerUntilTurn,
 } from '../rules/attack-markers.mjs';
-import { healBlockedByAbility } from '../rules/ability-combat.mjs';
+import { healBlockedByAbility, abilityBenchLimit, sideContextFor } from '../rules/ability-combat.mjs';
 import { classifyEnergyEffect, resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import {
   isSingleStrikeCard,
@@ -43,8 +45,14 @@ import {
   switchOutBlocked,
   cardEffectShielded,
   playerShieldBlocks,
+  pokemonHasType,
 } from './trainer-steps.mjs';
-import { ATTACK_STEP_HANDLERS, EXTRA_ENERGY_SELF_GATED, stepExtraEnergySatisfied } from './attack-steps.mjs';
+import {
+  ATTACK_STEP_HANDLERS,
+  EXTRA_ENERGY_SELF_GATED,
+  stepAttachedEnergySatisfied,
+  stepExtraEnergySatisfied,
+} from './attack-steps.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 
 export { createPendingChoice };
@@ -100,9 +108,9 @@ function targetsOpponentActiveAbilityOnly(step) {
 
 // Rocky Fighting / Mist / Wash Water / Wonder Energy (audit SE5): "Prevent all effects of
 // attacks used by your opponent's Pokémon done to the Pokémon this card is attached to."
-function opponentActiveEffectShielded(opponent) {
+function opponentActiveEffectShielded(draft, opponent) {
   const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
-  return Boolean(active) && specialEnergyShielded(opponent, active, 'effect');
+  return Boolean(active) && specialEnergyShielded(opponent, active, 'effect', draft.stadium);
 }
 
 // Fusion Strike Energy: same shape, for the opponent's Abilities; also an Ability shield on that
@@ -111,7 +119,7 @@ function opponentActiveAbilityShielded(draft, opponent) {
   const active = (opponent?.zones?.active || []).find((c) => !c.attachedTo);
   if (!active) return false;
   return (
-    specialEnergyShielded(opponent, active, 'ability') ||
+    specialEnergyShielded(opponent, active, 'ability', draft.stadium) ||
     cardEffectShielded(draft, { owner: opponent, root: active, source: 'Ability' })
   );
 }
@@ -124,6 +132,7 @@ function healTargetAllowed(draft, player, root, step) {
   const sideCards = [...(player.zones.active || []), ...(player.zones.bench || [])];
   const top = topPokemonCard(sideCards, root) || root;
   if (step.subtypes?.includes('gx') && !isGxCard(top)) return false;
+  if (step.subtypes?.includes('ex') && !isExCard(top)) return false;
   const energies = (step.minEnergy || step.energyType)
     ? sideCards.filter((c) => c.attachedTo === root.instanceId && isEnergy(c))
     : [];
@@ -139,6 +148,11 @@ function healTargetAllowed(draft, player, root, step) {
     if (remaining > step.maxRemainingHp) return false;
   }
   return true;
+}
+
+/** A player's Bench limit: 5, or fewer under an opposing Sudowoodo Roadblock. */
+function benchLimitOf(draft, player) {
+  return player?.playerId ? abilityBenchLimit(sideContextFor(draft, player.playerId)) : 5;
 }
 
 /** Whether executeSteps has a handler for a step kind (switch case or handler table). */
@@ -196,6 +210,25 @@ function pickAlternativeBranch(deck, selection, alternatives) {
       return card && matchesKind(card, branch);
     })
     .slice(0, branch.count);
+}
+
+// X-Boot "a Basic {P} Energy card, a Basic {M} Energy card, or 1 of each": the listed type a
+// Basic Energy card counts as, or null.
+function oneEachTypeOf(card, types) {
+  if (!matchesSearch(card, 'Basic Energy')) return null;
+  const own = (card?.types || []).map((t) => String(t).toLowerCase());
+  return types.find((type) => own.includes(type.toLowerCase())) ?? null;
+}
+
+// Keeps the first pick of each listed type.
+function keepOnePerType(deck, selection, types) {
+  const seen = new Set();
+  return selection.filter((id) => {
+    const type = oneEachTypeOf(deck.find((c) => c.instanceId === id), types);
+    if (type == null || seen.has(type)) return false;
+    seen.add(type);
+    return true;
+  });
 }
 
 // A search kind (`what`) minus an optional `exclude` kind: "3 Basic Pokémon (except for
@@ -352,6 +385,25 @@ function normalizeStatusAbilityStep(step) {
   };
 }
 
+/** A printed "If <board condition>, …" gate on an attack step, read as the attack reads it. */
+function attackBoardConditionHolds(draft, { playerId, oppId, sourceCard, clause }) {
+  const condition = parseConditionClause(clause);
+  if (!condition) return false;
+  const attacker = (sourceCard && findCard(draft, sourceCard.instanceId)?.card) || sourceCard || null;
+  const defender = (draft.players[oppId]?.zones?.active || []).find((c) => !c.attachedTo) || null;
+  return attackConditionMet(
+    condition,
+    buildServerAttackContext(draft, {
+      attackerPlayerId: playerId,
+      defenderPlayerId: oppId,
+      attacker,
+      defender,
+      attackerView: attacker ? inPlayView(draft, attacker) : null,
+      defenderView: defender ? inPlayView(draft, defender) : null,
+    })
+  );
+}
+
 function normalizeSteps(branch) {
   if (!branch) return [];
   if (Array.isArray(branch)) return branch;
@@ -420,6 +472,9 @@ export function executeSteps(draft, {
 
     // "If you attached Energy … in this way" bonuses (I93): remember the attach across resumes.
     const lastAttach = events.findLast((e) => e.type === 'cardAttached');
+    // Joltik Jolting Charge: "For each Energy card attached, …" counts every attach of the effect.
+    const attachedIds = events.filter((e) => e.type === 'cardAttached' && e.playerId === playerId).map((e) => e.instanceId);
+    if (attachedIds.length > 0) context.attachedIds = [...new Set([...(context.attachedIds || []), ...attachedIds])];
     if (lastAttach) {
       context.attachedEnergy = true;
       context.attachedTargetId = lastAttach.targetInstanceId;
@@ -434,10 +489,16 @@ export function executeSteps(draft, {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_attached', step: step.type });
       continue;
     }
+    // Dunsparce Strike and Run: only after this attack's own search put a Pokémon on the Bench.
+    if (step.requiresBenchedThisAttack && !draft.attackBenchedFromDeck) {
+      events.push({ type: 'effectStepSkipped', reason: 'nothing_benched', step: step.type });
+      continue;
+    }
     // "Discard an Energy from this Pokémon. If you do, …" (Swing and Skedaddle): the printed
     // discard must have moved an Energy this attack.
     if (
       step.requiresEnergyDiscard &&
+      !draft.attackEnergyDiscarded &&
       !events.some((e) => e.type === 'cardMoved' && e.reason === 'attack-energy-discard' && e.playerId === playerId)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'nothing_discarded', step: step.type });
@@ -451,6 +512,15 @@ export function executeSteps(draft, {
       !stepExtraEnergySatisfied({ draft, player, sourceCard, step })
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'extra_energy_unmet', step: step.type });
+      continue;
+    }
+    // Jet Headbutt: "If this Pokémon has any {F} Energy attached, …".
+    if (
+      effectType === 'attackSteps' &&
+      step.requiresAttachedEnergy &&
+      !stepAttachedEnergySatisfied({ draft, player, sourceCard, step })
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'attached_energy_unmet', step: step.type });
       continue;
     }
     // Hypno Spiral Aura: "If the Defending Pokémon isn't Knocked Out by the damage from this
@@ -470,8 +540,16 @@ export function executeSteps(draft, {
     }
     if (
       effectType === 'attackSteps' &&
+      step.boardCondition &&
+      !attackBoardConditionHolds(draft, { playerId, oppId, sourceCard, clause: step.boardCondition })
+    ) {
+      events.push({ type: 'effectStepSkipped', reason: 'condition_unmet', step: step.type });
+      continue;
+    }
+    if (
+      effectType === 'attackSteps' &&
       targetsOpponentActiveOnly(step) &&
-      opponentActiveEffectShielded(opponent)
+      opponentActiveEffectShielded(draft, opponent)
     ) {
       events.push({ type: 'effectStepSkipped', reason: 'effect_shield', step: step.type });
       continue;
@@ -539,6 +617,8 @@ export function executeSteps(draft, {
         revealsPicks: stepRevealsPicks(step, effectTextFor({ effectType, sourceCard, context })),
         selection: stepSelection,
         memo: context[memoKey],
+        // Joltik Jolting Charge: how many cards this effect attached (across resumes).
+        attachedThisEffect: (context.attachedIds || []).length,
         // Runs `more` right after this step (a Supporter's effect used as an attack's, design
         // 036 E). The widened list rides on later resume tokens.
         insertSteps: (more) => {
@@ -698,8 +778,9 @@ export function executeSteps(draft, {
         const evolvesFrom = step.evolvesFrom ? String(step.evolvesFrom).toLowerCase() : null;
         const opponentTypes = step.sameTypeAsOpponent ? inPlayTypes(opponent) : null;
         const opponentNames = step.sameNameAsOpponent ? inPlayNames(opponent) : null;
+        const oneEachOf = step.oneEachOf || null;
         const cardMatches = (c) =>
-          matchesKind(c, { what, exclude: step.exclude }) &&
+          (oneEachOf ? oneEachTypeOf(c, oneEachOf) != null : matchesKind(c, { what, exclude: step.exclude })) &&
           (!opponentNames || opponentNames.has(String(c?.name || '').toLowerCase())) &&
           (!nameFilter || String(c?.name || '').toLowerCase().includes(nameFilter)) &&
           (!evolvesFrom || String(c?.evolvesFrom || '').toLowerCase() === evolvesFrom) &&
@@ -894,8 +975,12 @@ export function executeSteps(draft, {
         }
 
         if (stepSelection && dest === 'attach') {
-          const picked = stepSelection.filter((id) =>
+          const valid = [...new Set(stepSelection)].filter((id) =>
             (player.zones.deck || []).some((c) => c.instanceId === id && cardMatches(c))
+          );
+          const picked = (oneEachOf ? keepOnePerType(player.zones.deck || [], valid, oneEachOf) : valid).slice(
+            0,
+            maxCount
           );
           const roots = attachRoots();
           if (picked.length === 0 || roots.length === 0) {
@@ -936,7 +1021,7 @@ export function executeSteps(draft, {
             if (dest === 'bench') {
               const currentBench = player.zones.bench || [];
               const benchCount = currentBench.filter((b) => !b.attachedTo).length;
-              if (benchCount >= BENCH_LIMIT) {
+              if (benchCount >= benchLimitOf(draft, player)) {
                 // Hard limit: bench is full, do not overfill bench
                 continue;
               }
@@ -949,6 +1034,8 @@ export function executeSteps(draft, {
                 if (isFossilItem(c)) becomeFossilPokemon(c);
                 c.enteredPlayTurn = draft.turn?.number ?? null;
                 player.zones.bench.push(c);
+                // Dunsparce Strike and Run: "If you put any Pokémon onto your Bench in this way".
+                draft.attackBenchedFromDeck = true;
               } else if (dest === 'discard') {
                 player.zones.discard.push(c);
               } else {
@@ -990,7 +1077,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, BENCH_LIMIT - benchCount);
+          const availableBenchSlots = Math.max(0, benchLimitOf(draft, player) - benchCount);
           if (availableBenchSlots <= 0) {
             events.push({
               type: 'effectStepSkipped',
@@ -1018,7 +1105,7 @@ export function executeSteps(draft, {
         if (dest === 'bench') {
           const bench = player.zones.bench || [];
           const benchCount = bench.filter((c) => !c.attachedTo).length;
-          const availableBenchSlots = Math.max(0, BENCH_LIMIT - benchCount);
+          const availableBenchSlots = Math.max(0, benchLimitOf(draft, player) - benchCount);
           effectiveMaxCount = Math.min(maxCount, availableBenchSlots);
         }
 
@@ -1065,7 +1152,11 @@ export function executeSteps(draft, {
           }
           break;
         }
-        const count = step.count || 1;
+        const sideCards = [...(player.zones.active || []), ...(player.zones.bench || [])];
+        const typedInPlay = step.perOwnType
+          ? sideCards.filter((c) => !c.attachedTo && isPokemon(c) && pokemonHasType(topPokemonCard(sideCards, c) || c, step.perOwnType)).length
+          : 1;
+        const count = (step.count || 1) * typedInPlay;
         // "Each player draws N cards" (Togetic Shared Peace): the user first, then the opponent.
         for (const drawer of step.eachPlayer ? [player, opponent] : [player]) {
           if (!drawer) continue;
@@ -1391,6 +1482,14 @@ export function executeSteps(draft, {
         };
         const bench = (player.zones.bench || []).filter((c) => !c.attachedTo && (step.selfSwap || benchAllowed(c)));
         const active = (player.zones.active || []).find((c) => !c.attachedTo);
+        // Dragonite ex Dragon Transport (customhb): "Switch your Active {N} Pokémon with …" — only
+        // an Active of that type switches.
+        const activeTop = active ? topPokemonCard(player.zones.active || [], active) || active : null;
+        if (step.activePokemonType && !(activeTop && matchesEnergyTypeFilter({ types: activeTop.types }, [step.activePokemonType]))) {
+          context.ownSwitchSkipped = true;
+          events.push({ type: 'effectStepSkipped', reason: 'active_type_mismatch', step: step.type });
+          break;
+        }
         // Temporal Freeze: a Trainer or Ability can't switch the frozen Active Pokémon out.
         if (active && shieldedTarget(player, active)) {
           context.ownSwitchSkipped = true;
@@ -2175,7 +2274,7 @@ export function executeSteps(draft, {
         // Twist Mountain: Restored Pokémon from hand to Bench.
         const hand = player.zones.hand || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= BENCH_LIMIT) {
+        if (bench.filter((c) => !c.attachedTo).length >= benchLimitOf(draft, player)) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }
@@ -2202,7 +2301,7 @@ export function executeSteps(draft, {
         const zoneKey = step.source === 'discard' ? 'discard' : 'hand';
         const zone = player.zones[zoneKey] || [];
         const bench = player.zones.bench || [];
-        if (bench.filter((c) => !c.attachedTo).length >= BENCH_LIMIT) {
+        if (bench.filter((c) => !c.attachedTo).length >= benchLimitOf(draft, player)) {
           events.push({ type: 'effectStepSkipped', reason: 'bench_full' });
           break;
         }

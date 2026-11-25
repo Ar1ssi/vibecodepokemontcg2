@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createGameState } from '../state.mjs';
 import { createCard } from '../cards.mjs';
 import { applyCommand } from '../reduce.mjs';
+import { hasCondition } from '../rules/special-conditions.mjs';
 
 function createTestGame() {
   const state = createGameState({
@@ -486,6 +487,127 @@ describe('Phase 1: Combat Passives & Modifier Pipeline', () => {
       assert.equal(res.error, null);
       // 3 counters (Rough Skin on the Garchomp ex, not the Gible root) + 2 (Rocky Helmet)
       assert.equal(res.state.players.p1.zones.active[0].damage, 50);
+    });
+
+    // Exported log: a Pidgeot ex took 40 from a Garchomp ex stack that Corviknight, hitting it without a
+    // Knock Out, took 70 from. The Knock Out moves the evolved card to the discard pile, so reading its
+    // Ability afterwards found only the Gible. customhb-040 Rough Skin, customhb-339 Rocky Helmet,
+    // customhb-860 Spiky Energy (set.json).
+    const garchompStack = (priorDamage) => {
+      const state = createTestGame();
+      state.players.p1.zones.active.push(
+        createCard({
+          instanceId: 1,
+          name: 'Pidgeot ex',
+          stage: 'Stage2',
+          subtypes: ['Stage 2', 'ex'],
+          types: ['Colorless'],
+          hp: 160,
+          attacks: [{ name: 'Blustery Wind', cost: [], damage: 120 }],
+        })
+      );
+      const gible = createCard({ instanceId: 2, name: 'Gible', stage: 'Basic', subtypes: ['Basic'], types: ['Dragon'], hp: 70, attacks: [] });
+      gible.damage = priorDamage;
+      state.players.p2.zones.active.push(
+        gible,
+        createCard({
+          instanceId: 4,
+          name: 'Garchomp ex',
+          stage: 'Stage2',
+          subtypes: ['Stage 2', 'ex'],
+          types: ['Dragon'],
+          hp: 190,
+          attachedTo: 2,
+          attacks: [],
+          abilities: [
+            {
+              name: 'Rough Skin',
+              type: 'Ability',
+              text: "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), put 3 damage counters on the Attacking Pokémon.",
+            },
+          ],
+        }),
+        createCard({
+          instanceId: 3,
+          name: 'Rocky Helmet',
+          type: 'Trainer',
+          trainerType: 'Tool',
+          subtypes: ['Pokémon Tool'],
+          attachedTo: 2,
+          text: "If the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if it is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+        }),
+        createCard({
+          instanceId: 5,
+          name: 'Spiky Energy',
+          type: 'Energy',
+          supertype: 'Energy',
+          attachedTo: 2,
+          text: "As long as this card is attached to a Pokémon, it provides {C} Energy.\n\nIf the Pokémon this card is attached to is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), put 2 damage counters on the Attacking Pokémon.",
+        })
+      );
+      state.players.p2.zones.bench.push(
+        createCard({ instanceId: 9, name: 'Bench', stage: 'Basic', subtypes: ['Basic'], types: ['Colorless'], hp: 60, attacks: [] })
+      );
+      return applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+    };
+
+    test('Rough Skin on an evolved Active still fires when the hit Knocks it Out', () => {
+      const res = garchompStack(100);
+      assert.equal(res.error, null);
+      assert.ok(res.events.some((e) => e.type === 'pokemonKnockedOut'), 'the hit Knocks Garchomp ex Out');
+      // 3 (Rough Skin) + 2 (Rocky Helmet) + 2 (Spiky Energy), the same as when it survives
+      assert.equal(res.state.players.p1.zones.active[0].damage, 70);
+    });
+
+    test('the same Garchomp ex stack deals the same retaliation when it survives', () => {
+      const res = garchompStack(0);
+      assert.equal(res.error, null);
+      assert.ok(!res.events.some((e) => e.type === 'pokemonKnockedOut'));
+      assert.equal(res.state.players.p1.zones.active[0].damage, 70);
+    });
+
+    // Roserade TEF 009, Poison Point (out/pkmn-pokemon-cards.json): evolves from Roselia.
+    test('Poison Point on an evolved Active still Poisons the attacker when the hit Knocks it Out', () => {
+      const state = createTestGame();
+      state.players.p1.zones.active.push(
+        createCard({
+          instanceId: 1,
+          name: 'Attacker',
+          subtypes: ['Basic'],
+          types: ['Colorless'],
+          hp: 200,
+          attacks: [{ name: 'Hit', cost: [], damage: 60 }],
+        })
+      );
+      const roselia = createCard({ instanceId: 2, name: 'Roselia', stage: 'Basic', subtypes: ['Basic'], types: ['Grass'], hp: 70, attacks: [] });
+      roselia.damage = 70;
+      state.players.p2.zones.active.push(
+        roselia,
+        createCard({
+          instanceId: 3,
+          name: 'Roserade',
+          stage: 'Stage1',
+          subtypes: ['Stage 1'],
+          types: ['Grass'],
+          hp: 130,
+          attachedTo: 2,
+          attacks: [],
+          abilities: [
+            {
+              name: 'Poison Point',
+              type: 'Ability',
+              text: "If this Pokémon is in the Active Spot and is damaged by an attack from your opponent's Pokémon (even if this Pokémon is Knocked Out), the Attacking Pokémon is now Poisoned.",
+            },
+          ],
+        })
+      );
+      state.players.p2.zones.bench.push(
+        createCard({ instanceId: 9, name: 'Bench', stage: 'Basic', subtypes: ['Basic'], types: ['Grass'], hp: 60, attacks: [] })
+      );
+      const res = applyCommand(state, { type: 'attack', payload: { attackIndex: 0 }, playerId: 'p1' });
+      assert.equal(res.error, null);
+      assert.ok(res.events.some((e) => e.type === 'pokemonKnockedOut'), 'the hit Knocks Roserade Out');
+      assert.ok(hasCondition(res.state.players.p1.zones.active[0], 'Poisoned'));
     });
   });
 

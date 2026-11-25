@@ -19,6 +19,7 @@ import {
   isSpecialEnergyCard,
   failedSpecialEnergyRestriction,
   discardsAtEndOfTurn,
+  stadiumBlanksSpecialEnergy,
   getSpecialEnergyStatusImmunity,
 } from '../rules/special-energy-parse.mjs';
 import { clearConditions, hasCondition, removeCondition } from '../rules/special-conditions.mjs';
@@ -510,6 +511,7 @@ export function runSpecialEnergyTriggers(draft, {
       attackExecuting: !!draft.__attackEffectPhase,
       hostZoneId,
       evolvedFrom,
+      stadium: draft.stadium,
     });
     for (const plan of plans) queue.push({ energyInstanceId: e.instanceId, plan });
   }
@@ -589,6 +591,7 @@ export function resolveSpecialEnergyDiscard(
     host: hostTop || host,
     zoneArray: zone,
     attackExecuting,
+    stadium: draft.stadium,
   });
   if (plans.some((p) => p.action === 'returnToHand')) return 'hand';
   if (plans.some((p) => p.action === 'reattach')) return 'reattach';
@@ -633,7 +636,7 @@ export function resolveSpecialEnergyKnockout(
   for (const energy of zone.filter(
     (c) => c && isSpecialEnergyCard(c) && c.attachedTo === host.instanceId
   )) {
-    const plans = planSpecialEnergyTriggers(energy, { trigger: 'knockout', host: hostTop || host, zoneArray: zone });
+    const plans = planSpecialEnergyTriggers(energy, { trigger: 'knockout', host: hostTop || host, zoneArray: zone, stadium: draft.stadium });
     for (const plan of plans) {
       if (!sourceMet(plan)) continue;
       if (plan.action === 'returnToHand') out.returnToHand = true;
@@ -688,7 +691,7 @@ function discardAttachedEnergy(draft, { energy, zone, zoneId, hostPlayerId, reas
 export function applySpecialEnergyStatusImmunity(draft, { events = [] } = {}) {
   for (const { pid, zone, root, view } of inPlayHosts(draft)) {
     if (!attachedSpecialEnergies(zone, root).length) continue;
-    for (const condition of getSpecialEnergyStatusImmunity(view, zone)) {
+    for (const condition of getSpecialEnergyStatusImmunity(view, zone, draft.stadium)) {
       if (!hasCondition(root, condition)) continue;
       removeCondition(root, condition);
       events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId: pid, reason: 'specialEnergy' });
@@ -705,7 +708,9 @@ export function applySpecialEnergyStatusImmunity(draft, { events = [] } = {}) {
  */
 export function settleSpecialEnergyPassives(draft, { events = [] } = {}) {
   if (!draft?.players) return;
+  const blanked = stadiumBlanksSpecialEnergy(draft.stadium);
   for (const { pid, zoneId, zone, root, view } of inPlayHosts(draft)) {
+    if (blanked) break;
     for (const energy of attachedSpecialEnergies(zone, root)) {
       const failed = failedSpecialEnergyRestriction(energy, view, zone);
       if (!failed?.discardIfNot) continue;
@@ -720,7 +725,7 @@ export function settleSpecialEnergyPassives(draft, { events = [] } = {}) {
  * Magma/Aqua, Magma/Aqua, Miracle): discards the ending player's attached copies (SE8).
  */
 export function discardEndOfTurnSpecialEnergies(draft, { endingPlayerId, events = [] } = {}) {
-  if (!draft?.players?.[endingPlayerId]) return;
+  if (!draft?.players?.[endingPlayerId] || stadiumBlanksSpecialEnergy(draft.stadium)) return;
   for (const { pid, zoneId, zone, root } of inPlayHosts(draft, [endingPlayerId])) {
     for (const energy of attachedSpecialEnergies(zone, root)) {
       if (!discardsAtEndOfTurn(energy)) continue;

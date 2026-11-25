@@ -212,3 +212,30 @@ test('viewFor: attackExtras lists Memory Helix attacks for the owner only', asyn
   state.players.p1.zones.bench.length = 0;
   assert.equal('attackExtras' in viewFor(state, 'p1', { attackExtrasFor }).you, false, 'empty Bench, no key');
 });
+
+test('viewFor hides the opponent Starting Active until both Actives are placed', () => {
+  const state = setupSampleGame();
+  state.players.p2.zones.active.length = 0;
+  state.openingDrawPending = 'p1';
+
+  const viewP2 = viewFor(state, 'p2');
+  assert.deepEqual(viewP2.them.zones.active, [{ instanceId: 16 }]);
+  assert.equal(JSON.stringify(viewP2).includes('Public Raichu'), false);
+  // The owner still sees their own pick.
+  assert.equal(viewFor(state, 'p1').you.zones.active[0].name, 'Public Raichu');
+
+  state.players.p2.zones.active.push(createCard({ instanceId: 23, name: 'Opponent Public Pidgeot ex' }));
+  assert.equal(viewFor(state, 'p2').them.zones.active[0].name, 'Public Raichu');
+  delete state.openingDrawPending;
+  assert.equal(viewFor(state, 'p1').them.zones.active[0].name, 'Opponent Public Pidgeot ex');
+});
+
+test('viewFor keeps attachedTo on a face-down Starting Active card so attachments lay out', () => {
+  const state = setupSampleGame();
+  state.players.p2.zones.active.length = 0;
+  state.openingDrawPending = 'p1';
+  state.players.p1.zones.active.push(createCard({ instanceId: 17, name: 'Lightning Energy', attachedTo: 16 }));
+
+  const active = viewFor(state, 'p2').them.zones.active;
+  assert.deepEqual(active, [{ instanceId: 16 }, { instanceId: 17, attachedTo: 16 }]);
+});

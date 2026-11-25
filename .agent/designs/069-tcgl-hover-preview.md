@@ -196,7 +196,7 @@ Settings (`fx-settings.mjs`): `HOVER_PREVIEW_OFF_KEY = 'ptcg-hover-preview-off'`
 | 6 | Mouse down, drag start, right-click, wheel | Hide + disarm + clear warm; click/drag/menu work as today | [ ] model + e2e |
 | 7 | Re-render detaches the hovered `<img>` | `revalidate` hides it; no orphan preview | [ ] dom test |
 | 8 | Inspector / focus / double-click preview opens | Hidden and blocked until all are closed | [ ] model + e2e |
-| 9 | Edge-to-edge layout, 1920×1080, sidebox open (gutter 201) | `mode:'band'`, width 177, height 247, left 12, top 416 | [ ] placement unit |
+| 9 | Edge-to-edge layout, 1920×1080, sidebox open (gutter 201) | **Rev:** the card hugs the art edge on the side with more room (`HOVER_MAX_WIDTH` 480): right of the art 480×671 `band-right` at left 1260; left band alone 177×247 | [ ] placement unit |
 | 10 | Sidebox hidden (gutter 436, vh 1080) | width 412 → height 576 (under the 972 cap) | [ ] placement unit |
 | 11 | Two-player / `sim` layout (gutter 0) | `mode:'edge'`, width 160 at board left + 12 | [ ] placement unit |
 | 12 | Preview rect would cover the hovered card (left hand card, edge mode over prizes) | Mirrors to the right (`band-right`/`edge-right`) | [ ] placement unit |

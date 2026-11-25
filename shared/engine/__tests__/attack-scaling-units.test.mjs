@@ -208,6 +208,22 @@ test('Heliolisk Powerful Bolt (Ascended Heroes 229): one coin per attached Energ
   assert.equal(damageOf(res), 70 * flip.headsCount);
 });
 
+test('Rapid Strike Urshifu Surging Strikes (customhb 221 set.json): one coin per {F} or {W} Pokémon in play', () => {
+  const text = 'Flip a coin for each of your {F} or {W} Pokémon in play. This attack does 30 damage for each heads.';
+  const setup = board('Rapid Strike Urshifu', { name: 'Surging Strikes', damage: '30×', text });
+  setup.attacker.types = ['Fighting', 'Water'];
+  setup.state.players.p1.zones.bench.push(
+    mon('Kubfu', { types: ['Fighting'] }),
+    mon('Squirtle', { types: ['Water'] }),
+    mon('Pikachu', { types: ['Lightning'] })
+  );
+  const res = attack(setup);
+  assert.equal(res.error, null);
+  const flip = res.events.find((e) => e.type === 'attackCoinFlipped');
+  assert.equal(flip.flips.length, 3);
+  assert.equal(damageOf(res), 30 * flip.headsCount);
+});
+
 test('Torkoal V Combustion Pillar (Sword & Shield 188): the deck top decides the +90', () => {
   const text = 'Discard the top card of your deck. If that card is a {R} Energy card, this attack does 90 more damage.';
   const fire = board('Torkoal V', { name: 'Combustion Pillar', damage: '90+', text }, { deckTop: energy('Fire') });

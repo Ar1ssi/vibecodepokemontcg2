@@ -1011,6 +1011,15 @@ export const COMMAND_SCHEMAS = {
     },
   },
 
+  // Design 090: the room's homebrew clock ran out for the acting player, who loses. Sent only by
+  // the server (GameRoom.flagTimeOut); a client's own `timeOut` is refused at the room.
+  timeOut: {
+    type: 'timeOut',
+    validate() {
+      return { valid: true };
+    },
+  },
+
   undo: {
     type: 'undo',
     validate(payload = {}) {

@@ -15,6 +15,7 @@ import { planSpecialEnergyTriggers } from '../../../../shared/engine/rules/speci
  * @param {string} args.oZoneId 'active' | 'bench'; Energy attached elsewhere is not redirected
  * @param {string} args.dZoneId the requested destination; only 'discard' is redirected
  * @param {object[]} args.zoneArray the origin zone array (host and attached Energy live in it)
+ * @param {object|null} args.stadium the Stadium in play (Temple of Sinnoh blanks Special Energy text)
  * @param {boolean} args.attackExecuting whether an attack's own discard is running
  */
 export function planSpecialEnergyDiscardRedirect({
@@ -22,6 +23,7 @@ export function planSpecialEnergyDiscardRedirect({
   oZoneId,
   dZoneId,
   zoneArray,
+  stadium = null,
   attackExecuting,
 }) {
   if (
@@ -36,6 +38,7 @@ export function planSpecialEnergyDiscardRedirect({
     (c) => c.type === 'Pokémon' && c.image === movingCard.image.relative
   );
   const plans = planSpecialEnergyTriggers(movingCard, {
+    stadium,
     trigger: 'discard',
     host,
     zoneArray,

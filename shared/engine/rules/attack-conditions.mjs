@@ -27,6 +27,7 @@
  */
 
 import { escapeRegExp, normalizeAttackText } from './attack-text.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 
 const STATUS_WORDS = {
   asleep: 'Asleep',
@@ -143,8 +144,11 @@ function kindOf(phrase) {
 
 /** "a Pokémon-GX or a Pokémon-EX" → ['gx', 'ex']; null when any part is not a known kind. */
 export function kindsOf(phrase) {
-  const kinds = String(phrase || '')
-    .split(/,? or /)
+  const parts = String(phrase || '').split(/,? or /);
+  // Rapid Strike Urshifu Surging Strikes: "{F} or {W} Pokémon" — the last part's noun is shared.
+  const noun = / (pokémon)$/.exec(parts[parts.length - 1])?.[1];
+  const kinds = parts
+    .map((part, i) => (noun && i < parts.length - 1 && /^(?:an? )?\{[a-z]\}$/.test(part.trim()) ? `${part} ${noun}` : part))
     .map(kindOf);
   return kinds.length > 0 && kinds.every(Boolean) ? kinds : null;
 }
@@ -205,7 +209,10 @@ const CLAUSES = [
   [/^you do$/, () => ({ desc: { kind: 'optionalCostPaid' }, printedNegated: false })],
   // ── Stadium ────────────────────────────────────────────────────────────────
   [/^there is no stadium(?: card)? in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: false })],
-  [/^there is any stadium card in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: true })],
+  [
+    /^(?:there is (?:a|any) stadium(?: card)? in play|a stadium(?: card)? is in play)$/,
+    () => ({ desc: { kind: 'noStadium' }, printedNegated: true }),
+  ],
   [/^you don't have a stadium card in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: false })],
 
   // ── Hand size ──────────────────────────────────────────────────────────────
@@ -293,6 +300,75 @@ const CLAUSES = [
       printedNegated: false,
     }),
   ],
+  // ── SM-LOT bonus conditions (TCGdex sm-series texts named per row) ─────────
+  // Dedenne Electrichain (sm6-88): "If you have any Lightning Pokémon on your Bench".
+  [
+    /^you have any (?:\{([a-z])\} )?pokémon on your bench$/,
+    (m) => ({ desc: { kind: 'benchHasType', ...(m[1] ? { type: ENERGY_LETTER_TYPES[m[1]] } : {}) }, printedNegated: false }),
+  ],
+  // Slowbro Facade (sm2-49): "If this Pokémon is Burned or Poisoned".
+  [
+    new RegExp(`^this pokémon is (${STATUS_RE}) or (${STATUS_RE})$`),
+    (m) => ({ desc: { kind: 'attackerStatus', statuses: [STATUS_WORDS[m[1]], STATUS_WORDS[m[2]]] }, printedNegated: false }),
+  ],
+  // Darkrai Dark Raid (sm3-87) / Zygarde Calm Strike (sm6-72).
+  [/^your opponent has (?:already )?used their gx attack$/, () => ({ desc: { kind: 'opponentGxUsed' }, printedNegated: false })],
+  [/^you have (?:already )?used your gx attack$/, () => ({ desc: { kind: 'ownGxUsed' }, printedNegated: false })],
+  // Wigglytuff Punishing Slap (sm4-72).
+  [
+    /^any of your opponent's pokémon (?:have|has) any \{([a-z])\} energy(?: cards?)? attached(?: to (?:them|it))?$/,
+    (m) => ({ desc: { kind: 'opponentInPlayEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
+  // Hippopotas Eleventh Hour Tackle (sm5-68).
+  [
+    /^there (?:are|is) (\d+) or fewer cards? in your deck$/,
+    (m) => ({ desc: { kind: 'ownDeckCount', op: 'lte', n: Number(m[1]) }, printedNegated: false }),
+  ],
+  // Araquanid Bubble Trap (sm6-33): any of your Pokémon; Volbeat Pheromone Catch (sm7-17): a named one.
+  [
+    /^1 of your pokémon used (.+?) during your last turn$/,
+    (m) => ({ desc: { kind: 'ownUsedAttackLastTurn', attackName: m[1].trim() }, printedNegated: false }),
+  ],
+  [
+    /^your (?!opponent)(.+?) used (.+?) during your last turn$/,
+    (m) => ({
+      desc: { kind: 'ownUsedAttackLastTurn', attackName: m[2].trim(), attackerName: m[1].trim() },
+      printedNegated: false,
+    }),
+  ],
+  // Grumpig Mirror Step (sm7-60).
+  [
+    /^1 of your opponent's pokémon in play has the same name as 1 of your pokémon in play$/,
+    () => ({ desc: { kind: 'sameNameInPlay' }, printedNegated: false }),
+  ],
+  // Medicham Strike of Enlightenment (sm7-77).
+  [
+    /^this pokémon's remaining hp is (\d+) or less$/,
+    (m) => ({ desc: { kind: 'attackerRemainingHp', op: 'lte', n: Number(m[1]) }, printedNegated: false }),
+  ],
+  // Raikou Lost Voltage (sm8-79).
+  [
+    /^you have any \{([a-z])\} energy cards? in the lost zone$/,
+    (m) => ({ desc: { kind: 'lostZoneEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
+  // Sudowoodo Reply Strongly (sm8-110): attack damage is only recorded on the Active.
+  [
+    /^this pokémon was damaged by an attack during your opponent's last turn while it was your active pokémon$/,
+    () => ({ desc: { kind: 'damagedLastOpponentTurn' }, printedNegated: false }),
+  ],
+  // Alolan Meowth Spoil the Fun (sm8-118): "If you go second, … during your first turn."
+  // Azelf Psychic Abduction (sm6-43): "only if you go second, and only on your first turn".
+  // Cinccino Amazing Plea: the opponent answered "no" (effects/attack-steps.mjs atkPleaRecover).
+  [/^no$/, () => ({ desc: { kind: 'pleaRefused' }, printedNegated: false })],
+  [/^you go second(?:,? and only on your first turn)?$/, () => ({ desc: { kind: 'goingSecondFirstTurn' }, printedNegated: false })],
+  // Wigglytuff Charmed Slap (sm8-134).
+  [
+    /^this pokémon has a pokémon tool(?: card)? that has ["“](.+?)["”] in its name attached to it$/,
+    (m) => ({ desc: { kind: 'attackerToolNamed', nameContains: m[1] }, printedNegated: false }),
+  ],
+  // Gumshoos Identify (sm5-113) / Xatu Energy Gaze (sm8-88): after "Your opponent reveals their hand."
+  [/^you find (?:a|any) pokémon there$/, () => ({ desc: { kind: 'opponentHandHas', what: 'pokemon' }, printedNegated: false })],
+  [/^you find (?:an|any) energy(?: cards?)? there$/, () => ({ desc: { kind: 'opponentHandHas', what: 'energy' }, printedNegated: false })],
   // Sableye Cocky Claw (me02-059): "any Stage 2 {D} Pokémon on your Bench".
   [
     /^you have any (stage [12]) (?:\{([a-z])\} )?pokémon on your bench$/,
@@ -479,6 +555,11 @@ const CLAUSES = [
     new RegExp(`^${DEFENDER} has \\{([a-z])\\} resistance$`),
     (m) => ({ desc: { kind: 'defenderResistance', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
   ],
+  // Tapu Lele Psyshock (customhb): "If your opponent's Active Pokémon is weak to {P}".
+  [
+    new RegExp(`^${DEFENDER} (?:is weak to|has (?:a )?weakness to) \\{([a-z])\\}(?: type)?$`),
+    (m) => ({ desc: { kind: 'defenderWeakness', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+  ],
   // Armaldo ex Vortex Chop: "If the Defending Pokémon has any Resistance".
   [
     new RegExp(`^${DEFENDER} has any resistance$`),
@@ -530,6 +611,11 @@ const CLAUSES = [
     /^this pokémon was healed during this turn$/,
     () => ({ desc: { kind: 'healedThisTurn' }, printedNegated: false }),
   ],
+  // Gardevoir ex Swelling Pulse (customhb): "If this Pokémon was healed during your last turn".
+  [
+    /^this pokémon was healed during your last turn$/,
+    () => ({ desc: { kind: 'healedLastOwnTurn' }, printedNegated: false }),
+  ],
   // Tapu Fini Shining Currents: "If any of your Water Pokémon were healed during this turn".
   [
     /^any of your (?:\{([a-z])\} )?pokémon were healed during this turn$/,
@@ -560,8 +646,16 @@ const CLAUSES = [
   ],
   // Alakazam ex Spoon Bend: "If the opponent's Active Pokémon has any {M} Energy attached".
   [
-    /^(?:your opponent's active pokémon|the defending pokémon) has any \{([a-z])\} energy(?: cards?)? attached(?: to it)?$/,
-    (m) => ({ desc: { kind: 'defenderEnergyType', type: ENERGY_LETTER_TYPES[m[1]] }, printedNegated: false }),
+    /^(?:your opponent's active pokémon|the defending pokémon) has any \{([a-z])\}(?: or \{([a-z])\})? energy(?: cards?)? attached(?: to it)?$/,
+    // Melmetal ex Fire Punch (customhb): "… has any {M} or {G} Energy attached".
+    (m) => ({
+      desc: {
+        kind: 'defenderEnergyType',
+        type: ENERGY_LETTER_TYPES[m[1]],
+        ...(m[2] ? { types: [ENERGY_LETTER_TYPES[m[1]], ENERGY_LETTER_TYPES[m[2]]] } : {}),
+      },
+      printedNegated: false,
+    }),
   ],
   [
     /^you attach(?:ed)? an? (?:\{([a-z])\} )?energy card from your hand to this pokémon during this turn$/,
@@ -601,6 +695,13 @@ const CLAUSES = [
       },
       printedNegated: false,
     }),
+  ],
+
+  // Mega Golisopod ex First Impression: "your Active Pokémon was Knocked Out by damage from an
+  // attack during your opponent's last turn".
+  [
+    /^your active pokémon was knocked out by damage from (?:an|an opponent's|your opponent's) attack during (?:your opponent's|their) last turn$/,
+    () => ({ desc: { kind: 'koLastOpponentTurn', byAttackDamage: true, wasActive: true }, printedNegated: false }),
   ],
 
   // ── Damage counters ────────────────────────────────────────────────────────
@@ -643,6 +744,15 @@ const CLAUSES = [
   ],
 
   // ── Prizes ─────────────────────────────────────────────────────────────────
+  // Archeops Undefeated (customcheck-009): "If your opponent has not taken any Prize cards".
+  [
+    /^your opponent has not taken any prize cards?$/,
+    () => ({ desc: { kind: 'opponentPrizesTaken', op: 'eq', n: 0 }, printedNegated: false }),
+  ],
+  [
+    /^your opponent has taken any prize cards?$/,
+    () => ({ desc: { kind: 'opponentPrizesTaken', op: 'gt', n: 0 }, printedNegated: false }),
+  ],
   [
     /^your opponent doesn't have exactly (\d+) or (\d+) prize cards? remaining$/,
     (m) => ({
@@ -850,6 +960,15 @@ function parseClause(raw) {
     // A row that matches but cannot read its phrase (an unknown name or kind) falls through.
     if (printed) return printed;
   }
+  // "<clause>, or if <clause>" (Mega Golisopod ex First Impression): either side opens the gate.
+  const either = /^(.+?), or (?:if )?(.+)$/.exec(clause);
+  if (either) {
+    const sides = [parseClause(either[1]), parseClause(either[2])];
+    if (sides.every(Boolean)) {
+      const of = sides.map((side) => ({ ...side.desc, negated: side.printedNegated }));
+      return { desc: { kind: 'anyOf', of }, printedNegated: false };
+    }
+  }
   return null;
 }
 
@@ -1024,7 +1143,37 @@ function extraEnergyCount(ctx, type) {
 const CHECKS = {
   optionalCostPaid: (cond, ctx) => ctx.optionalCostPaid === true,
   defenderStatus: (cond, ctx) => (cond.statuses || [cond.status]).some((status) => list(ctx.defenderConditions).includes(status)),
-  attackerStatus: (cond, ctx) => list(ctx.attackerConditions).includes(cond.status),
+  attackerStatus: (cond, ctx) => (cond.statuses || [cond.status]).some((status) => list(ctx.attackerConditions).includes(status)),
+  benchHasType: (cond, ctx) =>
+    cond.type
+      ? list(ctx.benchTypes).some((types) => list(types).some((t) => sameType(t, cond.type)))
+      : list(ctx.benchNames).length > 0,
+  opponentGxUsed: (cond, ctx) => ctx.opponentGxUsed === true,
+  ownGxUsed: (cond, ctx) => ctx.ownGxUsed === true,
+  opponentInPlayEnergyType: (cond, ctx) =>
+    list(ctx.opponentInPlayEnergyUnits).some((unit) =>
+      String(unit)
+        .split('|')
+        .some((part) => sameType(part, cond.type))
+    ),
+  ownDeckCount: (cond, ctx) => compare(num(ctx.ownDeckCount), cond.op, cond.n),
+  ownUsedAttackLastTurn: (cond, ctx) =>
+    Boolean(ctx.ownLastTurnAttack) &&
+    String(ctx.ownLastTurnAttack.name).toLowerCase() === String(cond.attackName).toLowerCase() &&
+    (!cond.attackerName || nameMatches(ctx.ownLastTurnAttack.attackerName, cond.attackerName)),
+  sameNameInPlay: (cond, ctx) =>
+    list(ctx.opponentInPlayNames).some((theirs) =>
+      list(ctx.ownInPlayNames).some((ours) => String(ours).trim().toLowerCase() === String(theirs).trim().toLowerCase())
+    ),
+  lostZoneEnergyType: (cond, ctx) => list(ctx.ownLostZoneEnergyTypes).some((t) => sameType(t, cond.type)),
+  goingSecondFirstTurn: (cond, ctx) => ctx.goingSecondFirstTurn === true,
+  pleaRefused: (cond, ctx) => ctx.pleaRefused === true,
+  attackerToolNamed: (cond, ctx) =>
+    list(ctx.attackerAttachedCards).some(
+      (card) => card.tool && String(card.name).toLowerCase().includes(String(cond.nameContains).toLowerCase())
+    ),
+  opponentHandHas: (cond, ctx) =>
+    num(cond.what === 'pokemon' ? ctx.opponentHandPokemonCount : ctx.opponentHandEnergyCount) > 0,
   noStadium: (cond, ctx) => !ctx.stadiumInPlay,
   handCount: (cond, ctx) => compare(num(ctx.ownHandCount), cond.op, cond.n),
   handCountVsOpponent: (cond, ctx) => compare(num(ctx.ownHandCount), cond.op, num(ctx.opponentHandCount)),
@@ -1039,6 +1188,8 @@ const CHECKS = {
   benchHasName: (cond, ctx) => list(cond.names).every((name) => list(ctx.benchNames).some((actual) => nameMatches(actual, name))),
   inPlayHasName: (cond, ctx) => list(cond.names).every((name) => list(ctx.ownInPlayNames).some((actual) => nameMatches(actual, name))),
   opponentPrizes: (cond, ctx) => compare(num(ctx.opponentPrizes), cond.op, cond.n),
+  opponentPrizesTaken: (cond, ctx) =>
+    compare(prizesTakenFor(ctx.opponentPrizes, ctx.opponentDeckFormat), cond.op, cond.n),
   ownPrizes: (cond, ctx) => compare(num(ctx.ownPrizes), cond.op, cond.n),
   opponentHandCount: (cond, ctx) => compare(num(ctx.opponentHandCount), cond.op, cond.n),
   attackerEnergyType: (cond, ctx) => energyCheck(cond, ctx),
@@ -1070,7 +1221,10 @@ const CHECKS = {
     list(ctx.defenderResistanceTypes).some(
       (type) => cond.type == null || String(type).toLowerCase() === String(cond.type).toLowerCase()
     ),
+  defenderWeakness: (cond, ctx) =>
+    list(ctx.defenderWeaknessTypes).some((type) => String(type).toLowerCase() === String(cond.type).toLowerCase()),
   healedThisTurn: (cond, ctx) => ctx.attackerHealedThisTurn === true,
+  healedLastOwnTurn: (cond, ctx) => ctx.attackerHealedLastOwnTurn === true,
   ownHealedThisTurn: (cond, ctx) =>
     list(ctx.ownHealedTypesThisTurn).some(
       (types) => !cond.type || list(types).some((t) => sameType(t, cond.type))
@@ -1082,7 +1236,10 @@ const CHECKS = {
   attackerRemainingHp: (cond, ctx) => compare(num(ctx.attackerRemainingHp), cond.op, cond.n),
   defenderEnergyType: (cond, ctx) =>
     list(ctx.defenderEnergyUnits).some((unit) =>
-      String(unit).toLowerCase().split('|').some((part) => sameType(part, cond.type))
+      String(unit)
+        .toLowerCase()
+        .split('|')
+        .some((part) => (cond.types || [cond.type]).some((type) => sameType(part, type)))
     ),
   damagedLastOpponentTurn: (cond, ctx) => num(ctx.attackerDamageTakenLastTurn) > 0,
   discardedCardIs: (cond, ctx) => {
@@ -1105,10 +1262,12 @@ const CHECKS = {
   },
   usedAttackLastTurn: (cond, ctx) =>
     String(ctx.attackerLastTurnAttackName || '').toLowerCase() === String(cond.attackName).toLowerCase(),
+  anyOf: (cond, ctx) => list(cond.of).some((sub) => attackConditionMet(sub, ctx)),
   koLastOpponentTurn: (cond, ctx) =>
     list(ctx.koLastOpponentTurnVictims).some(
       (victim) =>
         (!cond.byAttackDamage || victim?.byAttackDamage === true) &&
+        (!cond.wasActive || victim?.wasActive === true) &&
         (!cond.type || list(victim?.types).some((t) => String(t).toLowerCase() === String(cond.type).toLowerCase()))
     ),
   handPokemonCount: (cond, ctx) => compare(num(ctx.ownHandPokemonCount), cond.op, cond.n),
@@ -1156,6 +1315,7 @@ const DEFENDER_KINDS = new Set([
   'defenderName',
   'defenderAbility',
   'defenderResistance',
+  'defenderWeakness',
   'energyVsDefender',
   'defenderEnergyCount',
   'defenderEnergyType',

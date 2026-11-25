@@ -10,6 +10,7 @@
 import { TYPE_LETTER, attackerTypes, isBasicCard } from './tool-combat.mjs';
 import { isExCard, isVCard, isRuleBoxPokemon } from './card-classify.mjs';
 import { prizesTakenFor } from '../formats.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 
 // Groups: 1 type letter ({F}), 2 no-Rule-Box attacker, 3 amount, 4 ex defender, 5 ex-or-V defender.
 const USED_BY_RE =
@@ -36,7 +37,8 @@ const BATTLE_STYLES = {
 // and `perPrizeTaken` for the possessive wordings — or null when the text is not a
 // turn-scoped damage boost. defenderFilter: null | 'ex' | 'exOrV'.
 export function parseTurnDamageBonus(text) {
-  const raw = String(text || '');
+  // TCGdex spells the type ("your Lightning Pokémon's attacks", Electropower sm8-172).
+  const raw = symbolizeTypeWords(String(text || ''));
   const named = raw.match(NAMED_AFTER_WR_RE);
   if (named) {
     return {

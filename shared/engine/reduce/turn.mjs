@@ -6,7 +6,8 @@
  */
 
 import { discardCardToPlayerZone } from '../state.mjs';
-import { createCard, mintInstanceId } from '../cards.mjs';
+import { createCard, mintInstanceId, isEnergy } from '../cards.mjs';
+import { cardAbilityText } from '../rules/ability-executors.mjs';
 import { DECK_FORMAT_TCG, isDeckFormat } from '../formats.mjs';
 import { deckFormatMismatch, setupGame } from '../setup.mjs';
 import { legacyTrainerType } from '../rules/legacy-trainer-type.mjs';
@@ -36,7 +37,7 @@ import {
   stadiumCheckupPoisonBonusFor, stadiumBlocksToolEffects,
 } from '../rules/stadium-effects.mjs';
 import {
-  healBlockedByAbility, abilitySleepLock, sideContextFor, abilityPoisonHeal,
+  healBlockedByAbility, abilitySleepLock, abilityTeamStatusImmunity, isAbilitySuppressed, sideContextFor, abilityPoisonHeal,
 } from '../rules/ability-combat.mjs';
 import {
   removeCondition, hasCondition, hasAnyCondition, addCondition, listConditions, poisonCheckupDamage,
@@ -58,6 +59,39 @@ export function applyAbilitySleepLocks(draft, { events }) {
     if (!abilitySleepLock(sideContextFor(draft, playerId))) continue;
     removeCondition(active, 'Asleep');
     events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId, reason: 'ability' });
+  }
+}
+
+/**
+ * Xerneas Fairy Aura (customhb): a side's Pokémon with {Y} Energy attached are immune to Special
+ * Conditions; Hatterene Magic Bounce: a condition its holder refused lands on the opponent's
+ * Active Pokémon. addCondition cannot see the board, so this sweep runs after every command.
+ */
+export function applyAbilityStatusImmunity(draft, { events }) {
+  for (const playerId of Object.keys(draft.players || {})) {
+    const zones = draft.players[playerId]?.zones || {};
+    const ctx = sideContextFor(draft, playerId);
+    for (const zoneId of ['active', 'bench']) {
+      for (const root of zones[zoneId] || []) {
+        if (root.attachedTo) continue;
+        if (Array.isArray(root.bouncedConditions)) {
+          const bounced = root.bouncedConditions;
+          delete root.bouncedConditions;
+          const oppId = Object.keys(draft.players).find((id) => id !== playerId);
+          const target = (draft.players[oppId]?.zones?.active || []).find((c) => !c.attachedTo);
+          for (const condition of target ? bounced : []) {
+            if (addCondition(target, condition)) {
+              events.push({ type: 'specialConditionUpdated', instanceId: target.instanceId, condition, reason: 'magicBounce' });
+            }
+          }
+        }
+        if (!hasAnyCondition(root) || !abilityTeamStatusImmunity(inPlayView(draft, root), ctx)) continue;
+        for (const condition of listConditions(root)) {
+          removeCondition(root, condition);
+          events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId, reason: 'ability' });
+        }
+      }
+    }
   }
 }
 
@@ -173,6 +207,7 @@ function resolveDeferredKnockouts(draft, { events }) {
     }
   }
   for (const pid of Object.keys(draft.players || {})) {
+    if (applyDeferredActiveDamage(draft, pid, { events })) continue;
     const active = draft.players[pid].zones?.active?.find((c) => !c.attachedTo);
     // Wobbuffet Shadow Tag: "Put 7 damage counters on the Defending Pokémon at the end of your
     // opponent's next turn."
@@ -205,6 +240,33 @@ function resolveDeferredKnockouts(draft, { events }) {
   }
 }
 
+// Giratina ex Shadow Force (customhb): "At the end of your opponent's next turn, their Active Pokémon
+// takes 150 damage" — the Pokémon Active now, whichever it is. True when it was Knocked Out.
+function applyDeferredActiveDamage(draft, pid, { events }) {
+  const player = draft.players[pid];
+  const pending = player.deferredActiveDamage;
+  if (!Array.isArray(pending) || pending.length === 0) return false;
+  const turn = draft.turn?.number || 0;
+  const due = pending.filter((entry) => entry.atTurn === turn);
+  const later = pending.filter((entry) => entry.atTurn > turn);
+  if (later.length > 0) player.deferredActiveDamage = later;
+  else delete player.deferredActiveDamage;
+  const active = player.zones?.active?.find((c) => !c.attachedTo);
+  if (!active || due.length === 0) return false;
+  const amount = due.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+  active.damage = (active.damage || 0) + amount;
+  events.push({ type: 'damageUpdated', instanceId: active.instanceId, damage: active.damage, source: due[0].sourceAttack });
+  const hp = cardEffectiveHp(draft, active, pid);
+  if (!(hp > 0 && active.damage >= hp)) return false;
+  handleKnockout(draft, {
+    victimPlayerId: pid,
+    attackerPlayerId: due[0].sourcePlayerId ?? Object.keys(draft.players).find((id) => id !== pid),
+    victim: active,
+    events,
+  });
+  return true;
+}
+
 // Leftovers: "At the end of your turn, if the Pokémon this card is attached to is in the Active
 // Spot, heal 20 damage from it." Resolves as the turn ends, before Pokémon Checkup.
 function applyEndOfTurnToolHeals(draft, { endingPlayerId, events }) {
@@ -227,6 +289,31 @@ function applyEndOfTurnToolHeals(draft, { endingPlayerId, events }) {
       source: tool.name,
     });
   }
+}
+
+// Jirachi Wish (custom set): "At the end of your next turn, heal 100 damage from your Active
+// Pokémon" — the Pokémon Active when that turn ends, before Pokémon Checkup.
+function applyDeferredActiveHeal(draft, { endingPlayerId, events }) {
+  const player = draft.players?.[endingPlayerId];
+  const pending = player?.deferredActiveHeal;
+  if (!Array.isArray(pending) || pending.length === 0) return;
+  const turn = draft.turn?.number || 0;
+  const due = pending.filter((entry) => entry.atTurn === turn);
+  const later = pending.filter((entry) => entry.atTurn > turn);
+  if (later.length > 0) player.deferredActiveHeal = later;
+  else delete player.deferredActiveHeal;
+  const active = player.zones?.active?.find((c) => !c.attachedTo);
+  if (!active || due.length === 0 || !(active.damage > 0)) return;
+  if (stadiumBlocksHealing(draft.stadium?.card || draft.stadium || null) || healBlockedByAbility(draft, active)) return;
+  const before = active.damage;
+  active.damage = Math.max(0, before - due.reduce((sum, entry) => sum + (entry.amount || 0), 0));
+  events.push({
+    type: 'damageUpdated',
+    instanceId: active.instanceId,
+    damage: active.damage,
+    healed: before - active.damage,
+    source: due[0].sourceAttack,
+  });
 }
 
 // TM/Cube Items (design 035 slice 7): "At the end of your turn, discard <tool>." SV TMs
@@ -530,6 +617,7 @@ export function resolveCheckup(
 ) {
   resolveDeferredKnockouts(draft, { events });
   applyEndOfTurnToolHeals(draft, { endingPlayerId, events });
+  applyDeferredActiveHeal(draft, { endingPlayerId, events });
   // A condition landed this command (the attack that ended the turn) on a Pokémon whose
   // special Energy makes it immune never reaches Checkup.
   applySpecialEnergyStatusImmunity(draft, { events });
@@ -741,6 +829,9 @@ function applyOpponentTurnStartDraws(draft, { nextPlayerId, events }) {
 export function advanceTurn(draft, { nextPlayerId, events }) {
   delete draft.attackDiscardedForDamage;
   delete draft.attackAttachedForDamage;
+  delete draft.attackEnergyDiscarded;
+  delete draft.attackBenchedFromDeck;
+  delete draft.attackPleaRefused;
   returnSetAsideHands(draft, { endingTurn: draft.turn.number || 1, events });
   // The flags object is replaced wholesale below; a Checkup Knockout may have just
   // entitled the incoming player, and that entitlement must survive the reset so the
@@ -823,6 +914,55 @@ export function advanceTurn(draft, { nextPlayerId, events }) {
     });
   }
   applyOpponentTurnStartDraws(draft, { nextPlayerId, events });
+  applyEnergyDiscardedDraws(draft, { nextPlayerId, events });
+}
+
+const DRAGONS_AMBITION = /if this pok[eé]mon discarded energy last turn, draw a card/;
+
+/**
+ * Mega Charizard X ex Dragon's Ambition (customhb): "If this Pokémon discarded Energy last turn,
+ * draw a card." At the start of its player's turn, a holder that lost Energy to the discard pile
+ * during that player's previous turn draws 1 card (trackEnergyDiscards stamps the turn).
+ */
+function applyEnergyDiscardedDraws(draft, { nextPlayerId, events }) {
+  if (isGameConcluded(draft)) return;
+  const player = draft.players[nextPlayerId];
+  const ctx = sideContextFor(draft, nextPlayerId);
+  for (const zoneId of ['active', 'bench']) {
+    for (const root of player.zones[zoneId] || []) {
+      if (root.attachedTo || root.energyDiscardedTurn !== draft.turn.number - 2) continue;
+      const view = inPlayView(draft, root);
+      if (!DRAGONS_AMBITION.test(cardAbilityText(view)) || isAbilitySuppressed(view, ctx)) continue;
+      if (player.zones.deck.length === 0) continue;
+      const [card] = player.zones.deck.splice(0, 1);
+      player.zones.hand.push(card);
+      events.push({ type: 'cardsDrawn', playerId: nextPlayerId, count: 1, cards: [{ instanceId: card.instanceId }], source: view.name });
+    }
+  }
+}
+
+/**
+ * Stamps `energyDiscardedTurn` on Dragon's Ambition holders whose attached Energy went to the
+ * discard pile since the last command, with the turn of the holder's player it happened in.
+ * Runs after every command; other Pokémon carry no snapshot.
+ */
+export function trackEnergyDiscards(draft) {
+  for (const playerId of Object.keys(draft.players || {})) {
+    const player = draft.players[playerId];
+    const discardIds = new Set((player.zones.discard || []).map((c) => c.instanceId));
+    for (const zoneId of ['active', 'bench']) {
+      const zone = player.zones[zoneId] || [];
+      for (const root of zone) {
+        if (root.attachedTo || !DRAGONS_AMBITION.test(cardAbilityText(inPlayView(draft, root)))) continue;
+        const now = zone.filter((c) => c.attachedTo === root.instanceId && isEnergy(c)).map((c) => c.instanceId);
+        if ((root.energyIdsSeen || []).some((id) => discardIds.has(id))) {
+          const turn = Number(draft.turn?.number) || 1;
+          root.energyDiscardedTurn = draft.turn?.player === playerId ? turn : turn - 1;
+        }
+        root.energyIdsSeen = now;
+      }
+    }
+  }
 }
 
 /**

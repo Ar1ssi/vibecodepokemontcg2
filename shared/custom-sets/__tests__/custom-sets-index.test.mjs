@@ -89,7 +89,7 @@ test('a set without set.json, or with no files, is refused', () => {
   delete json.sets.customhbw.files['set.json'];
   assert.deepEqual(validateCustomSetsIndex(json).errors, ['sets.customhbw.files: set.json is missing']);
   json.sets.customhbw.files = {};
-  assert.deepEqual(validateCustomSetsIndex(json).errors, ['sets.customhbw.files: 1 to 4000 files']);
+  assert.deepEqual(validateCustomSetsIndex(json).errors, ['sets.customhbw.files: 1 to 24000 files']);
 });
 
 test('more than the published-set cap is refused', () => {
@@ -100,19 +100,19 @@ test('more than the published-set cap is refused', () => {
 
 test('a set over the total size cap is refused', () => {
   const json = sampleIndex();
-  for (let i = 1; i <= 40; i += 1) {
+  for (let i = 1; i <= 140; i += 1) {
     json.sets.customhbw.files[`${String(i).padStart(3, '0')}/high.webp`] = { sha256: sha('e'), size: 16 << 20 };
   }
   const { errors } = validateCustomSetsIndex(json);
   assert.equal(errors.length, 1);
-  assert.match(errors[0], /^sets\.customhbw\.files: \d+ bytes in all, over 536870912$/);
+  assert.match(errors[0], /^sets\.customhbw\.files: \d+ bytes in all, over 2147483648$/);
 });
 
 test('the publishable file pattern', () => {
-  for (const rel of ['set.json', 'foil.json', 'CHANGELOG.md', '001/high.webp', '299/low.webp', 'foil/001-front.webp', 'foil/012-etch.webp']) {
+  for (const rel of ['set.json', 'foil.json', 'CHANGELOG.md', '001/high.webp', '299/low.webp', 'foil/001-front.webp', 'foil/012-etch.webp', '1000/high.webp', '5000/low.webp', 'foil/1000-wp.webp']) {
     assert.equal(PUBLISHED_FILE_RE.test(rel), true, rel);
   }
-  for (const rel of ['ENGINE-CHECK.md', '1/high.webp', '001/mid.webp', 'foil/001-x.webp', 'foil/../set.json', 'a/set.json']) {
+  for (const rel of ['ENGINE-CHECK.md', '1/high.webp', '001/mid.webp', 'foil/001-x.webp', 'foil/../set.json', 'a/set.json', '0999/high.webp', '10000/high.webp', 'foil/0001-etch.webp']) {
     assert.equal(PUBLISHED_FILE_RE.test(rel), false, rel);
   }
 });

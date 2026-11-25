@@ -231,6 +231,8 @@ const WINDOW_PHRASES = [
     'yourNextTurn',
     (body) => `if your opponent's active pokémon is knocked out, ${body}`,
   ],
+  // Lucario Stance / Pupitar Hard Shell Evolution: "… until the end of your opponent's next turn".
+  [/^(.+) until the end of your opponent's next turn$/, 'opponentNextTurn'],
   [/^(.+) until the end of your next turn$/, 'throughYourNextTurn'],
   [/^until the end of your next turn, (.+)$/, 'throughYourNextTurn'],
   // Older wording: "Your opponent can't attach Energy … during his or her next turn."
@@ -249,7 +251,8 @@ const FROM_ATTACKS = "by attacks(?: from ((?:your opponent's )?[^,]+?(?:, except
 const MARKER_BODIES = [
   [/^this pokémon has no weakness$/, 'self', null, () => ({ kind: 'noWeakness' })],
   [
-    /^this pokémon takes (\d+) less damage from attacks$/,
+    // Lillipup Play Nice (customhb) leaves off "from attacks".
+    /^this pokémon takes (\d+) less damage(?: from attacks)?$/,
     'self',
     null,
     (m, { wrOrder }) => incomingReduce(m[1], undefined, wrOrder),
@@ -292,6 +295,18 @@ const MARKER_BODIES = [
       { kind: 'effectPrevent', filter: null },
     ],
   ],
+  // Lucario Stance (sm3-71): damage and every other effect.
+  [
+    /^prevent all effects of (?:your opponent's attacks|attacks), including damage, done to this pokémon$/,
+    'self',
+    null,
+    () => [
+      { kind: 'incomingPrevent', filter: null },
+      { kind: 'effectPrevent', filter: null },
+    ],
+  ],
+  // Pupitar Hard Shell Evolution (sm8-116).
+  [/^prevent all damage done to this pokémon by your opponent's attacks$/, 'self', null, () => ({ kind: 'incomingPrevent', filter: null })],
   // Latios-EX / Slurpuff Light Pulse ("except damage"), Light Dragonite ("other than damage"),
   // Venomoth ("excluding damage"), Altaria ex Light Pulse ("attacks used by your opponent's
   // Pokémon done to this Pokémon", reminder "Damage is not an effect").
@@ -309,7 +324,8 @@ const MARKER_BODIES = [
     () => ({ kind: 'incomingPrevent', filter: null }),
   ],
   [
-    /^if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon if that damage is (\d+) or (less|more)$/,
+    // Seedot Harden (sm7-11): "prevent all damage done to this Pokémon by attacks if that damage is 40 or less".
+    /^(?:if this pokémon would be damaged by an attack, prevent that attack's damage done to this pokémon|prevent all damage done to this pokémon by attacks) if that damage is (\d+) or (less|more)$/,
     'self',
     null,
     // Light Jolteon [Neo Destiny 48] Pulse Guard prints "30 or more".
@@ -403,6 +419,17 @@ const MARKER_BODIES = [
     'opponentActive',
     ['yourNextTurn', 'throughYourNextTurn'],
     (m, { wrOrder }) => incomingBonus(m[1], wrOrder),
+  ],
+  // Zeraora ex Plasma Fists (customhb): "During your opponent's next turn, their Active Pokémon is
+  // treated as a {L} type." Read by inPlayView (reduce/shared.mjs).
+  [
+    /^(?:their|your opponent's) active pokémon is treated as an? \{([a-z])\} (?:type|pokémon)$/,
+    'opponentActive',
+    null,
+    (m) => {
+      const type = TYPE_LETTER[m[1]];
+      return type ? { kind: 'typeOverride', type: type[0].toUpperCase() + type.slice(1) } : null;
+    },
   ],
   // Oranguru: only the Weakness type changes, not its amount.
   [
@@ -506,6 +533,23 @@ const MARKER_BODIES = [
     'yourNextTurn',
     (m) => ({ kind: 'nextTurnBaseDamage', attackName: m[1], doubled: true }),
   ],
+  // Aegislash Ticking Knock Out (sm6-49): reduce/attack-effect.mjs Knocks Out the marked Pokémon
+  // when an attack damages it during the window.
+  [
+    /^if your opponent's active pokémon is damaged by an attack, it will be knocked out$/,
+    'opponentActive',
+    'yourNextTurn',
+    () => ({ kind: 'koIfDamaged' }),
+  ],
+  // Poipole Knockout Reviver (sm6-55): handleKnockout pays no Prizes for the marked Pokémon.
+  [
+    /^if this pokémon is knocked out, your opponent can't take any prize cards for it$/,
+    'self',
+    null,
+    () => ({ kind: 'noPrizesOnKo' }),
+  ],
+  // Alolan Geodude Rock Polish (sm2-40): the freeRetreat marker reduce/retreat.mjs reads.
+  [/^this pokémon has no retreat cost$/, 'self', 'yourNextTurn', () => ({ kind: 'freeRetreat' })],
   // Galarian Slowking V Word of Ruin: resolveCheckup knocks the marked Pokémon out.
   [
     /^at the end of the turn, your opponent's active pokémon will be knocked out$/,
@@ -603,8 +647,28 @@ export function parseMarkerSentence(sentence, context = {}) {
 
 // Same [regex, build] shape as rules/attack-steps.mjs TEMPLATES; last in that list.
 export const MARKER_TEMPLATES = [
+  // Giratina ex Shadow Force (customhb): both shields print no window; the attack's own "at the end
+  // of your opponent's next turn" sets it, so they hold through that turn. Every attack the
+  // opponent can use comes from their Active Pokémon, so the damage shield needs no attacker filter.
   [
-    /^(?:during your|as long as this pokémon remains in the active spot, |at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your) next turn$)/,
+    /^prevent all damage done to this pokémon by your opponent's active pokémon$/,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'incomingPrevent', filter: null } }),
+  ],
+  // Giratina ex Shadow Force (SWSH259 print): one sentence carries both shields.
+  [
+    /^during your opponent's next turn, this pokémon takes no damage and isn't affected by any effects of trainer cards or abilities$/,
+    () => [
+      { type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'incomingPrevent', filter: null } },
+      { type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'cardEffectImmunity' } },
+    ],
+  ],
+  // Read by effects/trainer-steps.mjs freezeShields, like Temporal Freeze's position shield.
+  [
+    /^this pokémon can't be affected by trainer cards or abilities$/,
+    () => ({ type: 'atkAddMarker', target: 'self', window: 'opponentNextTurn', marker: { kind: 'cardEffectImmunity' } }),
+  ],
+  [
+    /^(?:during your|as long as this pokémon remains in the active spot, |at the end of your opponent's next turn|if an attack does damage to this pokémon during|if your opponent's active pokémon attacks this pokémon during your opponent's next turn, |if your opponent's active pokémon is knocked out during your next turn|until the end of your next turn, |.+ (?:during your opponent's|during their|until the end of your|until the end of your opponent's) next turn$)/,
     (m, rest, context) => parseMarkerSentence(rest, context),
   ],
   // Locks with no turn window. Ariados Spider Web / Piloswine Freeze print "(Benching or evolving

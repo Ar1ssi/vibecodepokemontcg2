@@ -71,7 +71,7 @@
 // 'lostZone>=N', 'koedLastTurn:type=p', 'handCount<=N') when the card can only be played under it.
 
 import { WORD_POKEMON_TYPES } from './pokemon-type-words.mjs';
-import { canonicalEffectWording } from './effect-wording.mjs';
+import { symbolizeTypeWords } from './attack-text.mjs';
 import { parseFossilPlay, parseNamedFossilSearch } from './fossil.mjs';
 import { parseTurnDamageBonus } from './turn-damage-bonus.mjs';
 import { rewriteLegacyTrainerWording } from './legacy-trainer-wording.mjs';
@@ -115,8 +115,9 @@ function typedPokemonSearchWhat(lower) {
 // so normalize them once up front:
 //   curly quotes  ’ ‘ ‚ ʼ `  →  straight '
 //   energy symbol { P } {G}  →  {P} (no inner spaces)
+// TCGdex spells Energy symbols as type words ("your Fire Pokémon"); symbolizeTypeWords turns them back.
 function normalizeText(text) {
-  return canonicalEffectWording(text)
+  return symbolizeTypeWords(String(text ?? ''))
     .replace(/[\u2018\u2019\u201A\u201B\u201A`]/g, "'")
     .replace(/\{\s*([A-Za-z])\s*\}/g, '{$1}')
     .toLowerCase();
@@ -143,6 +144,8 @@ const LEADING_TRAINER_COSTS = [
   [/^discard (\d+) (?:of the )?other cards (?:from|in) your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]) })],
   [/^discard (\d+) energy cards from your hand in order to/, (m) => ({ type: 'discardCost', count: Number(m[1]), energyOnly: true })],
   [/^discard a card from your hand in order to/, () => ({ type: 'discardCost', count: 1 })],
+  // Mysterious Treasure (sm6-113): "Discard a card from your hand. If you do, search …".
+  [/^discard (a|\d+) cards? from your hand\. if you do, /, (m) => ({ type: 'discardCost', count: m[1] === 'a' ? 1 : Number(m[1]) })],
   // Typed hand-discard cost: Team Plasma Grunt, Fiery Torch, Engineer's Adjustments.
   [/^discard an? ((?:team plasma|energy|\{[a-z]\} energy)) card from your hand\./, (m) => ({ type: 'discardCost', count: 1, what: `${m[1]} card` })],
   [/^discard 1 energy card attached to (?:1 of )?your (?:own )?pokémon in order to/, () => ({ type: 'discardOwnAttachedEnergy', cost: true })],
@@ -333,13 +336,17 @@ function knownKindWhat(phrase) {
   // card" (Old Rod): any of the kinds; matchesSearch splits on " or ".
   const either = p.split(/,? or (?:an? )?|, /);
   if (either.length > 1) {
-    const whats = either.map(knownKindWhat);
+    // Mysterious Treasure (sm6-113): "a {P} or {N} Pokémon" — the bare types share the noun.
+    const noun = either.at(-1).match(/^\{[a-z]\} (pokémon)$/)?.[1];
+    const whats = either.map((part) => (noun && /^\{[a-z]\}$/.test(part) ? `${part} ${noun}` : part)).map(knownKindWhat);
     return whats.every(Boolean) ? whats.join(' or ') : null;
   }
   if (p === 'evolution') return 'Evolution Pokémon';
   // A clause, not a kind ("card that evolves from that Pokémon", "Basic Pokémon card other
   // than a Baby Pokémon"): the caller keeps what it already had.
   if (/\b(?:that|from|which|with|other|than|named|in|and)\b/.test(p)) return null;
+  // Lisia (sm7-137): "up to 2 ◇ (Prism Star) cards" (pkmncards prints "{*} (Prism Star)").
+  if (/^(?:◇|\{\*\})? ?\(?prism star\)?$/.test(p)) return 'Prism Star card';
   if (/^(?:pokémon )?tool$/.test(p)) return 'Pokémon Tool';
   if (p === 'item') return 'Item';
   if (p === 'supporter') return 'Supporter';
@@ -555,6 +562,8 @@ function healTargetConditions(lower) {
   const target = lower.match(/heal \d+ damage from ([^.]*)/)?.[1] || '';
   const conditions = {};
   if (/pok[ée]mon-gx\b/.test(target)) conditions.subtypes = ['gx'];
+  // Homebrew Great Potion (customhb): "Heal 50 damage from your Active Pokémon ex."
+  if (/pok[ée]mon ex\b/.test(target)) conditions.subtypes = ['ex'];
   const minEnergy = target.match(/that has at least (\d+) energy attached/);
   if (minEnergy) conditions.minEnergy = Number(minEnergy[1]);
   const energyType = target.match(/that has any \{([a-z])\} energy attached/);
@@ -1322,6 +1331,16 @@ function parseCoinFlipStep(lower) {
     return { type: 'coinFlip', heads: [{ type: 'clearStatus', target: 'yourActive' }, { type: 'healAmount', amount: 2, target: 'Active Pokémon' }], tails: [] };
   }
 
+  // Homebrew Crushing Hammer (the user's scan, 2026-11-20): "Flip a coin. If heads, discard an
+  // Energy from your opponent's Active Pokémon." Only the Active's Energy can go.
+  if (/if heads,?\s+discard an energy from your opponent's active pokémon/.test(lower)) {
+    return {
+      type: 'coinFlip',
+      heads: [{ type: 'discardEnergyFromOpponent', energy: 'any Energy', count: 1, scope: 'Active' }],
+      tails: [],
+    };
+  }
+
   const headsEnergy = lower.match(/if heads,?\s+discard an energy from 1 of your opponent's pokémon/);
   if (headsEnergy) {
     return {
@@ -1432,6 +1451,9 @@ function parsePlayCondition(lower) {
   const lostZone = lower.match(/only if you have\s+(\d+)\s+or more cards in the lost zone/);
   if (lostZone) return `lostZone>=${lostZone[1]}`;
   if (lower.includes('only if there is any stadium card in play')) return 'stadiumInPlay';
+  // Switch Raft (sm7.5-62): "Switch your Active {W} Pokémon with 1 of your Benched Pokémon."
+  const switchActiveType = lower.match(/^switch your active \{([a-z])\} pokémon with 1 of your benched pokémon/);
+  if (switchActiveType) return `activeType=${switchActiveType[1].toUpperCase()}`;
   // Cyrus Prism Star: "only if your Active Pokémon is a {W} or {M} Pokémon."
   const ownActiveTypes = lower.match(
     /only if your active pokémon is a (?:\{([a-z])\} or )?\{([a-z])\} pokémon/
@@ -1490,6 +1512,20 @@ export function trainerEndsTurn(card) {
 // "You can use this card during your first turn or on a Pokémon that was put into play this turn." (Wally)
 const PRINTED_FIRST_TURN_OR_PLAYED_RE = /you can use this card during your first turn or on a pokémon that was put into play this turn/;
 
+// The printed limits on the Pokémon a returnPokemonToHand Trainer may pick: Acerola / Cheren's Care
+// "that has any damage counters on it", Cheren's Care "{C} Pokémon", Penny "Basic Pokémon",
+// Scoop Up Net "that isn't a Pokémon V or a Pokémon-GX", Poké Turn "Pokémon SP".
+function returnPokemonLimits(lower) {
+  const limits = {};
+  const typed = /^(?:put|return) 1 of your \{([a-z])\} pokémon/.exec(lower);
+  if (typed) limits.pokemonType = typed[1];
+  if (/^(?:put|return) 1 of your basic pokémon/.test(lower)) limits.basicOnly = true;
+  if (/pokémon that has any damage counters on it/.test(lower)) limits.damagedOnly = true;
+  if (/that isn['’]t a pokémon v or a pokémon-gx/.test(lower)) limits.excludeVGx = true;
+  if (/^(?:put|return) 1 of your pokémon sp\b/.test(lower)) limits.spOnly = true;
+  return limits;
+}
+
 export function parseTrainerEffect(text = '') {
   const lower = rewriteLegacyTrainerWording(normalizeText(text));
   // Fossil Items: the "play as a Basic Pokémon" clause is the whole effect; legacy wordings
@@ -1499,6 +1535,9 @@ export function parseTrainerEffect(text = '') {
   if (fossil) {
     return { steps: [{ type: 'fossilItem', ...(fossil.hp ? { hp: fossil.hp } : {}) }], recognizable: true };
   }
+  // Rotom Dex—Poké Finder Mode (sm3-122): nothing is taken; the cards go back or are shuffled in.
+  const lookBack = lower.match(/^look at the top (\d+) cards of your deck and put them back in any order or shuffle them into your deck\.?$/);
+  if (lookBack) return { steps: [{ type: 'rearrangeTop', count: Number(lookBack[1]), orShuffle: true }], recognizable: true };
   const fossilSearch = parseNamedFossilSearch(lower);
   if (fossilSearch) return { steps: [fossilSearch], recognizable: true };
   const playCondition = parsePlayCondition(lower);
@@ -1516,6 +1555,15 @@ export function parseTrainerEffect(text = '') {
   const leadingDraw = lower.match(/^draw (\d+|an?) cards?\./);
   if (leadingDraw && result.recognizable && !result.steps.some((s) => /draw/i.test(s.type))) {
     result.steps.unshift({ type: 'draw', count: /^\d+$/.test(leadingDraw[1]) ? Number(leadingDraw[1]) : 1 });
+  }
+  // Switch Raft (sm7.5-62): "If you do, heal 30 damage from the Pokémon you moved to your Bench."
+  if (/if you do, heal \d+ damage from the pokémon you moved to your bench/.test(lower)) {
+    result.steps = result.steps.map((s) => (s.type === 'healAmount' ? { ...s, target: 'switchedOut' } : s));
+  }
+  // Blaine's Last Stand (sm7.5-58): "Draw 2 cards for each {R} Pokémon you have in play."
+  const perType = lower.match(/draw (\d+) cards? for each \{([a-z])\} pokémon you have in play/);
+  if (perType) {
+    result.steps = result.steps.map((s) => (s.type === 'draw' ? { ...s, count: Number(perType[1]), perOwnType: perType[2] } : s));
   }
   return playCondition ? { ...result, playCondition } : result;
 }
@@ -2588,7 +2636,7 @@ function parseTrainerStepsInner(lower) {
       (lower.includes('into your hand') || lower.includes('to your hand'))) {
     const keepAttached = /(?:all attached cards|all cards attached)[^.]*?(?:into|to) your hand/.test(lower) ||
       lower.includes('and all attached cards');
-    steps.push({ type: 'returnPokemonToHand', keepAttached });
+    steps.push({ type: 'returnPokemonToHand', keepAttached, ...returnPokemonLimits(lower) });
     return { steps, recognizable: true };
   }
 
@@ -2652,7 +2700,11 @@ function parseTrainerStepsInner(lower) {
       const typedTarget = lower.match(/from your hand to 1 of your (benched )?\{([a-z])\} pokémon/);
       if (typedTarget) target = `1 of your ${typedTarget[1] ? 'Benched ' : ''}{${typedTarget[2].toUpperCase()}} Pokémon`;
       else if (lower.includes('benched')) target = '1 of your Benched Pokémon';
-      else if (lower.includes('stage 2')) target = '1 of your Stage 2 Pokémon';
+      else if (lower.includes('stage 2')) {
+        // The Masked Royal (sm7-139): "to one of your Stage 2 {G}, {R}, or {W} Pokémon".
+        const types = lower.match(/stage 2 ((?:\{[a-z]\}(?:,? or |, )?)+) pokémon/)?.[1];
+        target = types ? `1 of your Stage 2 ${types.replace(/\{([a-z])\}/g, (m) => m.toUpperCase())} Pokémon` : '1 of your Stage 2 Pokémon';
+      }
       const symbol = at[2] || at[4];
       const typeWord = symbol ? SYMBOL_TO_TYPE[symbol] : at[5] || null;
       const basic = Boolean(at[3] || typeWord);
@@ -2977,6 +3029,12 @@ function parseTrainerStepsInner(lower) {
     else if (lower.includes('pokémon') && lower.includes('basic energy')) what = 'Pokémon or Basic Energy';
     else if (lower.includes('basic energy')) what = 'Basic Energy';
     else if (lower.includes('pokémon')) what = 'Pokémon';
+    else {
+      // Pal Pad (sm5-132): "Shuffle 2 Supporter cards from your discard pile into your deck."
+      const kind = lower.match(/shuffle\s+(?:up to\s+)?\d+\s+([a-z ]+?) cards? from your discard pile/)?.[1];
+      const known = kind ? knownKindWhat(kind) : null;
+      if (known) what = known;
+    }
     steps.push({ type: 'shuffleFromDiscard', what, count });
     return { steps, recognizable: true };
   }

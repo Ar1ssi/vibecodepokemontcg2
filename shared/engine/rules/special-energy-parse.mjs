@@ -252,11 +252,11 @@ const CONDITIONAL_PROVISION = [
   [/^unit energy/, (lower) => [
     { type: 'provide', energyTypes: printedComboTypes(lower, ['Fighting', 'Dark', 'Fairy']), count: 1, combination: true },
   ]],
-  [/^beast energy prism star$/, () => [
+  [/^beast energy (?:prism star|◇)$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
     { type: 'provide', energyTypes: ['Any'], count: 1, condition: 'ultraBeast' },
   ]],
-  [/^super boost energy prism star$/, () => [
+  [/^super boost energy (?:prism star|◇)$/, () => [
     { type: 'provide', energyTypes: ['Colorless'], count: 1 },
     { type: 'provide', energyTypes: ['Any'], count: 1, condition: 'stage2' },
     { type: 'provide', energyTypes: ['Any'], count: 4, condition: 'threeStage2' },
@@ -363,9 +363,20 @@ const CONDITIONAL_PROVISION = [
   [/^miracle energy$/, () => [{ type: 'provide', energyTypes: ['Any'], count: 2 }]],
 ];
 
+// A name-keyed "provides {Y} only while attached to a {Y} Pokémon" (Wonder Energy) yields to a text
+// that provides the Energy unconditionally: the homebrew Wonder Energy (customhb) reads "As long as
+// this card is attached to a Pokémon, it provides {Y} Energy."
+function textOverridesHostCondition(steps, lower) {
+  if (!steps.length || !steps.every((step) => String(step.condition || '').startsWith('host:'))) return false;
+  return /^as long as this card is attached to a pok[eé]mon, it provides \{[a-z]\} energy\./.test(lower) && !/\bonly while\b/.test(lower);
+}
+
 function parseProvision(name, lower) {
   for (const [re, build] of CONDITIONAL_PROVISION) {
-    if (re.test(name)) return build(lower);
+    if (!re.test(name)) continue;
+    const steps = build(lower);
+    if (!textOverridesHostCondition(steps, lower)) return steps;
+    break;
   }
   const steps = [];
   for (const sentence of lower.split(/(?<=\.)\s+/)) {
@@ -453,6 +464,9 @@ const HP_BONUS_RE = clause(`${HOST} gets \\+(\\d+) hp`);
 const DAMAGE_BONUS_RE = clause(`(?:attacks used by|the attacks of) ${HOST} do (\\d+) more damage`);
 const DAMAGE_PENALTY_RE = clause(`the attacks of ${HOST} do (\\d+) less damage`);
 const TAKES_LESS_RE = clause(`${HOST} takes (\\d+) less damage from attacks from your opponent's pokémon( v\\b|-ex\\b| ex\\b)?`);
+// Guard Energy (customhb): "If the Pokémon this card is attached to doesn't have a Rule Box, it takes 30
+// less damage from attacks from your opponent's Pokémon ex."
+const NO_RULE_BOX_TAKES_LESS_RE = clause(`if ${HOST} doesn't have a rule box, it takes (\\d+) less damage from attacks from your opponent's pokémon( v\\b|-ex\\b| ex\\b)?`);
 const OPPONENT_DOES_LESS_RE = clause(`the attacks of your opponent's pokémon do (\\d+) less damage to ${HOST}`);
 const NO_WEAKNESS_RE = clause(`${HOST} (?:has|gets) no weakness`);
 const FREE_RETREAT_RE = clause(`${HOST} has no retreat cost`);
@@ -652,7 +666,7 @@ function parseEffects(lower) {
   if (bonus) {
     push({ type: 'damageBonus', amount: Number(bonus[2]), hostType: typeOf(bonus[1]), target: 'opponentActive' });
   } else if (beastBonus) {
-    push({ type: 'damageBonus', amount: Number(beastBonus[1]), hostType: 'Ultra Beast', target: 'opponentActive' });
+    push({ type: 'damageBonus', amount: Number(beastBonus[1]), hostType: 'Ultra Beast', condition: 'ultraBeast', target: 'opponentActive' });
   }
   // Unseen Forces prints "is attached to attack," (SE14).
   if (/if the pokémon (?:darkness|\{d\}) energy is attached to attacks?, the attack does (\d+) more damage/.test(lower)) {
@@ -689,6 +703,14 @@ function parseEffects(lower) {
     const attackerKind = (takesLess[3] || '').trim();
     const source = attackerKind === 'v' ? 'opponentPokemonV' : attackerKind ? 'opponentPokemonEx' : 'opponentPokemon';
     push({ type: 'damageReduction', amount: Number(takesLess[2]), ...hosted(takesLess[1]), source, afterWR: true });
+  }
+  const noRuleBoxLess = lower.match(NO_RULE_BOX_TAKES_LESS_RE);
+  if (noRuleBoxLess) {
+    const attackerKind = (noRuleBoxLess[3] || '').trim();
+    const source = attackerKind === 'v' ? 'opponentPokemonV' : attackerKind ? 'opponentPokemonEx' : 'opponentPokemon';
+    const step = { type: 'damageReduction', amount: Number(noRuleBoxLess[2]), source, afterWR: true, condition: 'noRuleBox' };
+    if (noRuleBoxLess[1]) step.condition = `host:${SYMBOL_TYPES[noRuleBoxLess[1]]}`;
+    push(step);
   }
   const doesLess = lower.match(OPPONENT_DOES_LESS_RE);
   if (doesLess) {
@@ -995,10 +1017,11 @@ export function describeSpecialEnergyEffects(card) {
 //   { action: 'prizeReduction', count }
 export function planSpecialEnergyTriggers(
   card,
-  { trigger, host = null, zoneArray = [], fromZone = null, attackExecuting = false, hostZoneId = null, evolvedFrom = null } = {}
+  { trigger, host = null, zoneArray = [], fromZone = null, attackExecuting = false, hostZoneId = null, evolvedFrom = null, stadium = null } = {}
 ) {
   const parsed = parseSpecialEnergyEffects(card);
   if (!parsed || !trigger) return [];
+  if (stadiumBlanksSpecialEnergy(stadium)) return [];
   if (effectsIgnoredOnHost(parsed, host, zoneArray)) return [];
   const plans = [];
   // Both gates apply: Nitro is "discarded by an effect of an attack used by the {R}
@@ -1129,8 +1152,20 @@ function effectsIgnoredOnHost(parsed, host, zoneArray) {
   return (parsed?.steps || []).some((s) => s.type === 'ignoredOn' && s.host === 'pokemonEx') && hostIsPokemonEx(host, zoneArray);
 }
 
+/**
+ * Temple of Sinnoh: "All Special Energy attached to Pokémon … provide {C} Energy and have no other
+ * effect." While it is the Stadium in play every effect step below is off; only the {C} pricing
+ * (energy-effects.mjs rewriteForStadium) survives. Takes the card or a `{ card }` wrapper.
+ */
+export function stadiumBlanksSpecialEnergy(stadium) {
+  const card = stadium?.card || stadium;
+  const text = String(card?.text ?? card?.effect ?? card?.cardText ?? '').toLowerCase();
+  return /special energy/.test(text) && /provide \{c\}/.test(text) && /no other effect/.test(text);
+}
+
 /** Attached special Energy whose effects apply to `pokemonCard` (drops the ones its host switches off). */
-function effectiveSpecialEnergies(pokemonCard, zoneArray = []) {
+function effectiveSpecialEnergies(pokemonCard, zoneArray = [], stadium = null) {
+  if (stadiumBlanksSpecialEnergy(stadium)) return [];
   return getAttachedSpecialEnergies(pokemonCard, zoneArray).filter(
     (energy) => !effectsIgnoredOnHost(parseSpecialEnergyEffects(energy), pokemonCard, zoneArray)
   );
@@ -1194,6 +1229,11 @@ function conditionMet(condition, pokemon, zoneArray) {
       return isStage2OrHigher(pokemon);
     case 'evolution':
       return stageKey(pokemon) !== 'basic';
+    case 'noRuleBox':
+      return !isRuleBoxPokemon(pokemon);
+    // Beast Energy ◇ (sm6-117): "The attacks of the Ultra Beast this card is attached to …".
+    case 'ultraBeast':
+      return isUltraBeast(pokemon);
     case 'delta':
       return /δ|delta/i.test(String(pokemon?.name ?? '')) || (pokemon?.subtypes || []).map((s) => String(s).toLowerCase()).includes('delta species');
     case 'otherSpecial': {
@@ -1206,9 +1246,9 @@ function conditionMet(condition, pokemon, zoneArray) {
 }
 
 /** Sum of +HP modifiers from attached special energies (Growing/Heat …). */
-export function getSpecialEnergyHpBonus(pokemonCard, zoneArray = []) {
+export function getSpecialEnergyHpBonus(pokemonCard, zoneArray = [], stadium = null) {
   let total = 0;
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1221,9 +1261,9 @@ export function getSpecialEnergyHpBonus(pokemonCard, zoneArray = []) {
 }
 
 /** Attack-damage bonus from the attacker's attached special energies. */
-export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defenderIsActive = true, afterWR = false } = {}) {
+export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defenderIsActive = true, afterWR = false } = {}, stadium = null) {
   let total = 0;
-  for (const energy of effectiveSpecialEnergies(attacker, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(attacker, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1237,9 +1277,9 @@ export function getSpecialEnergyAttackBonus(attacker, zoneArray = [], { defender
 }
 
 /** Penalty applied to the attacker's own attacks (Double Turbo, Double Rainbow). */
-export function getSpecialEnergyAttackPenalty(attacker, zoneArray = [], { afterWR = false } = {}) {
+export function getSpecialEnergyAttackPenalty(attacker, zoneArray = [], { afterWR = false } = {}, stadium = null) {
   let total = 0;
-  for (const energy of effectiveSpecialEnergies(attacker, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(attacker, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1258,11 +1298,11 @@ export function getSpecialEnergyAttackPenalty(attacker, zoneArray = [], { afterW
  * before-WR steps (Shield) are returned separately for callers that need
  * the distinction.
  */
-export function getSpecialEnergyDamageReduction(defender, zoneArray = [], { attacker = null, afterWR = true } = {}) {
+export function getSpecialEnergyDamageReduction(defender, zoneArray = [], { attacker = null, afterWR = true } = {}, stadium = null) {
   let total = 0;
   // "…can't be applied more than once at a time" (V Guard): one copy per name counts.
   const onceApplied = new Set();
-  for (const energy of effectiveSpecialEnergies(defender, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(defender, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     const onceKey = parsed.steps.some((s) => s.type === 'onceAtATime') ? parsed.name.toLowerCase() : null;
@@ -1283,8 +1323,8 @@ export function getSpecialEnergyDamageReduction(defender, zoneArray = [], { atta
 }
 
 /** True when the attacker's special Energy makes its attacks ignore Resistance (Holon FF). */
-export function hasSpecialEnergyIgnoresResistance(attacker, zoneArray = []) {
-  for (const energy of effectiveSpecialEnergies(attacker, zoneArray)) {
+export function hasSpecialEnergyIgnoresResistance(attacker, zoneArray = [], stadium = null) {
+  for (const energy of effectiveSpecialEnergies(attacker, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     for (const step of parsed?.steps || []) {
       if (step.type === 'ignoresResistance' && conditionMet(step.condition ?? null, attacker, zoneArray)) return true;
@@ -1294,8 +1334,8 @@ export function hasSpecialEnergyIgnoresResistance(attacker, zoneArray = []) {
 }
 
 /** True when an attached special energy grants a free retreat. */
-export function hasSpecialEnergyFreeRetreat(pokemonCard, zoneArray = []) {
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+export function hasSpecialEnergyFreeRetreat(pokemonCard, zoneArray = [], stadium = null) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1308,16 +1348,16 @@ export function hasSpecialEnergyFreeRetreat(pokemonCard, zoneArray = []) {
 }
 
 /** True when an attached special Energy stops the host retreating (Boost Energy). */
-export function hasSpecialEnergyCannotRetreat(pokemonCard, zoneArray = []) {
-  return effectiveSpecialEnergies(pokemonCard, zoneArray).some((energy) =>
+export function hasSpecialEnergyCannotRetreat(pokemonCard, zoneArray = [], stadium = null) {
+  return effectiveSpecialEnergies(pokemonCard, zoneArray, stadium).some((energy) =>
     parseSpecialEnergyEffects(energy)?.steps.some((step) => step.type === 'cannotRetreat')
   );
 }
 
 /** Retreat-cost reduction from attached special energies. */
-export function getSpecialEnergyRetreatReduction(pokemonCard, zoneArray = []) {
+export function getSpecialEnergyRetreatReduction(pokemonCard, zoneArray = [], stadium = null) {
   let total = 0;
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1328,9 +1368,9 @@ export function getSpecialEnergyRetreatReduction(pokemonCard, zoneArray = []) {
 }
 
 /** Status conditions the host is immune to, for a given zone array. */
-export function getSpecialEnergyStatusImmunity(pokemonCard, zoneArray = []) {
+export function getSpecialEnergyStatusImmunity(pokemonCard, zoneArray = [], stadium = null) {
   const out = new Set();
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1343,8 +1383,8 @@ export function getSpecialEnergyStatusImmunity(pokemonCard, zoneArray = []) {
 }
 
 /** True when attached special energy nullifies the host's Weakness. */
-export function hasSpecialEnergyNoWeakness(pokemonCard, zoneArray = []) {
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+export function hasSpecialEnergyNoWeakness(pokemonCard, zoneArray = [], stadium = null) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1357,8 +1397,8 @@ export function hasSpecialEnergyNoWeakness(pokemonCard, zoneArray = []) {
 }
 
 /** True when the host is shielded from opponent attack effects (not damage). */
-export function hasSpecialEnergyEffectShield(pokemonCard, zoneArray = []) {
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+export function hasSpecialEnergyEffectShield(pokemonCard, zoneArray = [], stadium = null) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1371,8 +1411,8 @@ export function hasSpecialEnergyEffectShield(pokemonCard, zoneArray = []) {
 }
 
 /** True when the host is shielded from opponent Abilities (Fusion Strike). */
-export function hasSpecialEnergyAbilityShield(pokemonCard, zoneArray = []) {
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+export function hasSpecialEnergyAbilityShield(pokemonCard, zoneArray = [], stadium = null) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {
@@ -1385,9 +1425,9 @@ export function hasSpecialEnergyAbilityShield(pokemonCard, zoneArray = []) {
 }
 
 /** True when an attached special energy shields a benched host from all damage. */
-export function blocksSpecialEnergyBenchDamage(pokemonCard, zoneId, zoneArray = []) {
+export function blocksSpecialEnergyBenchDamage(pokemonCard, zoneId, zoneArray = [], stadium = null) {
   if (zoneId !== 'bench') return false;
-  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray)) {
+  for (const energy of effectiveSpecialEnergies(pokemonCard, zoneArray, stadium)) {
     const parsed = parseSpecialEnergyEffects(energy);
     if (!parsed) continue;
     for (const step of parsed.steps) {

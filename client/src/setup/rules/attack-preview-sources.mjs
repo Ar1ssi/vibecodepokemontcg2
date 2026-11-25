@@ -16,6 +16,7 @@ import {
   resolveAttachedEnergyType,
   rewriteEnergyDescriptor,
 } from '../../../../shared/engine/rules/energy-effects.mjs';
+import { abilityNameLimitKeyFor } from '../../../../shared/engine/rules/ability-executors.mjs';
 
 /**
  * @param {object} card the previewed active Pokémon
@@ -32,6 +33,21 @@ export function attachedEnergiesFor(card, legacyActiveCards = []) {
 }
 
 /**
+ * Every card attached to `card` (Tools too, not just Energy): Mega Signal re-types Energy from a Tool.
+ * @param {object} card the previewed Pokémon
+ * @param {object[]} legacyActiveCards the zone's card array
+ * @returns {object[]}
+ */
+export function attachedCardsFor(card, legacyActiveCards = []) {
+  if (!card) return [];
+  const legacy = (legacyActiveCards || []).filter(
+    (c) => c !== card && c.image != null && c.image?.relative === card.image
+  );
+  if (legacy.length > 0) return legacy;
+  return Array.isArray(card.attachedCards) ? card.attachedCards : [];
+}
+
+/**
  * Synchronous energy pricing for the inspector's first paint, before card data has loaded.
  * Reads `types[0]` only when present; otherwise the name/effect hints, as the live path does —
  * dropping an unresolved Energy made every attack read "unusable" until the async fetch landed.
@@ -41,10 +57,11 @@ export function attachedEnergiesFor(card, legacyActiveCards = []) {
  */
 export function stampEnergyTypes(card, legacyActiveCards = []) {
   const attached = attachedEnergiesFor(card, legacyActiveCards);
+  const attachedAll = attachedCardsFor(card, legacyActiveCards);
   return attached.map((energy) =>
     rewriteEnergyDescriptor(
       { type: resolveAttachedEnergyType(energy), family: classifyEnergyEffect(energy) },
-      { card: energy, hostPokemon: card, attachedCards: attached }
+      { card: energy, hostPokemon: card, attachedCards: attachedAll }
     )
   );
 }
@@ -68,9 +85,12 @@ export function stadiumCardFor(legacyStadium, authoritativeStadiums = []) {
 export function abilityUsedFor(card, legacyUsed, serverAbilitiesUsed = null) {
   if (legacyUsed || card?.abilityUsed) return true;
   if (!serverAbilitiesUsed || !card) return false;
-  // reduce.mjs useAbility checks both keys.
+  // reduce.mjs useAbility checks these keys, and the shared one of a name-limited Ability
+  // ("You can't use more than 1 Quick Search Ability each turn").
+  const nameLimitKey = abilityNameLimitKeyFor(card);
   return Boolean(
     (card.instanceId != null && serverAbilitiesUsed[card.instanceId]) ||
-      (card.name && serverAbilitiesUsed[card.name])
+      (card.name && serverAbilitiesUsed[card.name]) ||
+      (nameLimitKey && serverAbilitiesUsed[nameLimitKey])
   );
 }
