@@ -133,3 +133,14 @@ test('an attack the chosen Pokémon gets from its Tool can be used (HB 509 Techn
   const state = alpha(game({ p1: [giratina()], p2: [target], p2Bench: [user, hbTool('509', user)] }), ['Plain', closeCombat.name, 'Target']);
   assert.equal(damageOf(state, 'Target'), parseInt(closeCombat.damage, 10));
 });
+
+// Antique Armor Fossil Protective Armor (corpus: out/pkmn-trainer-cards.json, Pitch Black 072).
+const PROTECTIVE_ARMOR =
+  "As long as this Pokémon is in the Active Spot, all of your Pokémon take 10 less damage from attacks from your opponent's Pokémon (after applying Weakness and Resistance).";
+
+test('a team Ability shield cuts a controlled hit on a Benched target once, not twice', () => {
+  const striker = mon('Striker', { attacks: [{ name: 'Zap', cost: [], damage: '90', text: '' }] });
+  const armor = mon('Armor', { abilities: [{ type: 'Ability', name: 'Protective Armor', text: PROTECTIVE_ARMOR }] });
+  const state = alpha(game({ p1: [giratina()], p2: [armor], p2Bench: [striker, mon('Target')] }), ['Striker', 'Target']);
+  assert.equal(damageOf(state, 'Target'), 80);
+});

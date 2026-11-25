@@ -107,6 +107,9 @@ const typeChangeText = (t) =>
   /is both \{[a-z]\} and \{[a-z]\}/.test(t);
 
 const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
+// Orthworm Earth Eater (custom set): the Energy goes onto the holder, not to the opponent's Bench or
+// between your own Pokémon, so neither move-Energy reading below may take it; the attack templates do.
+const OPPONENT_ENERGY_TO_SELF = /from your opponent's active pok[eé]mon to this pok[eé]mon/;
 // Mawile Energy Crunch (HB 160): played onto the Bench, one Energy from any of the opponent's Pokémon.
 const OPPONENT_ANY_ENERGY_DISCARD = /when you play [^.]*from your hand (?:on)?to your bench[^.]*, you may discard (?:1|an?) energy from 1 of your opponent's pok[eé]mon/;
 
@@ -411,7 +414,7 @@ export function parseAbilitySearchParams(lower) {
   }
 
   const nameWord = scope.match(NAME_WORD_CLAUSE)?.[0];
-  if (nameWord && what) what = `${what}${nameWord.startsWith(' ') ? '' : ' '}${nameWord.trim()}`;
+  if (nameWord && what) what = `${what} ${nameWord.trim()}`;
 
   if (!upTo) {
     const upToM = lower.match(/up to\s+(\d+)/);
@@ -603,6 +606,26 @@ function withIfYouDoHalves(lower, parsed) {
   if (energyCost) {
     steps = [
       { type: 'discardOwnAttachedEnergy', selfOnly: true, special: energyCost[1] === 'a special', cost: true, guidance: 'Discard an Energy from this Pokémon (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Iono's Kilowattrel Flashing Draw: "You must discard a Basic {L} Energy from this Pokémon in
+  // order to use this Ability." The attached-Energy discard is the cost of the draw that follows.
+  const mustDiscardOwn = lower.match(
+    new RegExp(`you must discard an? (basic )?((?:\\{[a-z]\\}|[a-z]+) )?energy(?: card)? from ${SELF} in order to use this ability`)
+  );
+  if (mustDiscardOwn) {
+    const energyType = mustDiscardOwn[2] ? parseEnergyTypeHint(mustDiscardOwn[2]) : null;
+    steps = [
+      {
+        type: 'discardOwnAttachedEnergy',
+        selfOnly: true,
+        cost: true,
+        ...(mustDiscardOwn[1] ? { basicOnly: true } : {}),
+        ...(energyType ? { energyTypes: [energyType] } : {}),
+        guidance: 'Discard an Energy from this Pokémon (cost).',
+      },
       ...steps,
     ];
   }
@@ -1018,6 +1041,7 @@ export function parseAbility(text = '') {
   if (
     !hasPromotionTrigger &&
     !lower.includes('knocked out') &&
+    !OPPONENT_ENERGY_TO_SELF.test(lower) &&
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     // Energy must be what moves: Adrena-Brain's "has any {D} Energy attached, … move
@@ -1980,6 +2004,7 @@ export function parseAbility(text = '') {
   if (
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
+    !OPPONENT_ENERGY_TO_SELF.test(lower) &&
     !steps.some((s) => s.type === 'moveEnergyAbility')
   ) {
     if (/from your opponent's active pok[eé]mon to/.test(lower)) {

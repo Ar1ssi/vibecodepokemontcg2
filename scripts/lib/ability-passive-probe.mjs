@@ -50,6 +50,7 @@ import {
   abilityHealLocked,
   abilitySleepLock,
   abilityEnergyAttackerShield,
+  abilityDamagedReturnsAttackerEnergy,
 } from '../../shared/engine/rules/ability-combat.mjs';
 import {
   inPlayEntries,
@@ -370,6 +371,17 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       // Magnemite Sparkling Induction: same-named Pokémon on the Bench.
       const twins = ctx.sideBench.filter((c) => !c.attachedTo).map((c) => ({ ...c, name: card.name }));
       ask(`retreat:twinBench:${card.name}`, () => abilityRetreatCost(card, { ...ctx, sideBench: twins }));
+      // Bastiodon Ancient Bulwark: an attacker with 2 or less Energy (the probe Active has 8).
+      const lowEnergyCtx = { ...ctx, opponentSideCards: p2.sideCards.filter((c) => c.attachedTo !== p2Active.instanceId) };
+      ask(`damagePrevention:lowEnergyAttacker:${card.name}`, () => abilityDamagePrevention(card, p2Active, lowEnergyCtx));
+      // Bastiodon Primal Fortress: a Pokémon V attacker.
+      ask(`damageReduction:vAttacker:${card.name}`, () =>
+        abilityDamageReduction(card, { ...p2Active, subtypes: ['Basic', 'V'] }, ctx)
+      );
+      // Carracosta Primal Knowledge: the opponent's Active is an Evolution Pokémon.
+      ask(`damageBonus:evolvedDefender:${card.name}`, () =>
+        abilityDamageBonus(card, { ...p2Active, stage: 'Stage 1', subtypes: ['Stage 1'], evolvesFrom: 'p2Basic' }, ctx)
+      );
       // Ninetales Luminous Barrier: a Pokémon-EX attacker.
       ask(`effectPrevention:exAttacker:${card.name}`, () =>
         abilityPreventsAttackEffects(card, { ...p2Active, subtypes: ['Basic', 'EX'] }, ctx)
@@ -407,6 +419,7 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     const ctx = at(p1, holderCard);
     ask('onDamage', () => parseOnDamageAbilities(holderCard, ctx));
     ask('onDamageStatus', () => parseOnDamageStatus(holderCard, ctx));
+    ask('onDamageReturnsAttackerEnergy', () => abilityDamagedReturnsAttackerEnergy(holderCard, ctx));
     ask('onEnergyAttach', () =>
       BASIC_ENERGY_NAMES.map((name) =>
         parseOnEnergyAttachAbilities(holderCard, createCard({ name, supertype: 'Energy', subtypes: ['Basic'] }), p1)

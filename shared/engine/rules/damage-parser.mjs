@@ -1137,7 +1137,8 @@ export function parseAttackDamage(
   // counter(s)" removes N × 10. The target (attacker / defender / all) is resolved
   // separately by healTarget().
   const healRe = /(?:heal|remove) (?:up to )?(\d+) damage( counters?)?/;
-  const healMatch = text ? healRe.exec(text) : null;
+  // "At the end of your next turn, heal 100 damage …" (Jirachi Wish) is atkDeferredActiveHeal.
+  const healMatch = text && !/\bat the end of your next turn, heal \d+ damage/.test(text) ? healRe.exec(text) : null;
   if (healMatch) {
     heal = amount(text, healRe) * (healMatch[2] ? 10 : 1);
     if (heal > 0) components.push('heal');

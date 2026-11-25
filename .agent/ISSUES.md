@@ -6,7 +6,7 @@
 # Format: `I<n> <YYYY-MM-DD> P<1|2|3> [scope] symptom — evidence/repro (refs: D<n>, design, S<n>)`
 #   ONE line, ≤300 chars. Needs more? Put it in a design or scratch file and reference it.
 #   P1 broken for users now · P2 wrong or risky, schedule it · P3 debt/idea, fix when passing.
-#   Next <n> = highest I number here or in the archive + 1 (next: I299). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
+#   Next <n> = highest I number here or in the archive + 1 (next: I301). The PR #182–#184 merge (S294) renumbered branch ids; "(PR #n branch id X)" keeps the old id.
 # Umbrella lines name every member as `(merged I<a>, I<b>…)`: grep any id to find its line.
 # Close = move the line under Closed and append ` → closed <YYYY-MM-DD> S<n>: <fix or wontfix + why>`.
 # Caps: Open ≤40 · Closed ≤30 (`pnpm harness:check`); maintain.md moves older Closed lines to .agent/archive/ISSUES-closed.md.
@@ -14,6 +14,8 @@
 # Full pre-2026-09-24 wording + all older Closed history: .agent/archive/ISSUES-full-2026-09-24.md
 
 ## Open (newest first)
+- I300 2026-11-24 P2 [rules] ability-combat.mjs damage shields ignore kind/type/attacker filters (Leavanny {G}, Dachsbun, Mew Neutral Shield), lend "it takes N less" to the side (Armarouge ex), read activated shields as permanent (Zamazenta VSTAR); Bench path reads only plain "your Pokémon" shields
+- I299 2026-11-24 P2 [rules] On-damage triggers (Silver Sparkle customhb-872, Lucky Energy, thorns, Rocky Helmet) fire only on an attack's main damage, not a chosen-target or damage-each hit on the Active (applyFlatDamageToTarget) — needs one shared helper
 - I298 2026-11-21 P2 [attacks] `pnpm audit:attacks` fails on main (d6c26287) with 8 regressions vs its baseline: Fuecoco ex Cheerful Flame, Salazzle-GX Diabolical Claws, Mega Mawile ex Gobble Down, Aegislash ex Peerless Edge → ran-no-effect; Leafeon-EX, Muk & Alolan Muk-GX, Altaria-EX, Mamoswine → partial. Bisect.
 - I297 2026-11-19 P3 [rules] customhb HB 554 Giratina ex Alpha Rage: the chosen Pokémon's attack does its damage as that Pokémon (reduce/controlled-attack.mjs) but its other printed effects (status, self-discard, draws) do not run — mapping "you"/"Defending Pokémon" for a controlled attack needs a design
 - I296 2026-11-19 P2 [client] The attack-button glow ignores marker cost increases (Head Ringer Tool, Flapple V Sour Spit): listUsableActions gets only `costDiscounts`, so it lights an attack the server then refuses (legality.mjs attackCostPayable markerIncrease). Needs a view `costIncreases` map.

@@ -202,7 +202,7 @@ export function isBenchPlayedTrigger(card) {
 // Out…", "Whenever your opponent attaches…") that must never run from the ability button.
 // Checked over the full corpus (S266): every non-matching text is a passive or trigger.
 const ACTIVATED_ABILITY_CLAUSE =
-  /once during your turn|during your (?:first )?turn\b[^.]*?\byou may\b|at any time during your turn|once during a game on your turn|you may use this ability|as often as you like|once per turn|when you play [^.]*?from your hand/;
+  /once during your turn|during your (?:first )?turn\b[^.]*?\byou may\b|at any time during your turn|once during a game on your turn|you may use this ability|as often as you like|once per turn|when you play [^.]*?from your hand|you may move [^.]*energy[^.]*from your opponent's active pok[eé]mon to this pok[eé]mon/;
 
 export function isActivatedAbility(card, abilityIndex = 0) {
   const ability = Array.isArray(card?.abilities) ? card.abilities[abilityIndex] : null;

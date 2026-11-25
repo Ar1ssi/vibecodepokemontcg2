@@ -299,7 +299,8 @@ export function parseToolCondition(card) {
     /your opponent'?s active ([^.]*?)(?: is knocked out|\.|$)/
   );
   if (defenderClause) {
-    const segment = defenderClause[1];
+    // "…has any {F} Energy attached" (Orthworm Earth Eater) names an Energy, not the defender's type.
+    const segment = defenderClause[1].replace(/\bhas (?:any|an?) (?:\{[a-z]\} )?energy(?: cards?)? attached\b/g, '');
     const types = [...segment.matchAll(/\{([a-z])\}/g)]
       .map((m) => TYPE_WORDS[m[1]])
       .filter(Boolean);

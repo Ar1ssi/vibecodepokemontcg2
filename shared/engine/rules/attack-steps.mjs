@@ -224,6 +224,12 @@ const TEMPLATES = [
     /^at the end of your opponent's next turn, (?:(?:their|your opponent's) active pokémon takes|this attack does) (\d+) damage(?: to their active pokémon)?$/,
     (m) => ({ type: 'atkDeferredActiveDamage', amount: Number(m[1]) }),
   ],
+  // Jirachi Wish (custom set): the heal waits for the end of the attacker's next turn
+  // (turn.mjs applyDeferredActiveHeal); damage-parser.mjs leaves it out of the immediate heal.
+  [
+    /^at the end of your next turn, heal (\d+) damage from your active pokémon$/,
+    (m) => ({ type: 'atkDeferredActiveHeal', amount: Number(m[1]) }),
+  ],
   // Unown Hidden Power (Unseen Forces I): after its switch, "The new Defending Pokémon is now
   // Burned and Confused."
   [
@@ -323,6 +329,11 @@ const TEMPLATES = [
       count: 1,
       ...energyFilter(m[1], s),
     }),
+  ],
+  // Orthworm Earth Eater (custom set): the opponent's Active Energy onto this Pokémon.
+  [
+    new RegExp(String.raw`^(?:you may )?move (?:an?|1) ${ENERGY_TYPE}energy(?: card)? (?:from|attached to) your opponent's active pokémon to this pokémon$`),
+    (m, s) => ({ type: 'atkMoveEnergy', from: 'opponentActive', to: 'self', count: 1, ...energyFilter(m[1], s) }),
   ],
   // Opponent Energy between their own Pokémon.
   [
@@ -515,7 +526,7 @@ const TEMPLATES = [
   // Brock's Primeape Mega Thrash / Light Piloswine Knock Over ("If there is a Stadium card in
   // play, [you may] discard it").
   [
-    /^(you may )?discard (?:a|any) stadium(?: card)? in play$/,
+    /^(you may )?discard (?:a|any|the) stadium(?: card)? in play$/,
     (m) => ({ type: 'atkDiscardStadium', owner: 'any', ...(m[1] ? { optional: true } : {}) }),
   ],
   [
@@ -937,6 +948,12 @@ const TEMPLATES = [
     /^put (an?|\d+) cards? from your opponent's discard pile in the lost zone$/,
     (m) => ({ type: 'atkLostZoneOppDiscard', count: countOf(m[1]) }),
   ],
+  // Custom-set Make It Rain: "Put any number of Basic Energy cards from your hand into the Lost
+  // Zone. This attack does 50 damage for each card you discarded in this way."
+  [
+    new RegExp(String.raw`^put any number of ${ENERGY_TYPE}energy cards? from your hand (?:in|into) the lost zone$`),
+    (m, s) => ({ type: 'atkLostZoneFromHand', anyNumber: true, what: 'energy', ...energyFilter(m[1], s) }),
+  ],
   [/^put this pokémon and all (?:attached cards|cards attached to it) in the lost zone$/, () => ({ type: 'atkLostZoneSelf' })],
   [
     /^put your opponent's active pokémon and all cards attached to it in the lost zone$/,
@@ -1274,6 +1291,11 @@ const TEMPLATES = [
   [
     /^devolve each of your opponent's evolved pokémon (?:by putting|and put) the highest stage evolution card on it into your opponent's hand$/,
     () => ({ type: 'atkDevolve', scope: 'all', to: 'hand' }),
+  ],
+  // Archeops Ancient Wing (corpus: White Flare 132; customhb-881): the player picks 1 of the opponent's Evolved Pokémon.
+  [
+    /^devolve 1 of your opponent's evolved pokémon by putting the highest stage evolution card on it into your opponent's hand$/,
+    () => ({ type: 'atkDevolve', scope: 'chooseOpponent', to: 'hand' }),
   ],
   [
     /^if your opponent's active pokémon is an evolved pokémon, devolve it by putting the highest stage evolution card on it into your opponent's hand$/,
@@ -2159,8 +2181,12 @@ const ABILITY_PREAMBLE =
  *   the holder must be for the Ability to work, when the text says so.
  */
 export function parseAbilityEffectSteps(text, { selfName = '' } = {}) {
-  const normalized = normalizeAttackText(text, selfName).replace(/\s*\([^)]*\)/g, '');
-  if (!ABILITY_PREAMBLE.test(normalized)) return { steps: [], holderZone: null };
+  const normalized = normalizeAttackText(text, selfName)
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(PASSIVE_LEAD, '');
+  if (!ABILITY_PREAMBLE.test(normalized) && !UNLIMITED_ENERGY_STEAL.test(normalized)) {
+    return { steps: [], holderZone: null };
+  }
   let effect = normalized.replace(ABILITY_PREAMBLE, '');
   // "if this Pokémon is in the Active Spot / on your Bench, …" is the one condition read.
   let holderZone = null;
@@ -2193,6 +2219,13 @@ function abilityRevealVoice(effect) {
     .replace(/^(your opponent reveals their hand\.) then, /, '$1 ')
     .replace(/(your opponent reveals their hand\. \w+ .*?)\byour opponent's (deck|bench)\b/, '$1their $2');
 }
+
+// Orthworm Earth Eater (custom set): a passive shield sentence ahead of the activated move; the
+// damage code (ability-combat.mjs sourceConditionMet) enforces it, the templates read the move.
+const PASSIVE_LEAD =
+  /^if your opponent's active pokémon has any \{[a-z]\} energy attached, prevent all damage done to this pokémon by attacks from your opponent's pokémon\. /;
+const UNLIMITED_ENERGY_STEAL =
+  /^you may move (?:an?|1) [^.]*energy[^.]* from your opponent's active pokémon to this pokémon\.?$/;
 
 const HOLDER_POSITION =
   /^if this pokémon is (in the active spot|your active pokémon|on your bench|in your discard pile|in your hand), (?:you may )?/;

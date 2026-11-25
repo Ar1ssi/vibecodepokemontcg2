@@ -7,6 +7,8 @@
  * deck is only shown for a choice that comes from a deck search.
  */
 
+import { withShownPokemonOptions } from './rules/shown-pokemon.mjs';
+
 const toViewCard = (card) => ({
   instanceId: card.instanceId,
   name: card.name || '',
@@ -70,9 +72,10 @@ export function choiceZoneView(state, choice) {
   return null;
 }
 
-/** A copy of `choice` for its chooser, carrying `zoneView` when there is one. */
+/** A copy of `choice` for its chooser: evolved Pokémon options show their top card, plus `zoneView` when there is one. */
 export function choiceForChooser(state, choice) {
   const copy = JSON.parse(JSON.stringify(choice));
+  if (Array.isArray(copy.options)) copy.options = withShownPokemonOptions(state, copy.options);
   const zoneView = choiceZoneView(state, choice);
   if (zoneView) copy.zoneView = zoneView;
   return copy;

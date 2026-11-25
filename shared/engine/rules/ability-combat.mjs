@@ -333,6 +333,13 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
     if (symbols.length && !symbols.some((ty) => attackerTypes(target).includes(lower(ty)))) return false;
   }
   if (/don't have a rule box/.test(text) && isRuleBoxPokemon(target)) return false;
+  // Orthworm Earth Eater (custom set): the shield holds only while the attacker has that Energy.
+  const oppEnergyShield = text.match(
+    /if your opponent's active pok[eé]mon has any \{([a-z])\} energy attached, prevent all damage/
+  );
+  if (oppEnergyShield && !hasEnergyOfType(attacker, ctx.opponentSideCards, TYPE_LETTER[oppEnergyShield[1]])) {
+    return false;
+  }
   const attackerEnergy = text.match(
     /from your opponent's pok[eé]mon that have (\d+) or less energy attached/
   );
@@ -352,7 +359,7 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
   if (/as long as this pok[eé]mon is on your bench/.test(text)) {
     if (holderZone(holder, ctx) !== 'bench') return false;
   }
-  if (/as long as this pok[eé]mon is in the active spot/.test(text)) {
+  if (/as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/.test(text)) {
     if (holderZone(holder, ctx) !== 'active') return false;
   }
   return inPlayConditionMet(text, target, ctx);
@@ -684,6 +691,7 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
   for (const holder of nonStackingOnce(dedupe([defender, ...sideInPlay(ctx)]))) {
     // Older prints name the holder ("by attacks to Misty's Cloyster"): read as "this pokémon"
     // so a self-only reduction is not lent to the team.
+    if (ctx.holderFilter && !ctx.holderFilter(holder)) continue;
     const t = selfNamedText(holder);
     if (!t || !parseDamageReduction(holder).reduce) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
@@ -707,13 +715,15 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
 
 // Regirock / Regice Unified Defense: "take 10 less damage for each Pokémon with the Ability Unified
 // Defense in play". In play spans both sides; same-named Abilities do not stack (nonStackingOnce),
-// so each holder's own text carries the whole count. 1 when the text has no such scaling.
+// so each holder's own text carries the whole count. Holders count once per name (user ruling:
+// two Regice are 10 less, Regice + Regieleki 20 less). 1 when the text has no such scaling.
 function abilityHolderCount(text, ctx) {
   const named = /for each pok[eé]mon with the ability ([a-z0-9 '’-]+?) in play/.exec(text)?.[1];
   if (!named) return 1;
-  return [...sideInPlay(ctx), ...opponentInPlay(ctx)].filter(
+  const holders = [...sideInPlay(ctx), ...opponentInPlay(ctx)].filter(
     (card) => !isAbilitySuppressed(card, ctx) && (card.abilities || []).some((a) => lower(a?.name) === named)
-  ).length;
+  );
+  return new Set(holders.map((card) => lower(card.name))).size;
 }
 
 /**
@@ -747,6 +757,18 @@ export function abilityEnergyAttackerShield(defender, attackerEnergyTypes = [], 
   return attackerEnergyTypes.some((t) => lower(t) === type) ? Number(m[2]) : null;
 }
 
+const TEAM_WIDE_DAMAGE_SHIELD =
+  /(?:^|[.,] )(?:each of |all of )?your pok[eé]mon take \d+ less damage from attacks|prevent all damage done to (?:each of |all of )?your pok[eé]mon by attacks/;
+
+/**
+ * A holder whose Ability shields every one of its side's Pokémon by an unqualified "your Pokémon"
+ * wording (Bastiodon Ancient Bulwark / Primal Fortress, customhb-874/875) — the readers the
+ * Bench damage path consults (attack-damage.mjs benchAbilityShieldedDamage).
+ */
+export function isTeamWideDamageShield(holder) {
+  return TEAM_WIDE_DAMAGE_SHIELD.test(selfNamedText(holder).replace(/[‘’]/g, "'"));
+}
+
 /**
  * Ability damage prevention for the defender as `{ preventAll, reduceHp }`,
  * covering the holder and its team (bench/team wordings).
@@ -755,6 +777,7 @@ export function abilityDamagePrevention(defender, attacker, ctx = {}) {
   const out = { preventAll: false, reduceHp: 0 };
   if (!defender) return out;
   for (const holder of nonStackingOnce(dedupe([defender, ...sideInPlay(ctx)]))) {
+    if (ctx.holderFilter && !ctx.holderFilter(holder)) continue;
     const t = selfNamedText(holder);
     if (!t) continue;
     const parsed = parseDamagePrevention(holder);
@@ -1550,6 +1573,20 @@ export function abilityDamagedOwnBenchCounters(card, ctx = {}) {
   );
   if (!match || isAbilitySuppressed(card, ctx)) return 0;
   return Number(match[1]);
+}
+
+const DAMAGED_RETURN_ATTACKER_ENERGY =
+  /if this pok[eé]mon is your active pok[eé]mon and is damaged by (?:an opponent's attack|an attack from your opponent's pok[eé]mon)(?: \(even if this pok[eé]mon is knocked out\))?, flip a coin\. if heads, choose an energy card attached to the attacking pok[eé]mon and return it to your opponent's hand/;
+
+/**
+ * Lugia ex Silver Sparkle (customhb-872): "If Lugia ex is your Active Pokémon and is damaged by an
+ * opponent's attack (even if Lugia ex is Knocked Out), flip a coin. If heads, choose an Energy card
+ * attached to the Attacking Pokémon and return it to your opponent's hand." True for a live holder.
+ */
+export function abilityDamagedReturnsAttackerEnergy(card, ctx = {}) {
+  if (!isPokemon(card)) return false;
+  const text = selfNamedText(card).replace(/[‘’]/g, "'");
+  return DAMAGED_RETURN_ATTACKER_ENERGY.test(text) && !isAbilitySuppressed(card, ctx);
 }
 
 /**

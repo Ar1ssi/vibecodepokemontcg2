@@ -274,3 +274,13 @@ import test from 'node:test';
         prizesForKO(card({ name: 'Lapras' }))
       );
     });
+
+    test('homebrew VMAX (custom id) counts as ex and takes 2 Prizes; a printed VMAX stays 3', () => {
+      const homebrew = card({ name: 'Charizard VMAX', id: 'customhb-470', subtypes: ['VMAX'] });
+      const printed = card({ name: 'Charizard VMAX', id: 'swsh3-020', subtypes: ['VMAX'] });
+      assert.equal(isExCard(homebrew), true);
+      assert.equal(prizesForKO(homebrew), 2);
+      assert.equal(isVmaxCard(homebrew), true);
+      assert.equal(isExCard(printed), false);
+      assert.equal(prizesForKO(printed), 3);
+    });
