@@ -29,6 +29,7 @@ import {
   settleAttackerEnergyToHand,
   settleKoHandDiscards,
   settleBenchLimits,
+  bindDraftRng,
   settleKoToolCounters,
   settlePrizeEntitlements, resolveDamageCounterKnockouts, takePrizesCommand,
   takePrizesByIndexCommand, promoteCommand,
@@ -300,6 +301,7 @@ export function applyCommand(state, command, rng = null) {
     activeRng = withForcedCoinOnce(activeRng, draft.players[willPlayerId].flags.willFirstCoin);
     willCoinUsed = activeRng.forcedCoinUsed;
   }
+  bindDraftRng(draft, activeRng);
   const events = [];
 
   switch (type) {

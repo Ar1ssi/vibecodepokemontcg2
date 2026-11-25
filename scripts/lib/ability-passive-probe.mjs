@@ -51,6 +51,9 @@ import {
   abilitySleepLock,
   abilityEnergyAttackerShield,
   abilityDamagedReturnsAttackerEnergy,
+  abilityPoisonHeal,
+  abilityBenchLimit,
+  abilityKoDeniesPrizes,
 } from '../../shared/engine/rules/ability-combat.mjs';
 import {
   inPlayEntries,
@@ -354,6 +357,8 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       );
     }
     ask('counterMoveLock', () => abilityCounterMoveLock(p1));
+    // Glimmora ex Dust Field: p1's holder caps the Bench p2 may have.
+    ask('benchLimit', () => abilityBenchLimit(p2));
     // Customhb passives: each reader sees a board that can show it (a Dragon / Metal / EX
     // opponent, a same-named Bench, the holder as the attacker or the Knocked Out).
     ask('sleepLock', () => abilitySleepLock(p1));
@@ -417,6 +422,8 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
 
     if (!holderCard) continue;
     const ctx = at(p1, holderCard);
+    ask('poisonHeal', () => abilityPoisonHeal(holderCard, ctx));
+    ask('koDeniesPrizes', () => abilityKoDeniesPrizes(holderCard, ctx));
     ask('onDamage', () => parseOnDamageAbilities(holderCard, ctx));
     ask('onDamageStatus', () => parseOnDamageStatus(holderCard, ctx));
     ask('onDamageReturnsAttackerEnergy', () => abilityDamagedReturnsAttackerEnergy(holderCard, ctx));
