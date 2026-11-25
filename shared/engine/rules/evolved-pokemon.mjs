@@ -64,6 +64,21 @@ export function topPokemonCard(zoneCards, root) {
   );
 }
 
+/**
+ * The card `card` evolved from: the highest-stage card of the stack ranked below it, or the
+ * root when nothing is. Reads the stack after the evolution, so a Rare Candy jump names the Basic.
+ * @param {object[]} zoneCards Cards in the zone holding the root (active or bench)
+ * @param {object} root The in-play Pokémon (a card with no attachedTo)
+ * @param {object} card An Evolution card in that stack
+ * @returns {object}
+ */
+export function evolvedFromCard(zoneCards, root, card) {
+  const rank = stageRank(card);
+  return stackEvolutions(zoneCards, root)
+    .filter((c) => c !== card && stageRank(c) < rank)
+    .reduce((best, c) => (stageRank(c) >= stageRank(best) ? c : best), root);
+}
+
 // The highest-stage card below the top, i.e. the Pokémon a BREAK card
 // evolved from (root when the stack has no other evolution).
 function previousTopPokemonCard(zoneCards, root, top) {

@@ -18,6 +18,7 @@ import { settleFossilCards } from './rules/fossil.mjs';
 import { settleRevealedHandCards } from './rules/revealed-hand.mjs';
 import { settleOpeningDraw } from './rules/opening-draw.mjs';
 import { stampRevealedArt } from './rules/reveal-picks.mjs';
+import { stampShownPokemonNames } from './rules/shown-pokemon.mjs';
 import { settleSpecialEnergyPassives } from './effects/special-energy.mjs';
 import { abilitySideContext, setGameEnded } from './reduce/shared.mjs';
 import { TIME_OUT_REASON } from './homebrew-clock.mjs';
@@ -493,6 +494,7 @@ export function applyCommand(state, command, rng = null) {
   // Design 059: a public reveal carries each card's art, so the opponent can draw a card
   // their view still shows face down (the revealed card is in its owner's hand).
   stampRevealedArt(events, (instanceId) => findCard(draft, instanceId)?.card?.src);
+  stampShownPokemonNames(state, draft, events);
 
   // Will is consumed by the first flip; clear the marker once it fired.
   if (willPlayerId && willCoinUsed?.value) {
