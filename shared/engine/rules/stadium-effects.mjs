@@ -520,6 +520,7 @@ export function hasRecognizedPassiveStadiumEffect(card) {
     isStadiumNoWeakness(card) ||
     isStadiumWeaknessTimesTwo(card) ||
     isStadiumResistanceIgnore(card) ||
+    isStadiumNoResistance(card) ||
     parseStadiumTypeDamageReduction(card) > 0 ||
     isStadiumBetweenTurnsDamage(card) ||
     isStadiumLostCity(card) ||
@@ -1513,6 +1514,11 @@ export function isStadiumResistanceIgnore(card) {
   );
 }
 
+/** Magnetic Storm: no Pokémon in play has Resistance (the damage step reads it in stadium-triggers.mjs). */
+export function isStadiumNoResistance(card) {
+  return /each pok[eé]mon in play has no resistance/.test(textOf(card));
+}
+
 /** Whether a Stadium makes `attacker`'s attack damage ignore Resistance. */
 export function stadiumIgnoresResistance(stadiumCard, attacker) {
   if (!isStadiumResistanceIgnore(stadiumCard)) return false;
@@ -2441,6 +2447,7 @@ function collectPassiveStadiumResults(card) {
     results.push({ action: 'weakness-times-two' });
   if (isStadiumResistanceIgnore(card))
     results.push({ action: 'ignore-resistance' });
+  if (isStadiumNoResistance(card)) results.push({ action: 'no-resistance' });
   const typeDamageReduction = parseStadiumTypeDamageReduction(card);
   if (typeDamageReduction > 0)
     results.push({ action: 'type-damage-reduction', amount: typeDamageReduction });

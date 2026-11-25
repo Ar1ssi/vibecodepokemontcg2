@@ -172,6 +172,15 @@ export function toolDiscardsAtEndOfOpponentTurn(card) {
 }
 
 /**
+ * "If this card is attached to an Evolution Pokémon, discard this card." (Bravery Charm, custom set):
+ * the Tool goes to the discard pile as soon as its holder is an Evolution.
+ */
+export function toolDiscardsOnEvolution(card) {
+  if (!card || isPokemon(card) || isEnergy(card)) return false;
+  return /if this card is attached to an evolution pok[eé]mon, discard this card/.test(normalizeText(cardTextOf(card)));
+}
+
+/**
  * The Pokémon a Technical Machine may be attached to, read from "Attach this card to 1 of
  * your <X> in play" (ex5-84, ex4 Team Magma/Aqua TM 01, pl2-95). Null when unrestricted
  * or when the card prints no such clause (SV TMs attach like any Tool).

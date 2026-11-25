@@ -11,7 +11,7 @@
  */
 
 import { topPokemonCard } from './evolved-pokemon.mjs';
-import { isGxCard, isTagTeamCard, isVmaxCard } from './card-classify.mjs';
+import { isExCard, isGxCard, isTagTeamCard, isVmaxCard } from './card-classify.mjs';
 import { attackerTypes, cardHasAbility, isEvolutionCard, TYPE_LETTER } from './tool-combat.mjs';
 
 /**
@@ -25,6 +25,18 @@ export function addAttackMarker(card, marker) {
 
 export function clearAttackMarkers(card) {
   if (card) delete card.attackMarkers;
+}
+
+/**
+ * Retreating or switching ends an attack's timed effects on the Pokémon, but not a shield a
+ * Trainer put on it ("Choose 1 of your Pokémon in play. During your opponent's next turn, …"):
+ * those carry `persistent` and last their printed window wherever the Pokémon stands.
+ */
+export function clearMovementMarkers(card) {
+  if (!card?.attackMarkers) return;
+  const kept = card.attackMarkers.filter((marker) => marker.persistent);
+  if (kept.length > 0) card.attackMarkers = kept;
+  else delete card.attackMarkers;
 }
 
 /**
@@ -106,6 +118,8 @@ const FILTER_KINDS = {
   stage2: (card) => stageOf(card) === 2,
   vmax: (card) => isVmaxCard(card),
   gx: (card) => isGxCard(card),
+  // The modern lowercase "Pokémon ex" (Acerola's Mischief); `EX` below is the old Pokémon-EX.
+  ex: (card) => isExCard(card),
   // Uppercase "-EX" only: the old Pokémon-EX, not the modern lowercase "ex".
   EX: (card) => /-EX$/.test(String(card?.name || '')),
   // "Pokémon-ex" of the EX era (Deoxys ex): normalized text cannot tell it from "Pokémon-EX".

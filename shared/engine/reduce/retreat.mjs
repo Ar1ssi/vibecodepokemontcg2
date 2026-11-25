@@ -13,7 +13,7 @@ import { stadiumRetreatCoin } from '../rules/stadium-triggers.mjs';
 import { applyStadiumSwitchTriggers } from '../effects/stadium-trigger-apply.mjs';
 import { abilityNoRetreatCost, abilityRetreatCost, opponentRetreatConditions } from '../rules/ability-combat.mjs';
 import { createPendingChoice } from '../effects/executor.mjs';
-import { clearAttackMarkers } from '../rules/attack-markers.mjs';
+import { clearMovementMarkers } from '../rules/attack-markers.mjs';
 import {
   hasSpecialEnergyFreeRetreat, getSpecialEnergyRetreatReduction,
 } from '../rules/special-energy-parse.mjs';
@@ -285,7 +285,7 @@ export function applyRetreatSwap(
     delete active.cannotAttackUntilTurn;
     delete active.cannotAttackAttackName;
     delete active.cannotRetreatUntilTurn;
-    clearAttackMarkers(active);
+    clearMovementMarkers(active);
     benchPokemon.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
 
     if (!player.flags) player.flags = {};

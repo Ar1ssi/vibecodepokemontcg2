@@ -190,6 +190,30 @@ export function ownedCards(player) {
 }
 
 /**
+ * Marks each Basic Pokémon of the player that can evolve (Bravery Charm: "… and can evolve"): a card
+ * of theirs names it in evolvesFrom / evolvesFromBase, or the static Stage 1 table does. The cards the
+ * game knows of are the only evidence there is: a Basic whose Evolutions are all outside the deck
+ * and the table reads as unable to evolve. Rerun when card stats land (cardStatsCommand).
+ * @param {object} player Server-state player
+ */
+export function stampCanEvolve(player) {
+  const pokemon = ownedCards(player).filter(isPokemon);
+  const tabled = [...STAGE1_EVOLVES_FROM.values()];
+  for (const card of pokemon) {
+    if ((normalizeStage(card.stage) || 'Basic') !== 'Basic') continue;
+    const evolves =
+      tabled.some((base) => pokemonNamesMatch(base, card.name)) ||
+      pokemon.some(
+        (other) =>
+          other !== card &&
+          [other.evolvesFromBase, other.evolvesFrom].some((from) => from && pokemonNamesMatch(from, card.name))
+      );
+    if (evolves) card.canEvolve = true;
+    else delete card.canEvolve;
+  }
+}
+
+/**
  * Counts that decide whether a targeted Trainer has anything to act on
  * (trainer-play-conditions.mjs), from a server-state player.
  */

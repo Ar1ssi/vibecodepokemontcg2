@@ -22,7 +22,14 @@ import {
   copyConditions,
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
-import { clearAttackMarkers, healLocked, liveAttackMarkers } from '../rules/attack-markers.mjs';
+import {
+  addAttackMarker,
+  clearAttackMarkers,
+  healLocked,
+  liveAttackMarkers,
+  markerFromTurn,
+  markerUntilTurn,
+} from '../rules/attack-markers.mjs';
 import { classifyStadiumEffect, stadiumAllowsSameTurnEvolution, stadiumBlocksHealing } from '../rules/stadium-effects.mjs';
 import {
   evolvedView,
@@ -6334,6 +6341,57 @@ function benchAttackShield(ctx) {
   return null;
 }
 
+// Acerola's Mischief: "Choose 1 of your Pokémon in play. During your opponent's next turn, prevent all
+// damage from and effects of attacks done to that Pokémon by your opponent's Pokémon <kind>." The shield is
+// two attack markers on the chosen Pokémon (read on the Active and the Bench alike) that survive a retreat.
+function shieldOwnPokemon(ctx) {
+  const { player, step } = ctx;
+  const shield = (root) => {
+    const turn = turnNumberOf(ctx);
+    const window = { fromTurn: markerFromTurn('opponentNextTurn', turn), untilTurn: markerUntilTurn('opponentNextTurn', turn), persistent: true };
+    addAttackMarker(root, { kind: 'incomingPrevent', filter: step.attackerFilter, ...window });
+    addAttackMarker(root, { kind: 'effectPrevent', filter: step.attackerFilter, ...window });
+    ctx.events.push({ type: 'attackShieldSet', playerId: player.playerId, instanceId: root.instanceId, source: sourceName(ctx, 'Trainer') });
+    return null;
+  };
+  const roots = rootsOf(player);
+  if (ctx.selection) {
+    const root = roots.find((c) => c.instanceId === ctx.selection[0]);
+    return root ? shield(root) : skip(ctx, 'target_not_found');
+  }
+  if (roots.length === 0) return skip(ctx, 'no_pokemon');
+  if (roots.length === 1) return shield(roots[0]);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your Pokémon in play`,
+    options: roots,
+    min: 1,
+    max: 1,
+  });
+}
+
+// Roxie's Performance: "During your opponent's next turn, their Poisoned Pokémon can't retreat. (This
+// includes newly Poisoned Pokémon.)" The window sits on the opponent, so a Pokémon Poisoned after
+// the card was played is locked too; reduce/legality.mjs reads it at retreat time.
+function poisonedCannotRetreat(ctx) {
+  const { opponent } = ctx;
+  if (!opponent) return skip(ctx, 'no_opponent');
+  const untilTurn = turnNumberOf(ctx) + 1;
+  opponent.poisonedRetreatLockUntilTurn = Math.max(opponent.poisonedRetreatLockUntilTurn || 0, untilTurn);
+  ctx.events.push({ type: 'poisonedRetreatLock', playerId: opponent.playerId, untilTurn });
+  return null;
+}
+
+// Briar: "During this turn, if your opponent's Active Pokémon is Knocked Out by damage from an attack
+// used by your Tera Pokémon, take 1 more Prize card." reduce/knockout.mjs reads the flag (cleared
+// when the turn passes).
+function turnKoPrizeBonus(ctx) {
+  const { player } = ctx;
+  if (!player.flags) player.flags = {};
+  player.flags.briarActive = true;
+  ctx.events.push({ type: 'koPrizeBonusSet', playerId: player.playerId });
+  return null;
+}
+
 // Koga gym2-19: the reducer applies the condition after this turn's attack damages the Defending
 // Pokémon (flags are cleared when the turn passes).
 function turnAttackRider(ctx) {
@@ -6593,6 +6651,9 @@ export const EXTRA_STEP_HANDLERS = {
   moveAllEnergy,
   powersOff,
   benchAttackShield,
+  shieldOwnPokemon,
+  poisonedCannotRetreat,
+  turnKoPrizeBonus,
   turnAttackRider,
   freeEvolve,
   energyAttachPlan,

@@ -29,7 +29,7 @@ import {
 import {
   resolveSpecialEnergyDiscard, resolveSpecialEnergyKnockout,
 } from '../effects/special-energy.mjs';
-import { isStadiumLostCity } from '../rules/stadium-effects.mjs';
+import { isStadiumLostCity, parseStadiumHpModifier } from '../rules/stadium-effects.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { addCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
@@ -437,11 +437,10 @@ export function handleKnockout(
     }
   }
 
-  if (attacker?.flags?.briarActive) {
-    const victimIsEx = isExCard(victim);
-    if (victimIsEx && attackerActive && isTeraCard(attackerActive)) {
-      prizeCount += 1;
-    }
+  // Briar (Prismatic Evolutions 100, pkmncards): the opponent's Active, not only an ex, Knocked Out by
+  // damage from an attack used by the player's Tera Pokémon.
+  if (attacker?.flags?.briarActive && koByOpponentAttack && wasActive && attackerActive && isTeraCard(attackerActive)) {
+    prizeCount += 1;
   }
 
   // Ribombee Plentiful Pollen: a `prizeBonus` marker on the victim pays its printed count
@@ -1183,6 +1182,24 @@ export function settlePrizeEntitlements(draft, { events }) {
     },
   });
   events.push({ type: 'prizeChoiceRequested', playerId, count });
+}
+
+/**
+ * A Stadium that takes HP away (Gravity Mountain: "Each Stage 2 Pokémon in play gets -30 HP") can leave a
+ * damaged Pokémon with as many counters as its new HP: queue every damaged Pokémon in play for the
+ * HP check resolveDamageCounterKnockouts runs next.
+ */
+export function markStadiumHpLossKnockouts(draft, { events }) {
+  const stadium = draft.stadium?.card || draft.stadium || null;
+  if (!stadium || parseStadiumHpModifier(stadium) >= 0) return;
+  for (const player of Object.values(draft.players || {})) {
+    for (const zone of [player.zones?.active || [], player.zones?.bench || []]) {
+      for (const root of zone) {
+        if (root.attachedTo || !(root.damage > 0)) continue;
+        events.push({ type: 'damageCountersPlaced', instanceId: root.instanceId });
+      }
+    }
+  }
 }
 
 /**
