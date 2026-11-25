@@ -223,7 +223,7 @@ test('clock transport arms one timer for the running bank and fires the flag', (
   assert.equal(transport.hasTimer('clock-room'), false);
 });
 
-test('room: each card played from hand adds 6 s once per turn; discards add nothing', () => {
+test('room: each card played from hand adds 3 s once per turn; discards add nothing', () => {
   const { room, advance } = roomInPlay();
   const hand = room.state.players.p1.zones.hand;
   const [first, second, third] = [901, 902, 903];
@@ -234,12 +234,12 @@ test('room: each card played from hand adds 6 s once per turn; discards add noth
 
   advance(10_000);
   assert.equal(move(first, 'bench', 0).success, true); // first command in play arms the clock
-  assert.equal(bank(), CLOCK_BANK_MS + 6_000);
+  assert.equal(bank(), CLOCK_BANK_MS + 3_000);
   advance(5_000);
   assert.equal(move(second, 'discard', 1).success, true);
-  assert.equal(bank(), CLOCK_BANK_MS + 6_000 - 5_000);
+  assert.equal(bank(), CLOCK_BANK_MS + 3_000 - 5_000);
   assert.equal(move(third, 'bench', 2).success, true);
-  assert.equal(bank(), CLOCK_BANK_MS + 12_000 - 5_000);
+  assert.equal(bank(), CLOCK_BANK_MS + 6_000 - 5_000);
 });
 
 test('creditCardPlay credits a card once per turn and never to a bank at 0:00', () => {
