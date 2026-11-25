@@ -11,6 +11,7 @@ import { isAbilitySuppressed, sideContextFor } from '../rules/ability-combat.mjs
 import { resolveAttachedEnergyType } from '../rules/energy-effects.mjs';
 import { pokemonHasType } from '../effects/trainer-steps.mjs';
 import { liveAttackMarkers } from '../rules/attack-markers.mjs';
+import { replaceSelfName } from '../rules/attack-text.mjs';
 import { effectiveHp, isStadiumToolNegation } from '../rules/stadium-effects.mjs';
 import { attachedToolMarkers, toolTypeOverride } from '../rules/tool-combat.mjs';
 import { isGxCard, isVstarCard } from '../rules/card-classify.mjs';
@@ -53,11 +54,29 @@ export function activeAttackMarkers(draft, playerId, card) {
       sourceZoneCards: draft.players[otherId]?.zones?.active || [],
     }),
     ...restOfGameMarkers(draft, playerId, card),
+    ...usedAttackVulnerability(draft, card),
     // I224: PlusPower / Defender / Magnifier attached to it, read as the same marker kinds.
     ...attachedTrainerMarkers(active, card),
     // Head Ringer / Jamming Net: its Tools tax its own attacks (Jamming Tower switches them off).
     ...(isStadiumToolNegation(draft.stadium?.card || draft.stadium || null) ? [] : attachedToolMarkers(active, card)),
   ];
+}
+
+// Carracosta Shell Smash (customcheck-014): "This Pokémon takes 20 more damage from attacks for each
+// time you have used this attack" lasts while the Pokémon stays in play, so it is read from the
+// printed attack and the uses reduce/attack.mjs counted rather than from a timed marker.
+const USED_ATTACK_VULNERABILITY = /this pok[ée]mon takes (\d+) more damage from attacks for each time you have used this attack/;
+
+function usedAttackVulnerability(draft, card) {
+  const uses = card?.attackUses;
+  if (!uses) return [];
+  const view = inPlayView(draft, card);
+  return (view?.attacks || []).flatMap((attack) => {
+    const text = replaceSelfName(String(attack?.text ?? attack?.effect ?? '').replace(/[‘’]/g, "'"), view.name).toLowerCase();
+    const per = USED_ATTACK_VULNERABILITY.exec(text)?.[1];
+    const count = uses[attack.name] || 0;
+    return per && count > 0 ? [{ kind: 'incomingBonus', amount: Number(per) * count, afterWR: true }] : [];
+  });
 }
 
 // "For the rest of this game, …" (design 036 E) read as the marker kinds the damage path knows:

@@ -28,6 +28,12 @@ const nameOf = (instanceId, resolveName) => {
   return resolveName(instanceId) || null;
 };
 
+// The engine names an evolved Pokémon by its Basic's id, so the registry would answer with the
+// Basic; the event carries the card on top of the stack (shared/engine/rules/shown-pokemon.mjs).
+const withShownNames = (event, resolveName) => (instanceId) =>
+  event.pokemonNames?.[instanceId] ||
+  (typeof resolveName === 'function' ? resolveName(instanceId) : null);
+
 /**
  * Chat lines for one advisory server event, from this client's point of view.
  *
@@ -43,6 +49,7 @@ export function serverBattleLogLines(event, selfPlayerId, resolveName, names = n
   if (!event || typeof event !== 'object' || typeof event.type !== 'string') {
     return [];
   }
+  resolveName = withShownNames(event, resolveName);
   if (ATTACK_EVENT_TYPES.has(event.type)) {
     return attackAnnouncementLines(event, selfPlayerId, resolveName, names);
   }

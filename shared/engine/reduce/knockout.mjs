@@ -928,6 +928,62 @@ export function settleToolEnergyBenchMoves(draft) {
   }
 }
 
+export const ATTACKER_ENERGY_HAND_EFFECT = 'attackerEnergyToHand';
+
+/** The Energy cards still attached to the Attacking Pokémon `attackerId` (in play), or []. */
+function attackerEnergyCards(draft, { ownerId, attackerId }) {
+  const ref = findCard(draft, attackerId);
+  if (!ref || ref.playerId !== ownerId || (ref.zoneId !== 'active' && ref.zoneId !== 'bench')) return [];
+  return (ref.player.zones[ref.zoneId] || []).filter((c) => c.attachedTo === attackerId && isEnergy(c));
+}
+
+/** Puts `energyId`, if still on the Attacking Pokémon, into its owner's hand. */
+export function returnAttackerEnergyToHand(draft, { move, energyId, events }) {
+  const energy = attackerEnergyCards(draft, move).find((c) => c.instanceId === energyId);
+  if (!energy) return false;
+  const ref = findCard(draft, energy.instanceId);
+  const zone = ref.player.zones[ref.zoneId];
+  zone.splice(zone.indexOf(energy), 1);
+  energy.attachedTo = null;
+  draft.players[move.ownerId].zones.hand.push(energy);
+  events.push({ type: 'cardMoved', instanceId: energy.instanceId, from: 'inPlay', to: 'hand', playerId: move.ownerId, source: move.source });
+  return true;
+}
+
+/**
+ * Lugia ex Silver Sparkle (customhb-872): "choose an Energy card attached to the Attacking Pokémon
+ * and return it to your opponent's hand". Queued by the attack on heads, asked at the command tail
+ * (after the Knock Out of the holder settles); a single Energy card needs no choice.
+ */
+export function settleAttackerEnergyToHand(draft, { events }) {
+  if (draft.pendingChoice) return;
+  const pending = draft.__attackerEnergyToHand;
+  delete draft.__attackerEnergyToHand;
+  if (isGameConcluded(draft) || !Array.isArray(pending)) return;
+  const remaining = [...pending];
+  while (remaining.length > 0) {
+    const move = remaining.shift();
+    const options = attackerEnergyCards(draft, move);
+    if (options.length === 0) continue;
+    if (options.length === 1) {
+      returnAttackerEnergyToHand(draft, { move, energyId: options[0].instanceId, events });
+      continue;
+    }
+    draft.pendingChoice = createPendingChoice({
+      player: move.chooserId,
+      source: move.source,
+      prompt: `${move.source}: choose an Energy card attached to the Attacking Pokémon to return to your opponent's hand`,
+      options,
+      min: 1,
+      max: 1,
+      cancellable: false,
+      stateVersion: draft.stateVersion,
+      resumeToken: { effectType: ATTACKER_ENERGY_HAND_EFFECT, initiatorPlayerId: move.chooserId, move, remaining },
+    });
+    return;
+  }
+}
+
 export function settleKoEnergyMoves(draft, { events }) {
   if (draft.pendingChoice) return;
   // A finished game resolves nothing more (the last Pokémon's Knock Out ended it).

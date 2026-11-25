@@ -109,7 +109,21 @@ function deckFor(pfx) {
     tool('Tool Card')
   );
   out.push(energy('Fire'), energy('Water'), energy('Lightning'));
+  // "Search your deck for a Special Energy card" (Primal Turbo): a Basic Energy never answers it.
+  // Last in the deck so the cards drawn from the top do not move.
+  out.push(
+    mk({ name: 'Probe Special Energy', supertype: 'Energy', subtypes: ['Special'], type: 'Energy' }),
+    mk({ name: 'Probe Special Energy', supertype: 'Energy', subtypes: ['Special'], type: 'Energy' })
+  );
   return out;
+}
+
+const NAMED_ITEM_SEARCH = /\bitem(?: cards?)? (?:that has|that have|with)\s*(?:the word )?["“”]([^"“”]+)["“”] in (?:its|their) names?/i;
+
+/** The quoted name word of an Item search in the holder's Ability text, or null. */
+function namedItemWord(card) {
+  const text = (card?.abilities || []).map((a) => a?.text || '').join(' ');
+  return NAMED_ITEM_SEARCH.exec(text)?.[1]?.trim() || null;
 }
 
 /**
@@ -182,6 +196,12 @@ export function buildState(holder, holderZone) {
     // its filtered search finds nothing and the row reads as a dropped clause.
     const owner = own ? String(holder().name || '').match(/^(.+?)'s /)?.[1] : null;
     if (owner) z.deck.push(mon(`${owner}'s Deckmate`));
+    // "an Item that has “Antique” in its name" (Relicanth Antique Search, customhb-890): the same
+    // for a name-word Item search the stock deck cannot meet (Great Ball already meets "Ball").
+    const itemWord = own ? namedItemWord(holder()) : null;
+    if (itemWord && !z.deck.some((c) => c.name.toLowerCase().includes(itemWord.toLowerCase()))) {
+      z.deck.push(trainer(`${itemWord} Deckmate`, 'Item'));
+    }
     z.hand.push(
       energy('Fire'),
       trainer('Hand Item', 'Item'),
@@ -261,6 +281,7 @@ export function snapshot(state) {
       (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
     ),
     winner: state.winner,
+    stadiumId: state.stadium?.instanceId ?? null,
     // Player-scoped effects no card carries, so a per-card diff alone cannot see them: play
     // locks ("can't play Item cards"), Iron Rule attack locks, Bench traps, forced-tails coins.
     playerLocks: ['p1', 'p2'].map((pid) => {
@@ -315,6 +336,7 @@ export function diffTags(before, after, events) {
     if (/knock|KO/i.test(e.type)) tags.add('ko');
     if (e.type === 'effectStepSkipped') tags.add(`skipped:${e.reason}`);
     if (e.type === 'abilityUsed') tags.add('ability-used');
+    if (e.type === 'deferredHealScheduled') tags.add(`${role(e.playerId)}:deferred-heal`);
     // A turn-scoped damage boost lives on the turn flags, not on any card.
     if (e.type === 'turnDamageBonus') tags.add(`${role(e.playerId)}:turn-bonus`);
   }
@@ -328,6 +350,7 @@ export function diffTags(before, after, events) {
       tags.add(`${role(pid)}:deck-reordered`);
     }
   });
+  if (before.stadiumId !== after.stadiumId) tags.add('stadium-changed');
   if (after.winner && !before.winner) tags.add('game-won');
   return tags;
 }

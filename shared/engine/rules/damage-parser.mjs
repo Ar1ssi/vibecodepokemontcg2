@@ -823,7 +823,9 @@ export function parseAttackDamage(
     // Prize-count comparisons are conditional bonuses (attack-conditions.mjs), not per-Prize scaling.
     !/\b(?:more|fewer|less) prize cards? remaining than\b/.test(text) &&
     // "If your opponent has exactly 6 Prize cards remaining" (customhb Kartana Divine Paper) is a condition too.
-    !/\b\d+ prize cards? (?:remaining|left)\b/.test(text)
+    !/\b\d+ prize cards? (?:remaining|left)\b/.test(text) &&
+    // "If your opponent has not taken any Prize cards" (Archeops Undefeated) is a condition too.
+    !/\bhas (?:not )?taken any prize cards?\b/.test(text)
   ) {
     const per = amount(text, /(\d+) more damage|does (\d+) damage/);
     total = base + per * opponentPrizes;
@@ -1135,7 +1137,8 @@ export function parseAttackDamage(
   // counter(s)" removes N × 10. The target (attacker / defender / all) is resolved
   // separately by healTarget().
   const healRe = /(?:heal|remove) (?:up to )?(\d+) damage( counters?)?/;
-  const healMatch = text ? healRe.exec(text) : null;
+  // "At the end of your next turn, heal 100 damage …" (Jirachi Wish) is atkDeferredActiveHeal.
+  const healMatch = text && !/\bat the end of your next turn, heal \d+ damage/.test(text) ? healRe.exec(text) : null;
   if (healMatch) {
     heal = amount(text, healRe) * (healMatch[2] ? 10 : 1);
     if (heal > 0) components.push('heal');

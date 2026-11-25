@@ -397,7 +397,14 @@ export function rootMatchesTarget(player, root, target = '') {
   if (/\bpok[eé]mon v\b/.test(t) && !isVCard(top)) return false;
   // "your {P} Pokémon and {M} Pokémon" (X-Boot): a Pokémon of any listed type.
   const typed = [...t.matchAll(/\{([a-z])\}/g)].map((m) => m[1]).filter((letter) => letter !== 'c');
-  if (typed.length > 0) return typed.some((letter) => pokemonHasType(top, letter));
+  // Archeops Primal Turbo (customcheck-017): "your {C} Pokémon" is the Colorless type, not any Pokémon.
+  const wantsColorless = /\{c\}\s+pok[eé]mon/.test(t);
+  if (typed.length > 0 || wantsColorless) {
+    return (
+      typed.some((letter) => pokemonHasType(top, letter)) ||
+      (wantsColorless && (top.types || []).some((type) => String(type).toLowerCase() === 'colorless'))
+    );
+  }
   return true;
 }
 
@@ -1469,6 +1476,15 @@ function returnOwnAttachedEnergy(ctx) {
 // Celadon City Gym: discard an Energy attached to a qualifying Pokémon to cure it.
 // `selfOnly`: an Ability's cost from its own Pokémon (Goodra Gooey Regeneration; `special`:
 // Porygon-Z-GX Troubleshooting).
+// Basic Energy carries its type in the printed name; some printings also set `types` (the same
+// reading as executor.mjs matchesEnergyTypeFilter, which this module cannot import).
+function energyMatchesTypes(card, energyTypes) {
+  if (!Array.isArray(energyTypes) || energyTypes.length === 0) return true;
+  const name = String(card?.name || '').toLowerCase();
+  const types = (Array.isArray(card?.types) ? card.types : []).map((t) => String(t).toLowerCase());
+  return energyTypes.some((type) => types.includes(type) || name.includes(type));
+}
+
 function discardOwnAttachedEnergy(ctx) {
   const { player, step } = ctx;
   const nameFilter = String(step.nameContains || '').toLowerCase();
@@ -1483,7 +1499,13 @@ function discardOwnAttachedEnergy(ctx) {
   );
   const attached = hosts
     .flatMap((root) => attachedCards(player, root.instanceId))
-    .filter((card) => isEnergy(card) && (!step.special || isSpecialEnergy(card)));
+    .filter(
+      (card) =>
+        isEnergy(card) &&
+        (!step.special || isSpecialEnergy(card)) &&
+        (!step.basicOnly || isBasicEnergy(card)) &&
+        energyMatchesTypes(card, step.energyTypes)
+    );
 
   const applyDiscard = (energy) => {
     const host = hosts.find((root) => root.instanceId === energy.attachedTo);
@@ -3126,9 +3148,9 @@ function discardOwnBenchPokemon(ctx) {
   if (bench.length === 0) return skip(ctx, 'no_matching_bench');
   const count = Math.min(step.count || 1, bench.length);
   return ctx.ask({
-    prompt: `${sourceName(ctx, 'Trainer')}: Choose up to ${count} Benched Pokémon to discard`,
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose ${step.required ? '' : 'up to '}${count} Benched Pokémon to discard`,
     options: bench,
-    min: 0,
+    min: step.required ? count : 0,
     max: count,
   });
 }

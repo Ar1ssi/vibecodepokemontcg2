@@ -30,6 +30,7 @@ import {
   healBlockedByAbility,
   abilityMirrorCounter,
   abilityDamagedOwnBenchCounters,
+  abilityDamagedReturnsAttackerEnergy,
   abilityLostZoneKnockouts,
 } from '../rules/ability-combat.mjs';
 import { isExCard, isGxCard } from '../rules/card-classify.mjs';
@@ -671,7 +672,13 @@ export function resolveAttackEffectPhase(draft, ctx) {
     ? events
         .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
         .reduce((total, e) => total + e.cards.length, 0)
-    : undefined;
+    : // "Put any number of Basic Energy cards from your hand into the Lost Zone. This attack does 50
+      // damage for each card you discarded in this way": the Lost Zone move is the counted discard.
+      attackSteps.before.some((step) => step.countsForDamage && step.type === 'atkLostZoneFromHand')
+      ? events
+          .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
+          .reduce((total, e) => total + e.count, 0)
+      : undefined;
   const lostZoned = ctx.lostZoned ?? attackSteps.before.some((step) => step.countsForDamage)
     ? events
         .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
@@ -1273,6 +1280,19 @@ export function resolveAttackEffectPhase(draft, ctx) {
             }
             for (const cond of lands ? onDamageStatus.conditions : []) {
               if (addCondition(atkRef.card, cond)) events.push(conditionsUpdatedEvent(atkRef.card, cond));
+            }
+          }
+
+          // Lugia ex Silver Sparkle: on heads, the holder's owner returns an Energy card from the
+          // Attacking Pokémon to its owner's hand — picked at the command tail (settleAttackerEnergyToHand).
+          if (abilityDamagedReturnsAttackerEnergy(defenderView, defenderSide)) {
+            const face = flipCoin(activeRng);
+            events.push({ type: 'coinFlipped', playerId: defenderPlayerId, face, source: defenderView.name });
+            if (face === 'heads') {
+              draft.__attackerEnergyToHand = [
+                ...(draft.__attackerEnergyToHand || []),
+                { chooserId: defenderPlayerId, ownerId: playerId, attackerId: attacker.instanceId, source: defenderView.name },
+              ];
             }
           }
 

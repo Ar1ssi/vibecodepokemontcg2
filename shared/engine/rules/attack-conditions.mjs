@@ -27,6 +27,7 @@
  */
 
 import { escapeRegExp, normalizeAttackText } from './attack-text.mjs';
+import { prizesTakenFor } from '../formats.mjs';
 
 const STATUS_WORDS = {
   asleep: 'Asleep',
@@ -208,7 +209,10 @@ const CLAUSES = [
   [/^you do$/, () => ({ desc: { kind: 'optionalCostPaid' }, printedNegated: false })],
   // ── Stadium ────────────────────────────────────────────────────────────────
   [/^there is no stadium(?: card)? in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: false })],
-  [/^there is any stadium card in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: true })],
+  [
+    /^(?:there is (?:a|any) stadium(?: card)? in play|a stadium(?: card)? is in play)$/,
+    () => ({ desc: { kind: 'noStadium' }, printedNegated: true }),
+  ],
   [/^you don't have a stadium card in play$/, () => ({ desc: { kind: 'noStadium' }, printedNegated: false })],
 
   // ── Hand size ──────────────────────────────────────────────────────────────
@@ -740,6 +744,15 @@ const CLAUSES = [
   ],
 
   // ── Prizes ─────────────────────────────────────────────────────────────────
+  // Archeops Undefeated (customcheck-009): "If your opponent has not taken any Prize cards".
+  [
+    /^your opponent has not taken any prize cards?$/,
+    () => ({ desc: { kind: 'opponentPrizesTaken', op: 'eq', n: 0 }, printedNegated: false }),
+  ],
+  [
+    /^your opponent has taken any prize cards?$/,
+    () => ({ desc: { kind: 'opponentPrizesTaken', op: 'gt', n: 0 }, printedNegated: false }),
+  ],
   [
     /^your opponent doesn't have exactly (\d+) or (\d+) prize cards? remaining$/,
     (m) => ({
@@ -1175,6 +1188,8 @@ const CHECKS = {
   benchHasName: (cond, ctx) => list(cond.names).every((name) => list(ctx.benchNames).some((actual) => nameMatches(actual, name))),
   inPlayHasName: (cond, ctx) => list(cond.names).every((name) => list(ctx.ownInPlayNames).some((actual) => nameMatches(actual, name))),
   opponentPrizes: (cond, ctx) => compare(num(ctx.opponentPrizes), cond.op, cond.n),
+  opponentPrizesTaken: (cond, ctx) =>
+    compare(prizesTakenFor(ctx.opponentPrizes, ctx.opponentDeckFormat), cond.op, cond.n),
   ownPrizes: (cond, ctx) => compare(num(ctx.ownPrizes), cond.op, cond.n),
   opponentHandCount: (cond, ctx) => compare(num(ctx.opponentHandCount), cond.op, cond.n),
   attackerEnergyType: (cond, ctx) => energyCheck(cond, ctx),

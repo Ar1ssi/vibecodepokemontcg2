@@ -16,7 +16,7 @@ import { buildServerAttackContext } from '../rules/attack-damage-context.mjs';
 import { evaluateToolKoPrevention, isExCard, isTeraCard, attackerTypes, TYPE_LETTER } from '../rules/tool-combat.mjs';
 import { cardAbilityText } from '../rules/ability-executors.mjs';
 import {
-  abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers,
+  abilityDamageBonus, abilityDamageReduction, abilityDamagePrevention, abilityLegacyDamageModifiers, isTeamWideDamageShield,
   abilityPreventsAttackEffects, sideContextFor, powersOffActive, abilityWeaknessOverride,
   abilityIgnoresDefenderEffects, abilityExtraTypes, isAbilitySuppressed,
   abilityIgnoresResistance, abilityIgnoresWeakness, abilityIgnoresDefenderAbilities, abilityIgnoresAttackerBoosts, abilityFlipPreventsAttackDamage,
@@ -43,8 +43,19 @@ import {
 } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
 
+// Groups: 1 "by attacks" (opponent's attacks only unless group 2 follows), 2 "(both yours and your
+// opponent's)". Iron Armor (custom set) prints neither: "prevent all damage done to it" stops the
+// Pokémon's own side's attacks too.
 const SELF_BENCH_SHIELD =
-  /as long as this pok[eé]mon is on your bench, prevent all damage done to this pok[eé]mon by attacks/;
+  /as long as this pok[eé]mon is on your bench, prevent all damage done to (?:this pok[eé]mon|it)( by attacks)?(\s*\(both yours and your opponent's\.?\))?/;
+
+const ENERGY_CONDITION_SHIELD =
+  /if your opponent's active pok[eé]mon has any \{[a-z]\} energy attached, prevent all damage done to this pok[eé]mon/;
+
+function benchSelfShieldStops(text, ownAttack) {
+  const match = SELF_BENCH_SHIELD.exec(text);
+  return Boolean(match) && (!ownAttack || !match[1] || Boolean(match[2]));
+}
 
 /**
  * Applies damage to one benched Pokémon: counters, event, and KO through handleKnockout
@@ -62,6 +73,9 @@ export function damageBenchedPokemon(
     ownAttack = false,
     countersPlaced = false,
     ignoreDefenderEffects = false,
+    // The caller already read the defending side's Abilities into `dealt` (Alpha Rage's
+    // controlled attack, with the controlled Pokémon as the attacker).
+    abilityShieldsApplied = false,
     activeRng = null,
     events,
   }
@@ -122,11 +136,28 @@ export function damageBenchedPokemon(
   // Plume Protection).
   const victimView = inPlayView(draft, victim);
   if (
-    !ownAttack &&
-    SELF_BENCH_SHIELD.test(cardAbilityText(victimView)) &&
+    benchSelfShieldStops(cardAbilityText(victimView), ownAttack) &&
     !isAbilitySuppressed(victimView, abilitySideContext(draft, victimPlayerId))
   ) {
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'bench-self-shield' });
+    return;
+  }
+
+  // Orthworm Earth Eater (custom set): the shield that holds while the attacker has {F} Energy
+  // attached covers the holder on the Bench too.
+  const striker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  if (
+    !ownAttack &&
+    striker &&
+    ENERGY_CONDITION_SHIELD.test(cardAbilityText(victimView)) &&
+    abilityDamagePrevention(victimView, inPlayView(draft, striker) || striker, {
+      ...abilitySideContext(draft, victimPlayerId),
+      zone: 'bench',
+      isActive: false,
+      attackerIsActive: true,
+    }).preventAll
+  ) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
     return;
   }
 
@@ -182,6 +213,14 @@ export function damageBenchedPokemon(
       reason: 'attack-marker',
     });
     return;
+  }
+
+  if (!ownAttack && !countersPlaced && !ignoreDefenderEffects && !abilityShieldsApplied) {
+    dealt = benchAbilityShieldedDamage(draft, { victim, victimPlayerId, attackerPlayerId, dealt });
+    if (dealt <= 0) {
+      events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
+      return;
+    }
   }
 
   // Defender (base1-80) on a Benched Pokémon: "Damage done to that Pokémon by attacks is reduced
@@ -675,7 +714,7 @@ function activeTargetDamage(draft, { ref, clause, attackerPlayerId, attackName }
  */
 export function attackAbilityReads(
   draft,
-  { attacker, defender, playerId, defenderPlayerId, defenderIsActive = true }
+  { attacker, defender, playerId, defenderPlayerId, defenderIsActive = true, holderFilter = null }
 ) {
   const attackerZones = draft.players[playerId]?.zones || {};
   const defenderZones = draft.players[defenderPlayerId]?.zones || {};
@@ -713,6 +752,7 @@ export function attackAbilityReads(
     opponentBench: attackerZones.bench || [],
     zone: 'active',
     isActive: defenderIsActive,
+    ...(holderFilter ? { holderFilter } : {}),
     attackerIsActive: true,
     attackerIsEx: isExCard(attacker),
     turnNumber: draft.turn?.number,
@@ -752,6 +792,28 @@ export function attackAbilityReads(
     ignoresDefenderAbilities,
     ignoresAttackerBoosts,
   };
+}
+
+// The victim side's team-wide Ability shields read for a Benched victim (Bastiodon Ancient Bulwark
+// "prevent all damage done to each of your Pokémon by attacks …", customhb-874; Primal Fortress
+// "Your Pokémon take 30 less damage from attacks …", customhb-875). Only the unqualified "your
+// Pokémon" wordings (isTeamWideDamageShield): the kind-, type- and self-scoped readers are not yet
+// exact enough to reach the Bench. Bench damage has no Weakness or Resistance, so a before- and an
+// after-W/R reduction both come off.
+function benchAbilityShieldedDamage(draft, { victim, victimPlayerId, attackerPlayerId, dealt }) {
+  const striker = rootsIn(draft.players[attackerPlayerId]?.zones?.active)[0];
+  if (!striker) return dealt;
+  const reads = attackAbilityReads(draft, {
+    attacker: inPlayView(draft, striker),
+    defender: inPlayView(draft, victim),
+    playerId: attackerPlayerId,
+    defenderPlayerId: victimPlayerId,
+    defenderIsActive: false,
+    holderFilter: isTeamWideDamageShield,
+  });
+  if (reads.abilityPrevention.preventAll) return 0;
+  const reduction = reads.abilityReductionBeforeWR + reads.abilityReductionAfterWR + (reads.abilityPrevention.reduceHp || 0);
+  return Math.max(0, dealt - reduction);
 }
 
 // A side-wide marker on the victim's Active (M Diancie-EX Diamond Force) guards the Bench too.

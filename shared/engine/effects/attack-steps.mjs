@@ -448,13 +448,21 @@ function moveEnergyEnds(ctx) {
     }
     case 'opponentActive': {
       const active = activeOf(opponent);
-      const toOwn = step.to === 'own' || step.to === 'ownBench';
+      const toSelf = step.to === 'self';
+      const toOwn = toSelf || step.to === 'own' || step.to === 'ownBench';
       return {
         owner: opponent,
-        // Harvesting Scythe: the Energy lands on one of the attacker's own Pokémon.
+        // Harvesting Scythe: the Energy lands on one of the attacker's own Pokémon; Orthworm Earth
+        // Eater: on the Pokémon using it.
         ...(toOwn ? { targetOwner: player } : {}),
         energies: active ? removableEnergy(ctx, opponent, attachedCards(opponent, active.instanceId).filter(matches)) : [],
-        targets: !toOwn ? benchRootsOf(opponent) : step.to === 'ownBench' ? benchRootsOf(player) : rootsOf(player),
+        targets: toSelf
+          ? [attacker].filter(Boolean)
+          : !toOwn
+            ? benchRootsOf(opponent)
+            : step.to === 'ownBench'
+              ? benchRootsOf(player)
+              : rootsOf(player),
       };
     }
     case 'opponentAny':
@@ -2215,12 +2223,14 @@ function atkLostZoneFromDiscard(ctx) {
 /** Hand cards an `atkLostZoneFromHand` step may take (Absol Vicious Claw: Pokémon only). */
 export function handCardsForLostZone(player, step) {
   const hand = player?.zones?.hand || [];
+  if (step.what === 'energy') return hand.filter((card) => energyMatches(card, step));
   return step.what === 'pokemon' ? hand.filter(isPokemon) : hand;
 }
 
 function atkLostZoneFromHand(ctx) {
   const { player, step } = ctx;
-  return lostZoneChoice(ctx, player, handCardsForLostZone(player, step), step.what === 'pokemon' ? 'Pokémon' : 'cards');
+  const label = step.what === 'pokemon' ? 'Pokémon' : step.what === 'energy' ? `${energyLabel(step)} cards` : 'cards';
+  return lostZoneChoice(ctx, player, handCardsForLostZone(player, step), label);
 }
 
 function atkLostZoneOppHandRandom(ctx) {
@@ -3957,6 +3967,20 @@ function atkDeferredActiveDamage(ctx) {
   return null;
 }
 
+// Jirachi Wish (custom set): "At the end of your next turn, heal 100 damage from your Active
+// Pokémon." Lives on the attacker, not a card: whichever Pokémon is Active then is healed
+// (turn.mjs applyDeferredActiveHeal).
+function atkDeferredActiveHeal(ctx) {
+  const { player } = ctx;
+  const atTurn = (ctx.draft.turn?.number || 1) + 2;
+  player.deferredActiveHeal = [
+    ...(player.deferredActiveHeal || []),
+    { atTurn, amount: ctx.step.amount, sourceAttack: attackName(ctx) },
+  ];
+  ctx.events.push({ type: 'deferredHealScheduled', playerId: player.playerId, atTurn, amount: ctx.step.amount });
+  return null;
+}
+
 // Dialga-GX Timeless-GX / Togepi & Cleffa & Igglybuff-GX Supreme Puff-GX: the attack tail
 // consumes `flags.extraTurn` and advances the turn to the same player without a checkup.
 function atkTakeAnotherTurn(ctx) {
@@ -5288,6 +5312,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkOppAttackLock,
   atkFreezeBoth,
   atkDeferredActiveDamage,
+  atkDeferredActiveHeal,
   atkTakeAnotherTurn,
   atkShuffleOppAllBench,
   atkBothDrawUntil,

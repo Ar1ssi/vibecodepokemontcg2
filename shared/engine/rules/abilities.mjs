@@ -107,6 +107,9 @@ const typeChangeText = (t) =>
   /is both \{[a-z]\} and \{[a-z]\}/.test(t);
 
 const OPPONENT_ACTIVE_ENERGY_DISCARD = /when you play [^.]*from your hand to evolve[^.]*, you may discard an energy attached to your opponent's active pok[eé]mon/;
+// Orthworm Earth Eater (custom set): the Energy goes onto the holder, not to the opponent's Bench or
+// between your own Pokémon, so neither move-Energy reading below may take it; the attack templates do.
+const OPPONENT_ENERGY_TO_SELF = /from your opponent's active pok[eé]mon to this pok[eé]mon/;
 // Mawile Energy Crunch (HB 160): played onto the Bench, one Energy from any of the opponent's Pokémon.
 const OPPONENT_ANY_ENERGY_DISCARD = /when you play [^.]*from your hand (?:on)?to your bench[^.]*, you may discard (?:1|an?) energy from 1 of your opponent's pok[eé]mon/;
 
@@ -367,6 +370,9 @@ export function parseAbilitySearchParams(lower) {
   const typedEnergy = lower.match(/basic\s+(\{[a-z]\})\s+energy/);
   if (typedEnergy) {
     what = `Basic ${typedEnergy[1].toUpperCase()} Energy`;
+  } else if (/\bspecial energy\b/.test(scope)) {
+    // Archeops Primal Turbo (customcheck-017): "a Special Energy card" never matches a Basic Energy.
+    what = 'Special Energy';
   } else if (/\{[a-z]\} energy/.test(scope)) {
     // "search your deck for up to 2 {G} Energy cards" (Rillaboom Voltage Beat)
     what = `${scope.match(/(\{[a-z]\}) energy/)[1].toUpperCase()} Energy`;
@@ -408,7 +414,7 @@ export function parseAbilitySearchParams(lower) {
   }
 
   const nameWord = scope.match(NAME_WORD_CLAUSE)?.[0];
-  if (nameWord && what) what = `${what}${nameWord.startsWith(' ') ? '' : ' '}${nameWord.trim()}`;
+  if (nameWord && what) what = `${what} ${nameWord.trim()}`;
 
   if (!upTo) {
     const upToM = lower.match(/up to\s+(\d+)/);
@@ -604,11 +610,39 @@ function withIfYouDoHalves(lower, parsed) {
     ];
   }
 
+  // Iono's Kilowattrel Flashing Draw: "You must discard a Basic {L} Energy from this Pokémon in
+  // order to use this Ability." The attached-Energy discard is the cost of the draw that follows.
+  const mustDiscardOwn = lower.match(
+    new RegExp(`you must discard an? (basic )?((?:\\{[a-z]\\}|[a-z]+) )?energy(?: card)? from ${SELF} in order to use this ability`)
+  );
+  if (mustDiscardOwn) {
+    const energyType = mustDiscardOwn[2] ? parseEnergyTypeHint(mustDiscardOwn[2]) : null;
+    steps = [
+      {
+        type: 'discardOwnAttachedEnergy',
+        selfOnly: true,
+        cost: true,
+        ...(mustDiscardOwn[1] ? { basicOnly: true } : {}),
+        ...(energyType ? { energyTypes: [energyType] } : {}),
+        guidance: 'Discard an Energy from this Pokémon (cost).',
+      },
+      ...steps,
+    ];
+  }
+
   // Ampharos Unseen Flash: "put 2 {L} Energy cards from your hand in the Lost Zone. If you do".
   const lostCost = lower.match(/you may put (\d+) \{([a-z])\} energy cards? from your hand in the lost zone\. if you do/);
   if (lostCost) {
     steps = [
       { type: 'lostZoneCost', count: Number(lostCost[1]), energyType: PROVIDES_SYMBOL_TYPES[lostCost[2]] || null, cost: true, guidance: 'Put Energy from your hand in the Lost Zone (cost).' },
+      ...steps,
+    ];
+  }
+
+  // Tyrunt In Fighting (customcheck-012): the Benched Pokémon is the cost, so it runs before the draw.
+  if (/you may discard (?:a|1) benched pok[eé]mon and all cards attached to it in order to/.test(lower)) {
+    steps = [
+      { type: 'discardOwnBenchPokemon', count: 1, required: true, cost: true, guidance: 'Discard a Benched Pokémon and all cards attached to it (cost).' },
       ...steps,
     ];
   }
@@ -1007,6 +1041,7 @@ export function parseAbility(text = '') {
   if (
     !hasPromotionTrigger &&
     !lower.includes('knocked out') &&
+    !OPPONENT_ENERGY_TO_SELF.test(lower) &&
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     // Energy must be what moves: Adrena-Brain's "has any {D} Energy attached, … move
@@ -1969,6 +2004,7 @@ export function parseAbility(text = '') {
   if (
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
+    !OPPONENT_ENERGY_TO_SELF.test(lower) &&
     !steps.some((s) => s.type === 'moveEnergyAbility')
   ) {
     if (/from your opponent's active pok[eé]mon to/.test(lower)) {
