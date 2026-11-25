@@ -216,6 +216,35 @@ test('ability: Porygon-Z-GX Troubleshooting pays only with a Special Energy', ()
   assert.equal(holderCard(res).damage, 20);
 });
 
+// Iono's Kilowattrel, Ascended Heroes 072 (out/pkmn-pokemon-cards.json).
+const FLASHING_DRAW =
+  'You must discard a Basic {L} Energy from this Pokémon in order to use this Ability. Once during your turn, you may draw cards until you have 6 cards in your hand.';
+
+const withDeckAndHand = (state) => {
+  state.players.p1.zones.deck.push(...[1, 2, 3, 4, 5, 6, 7, 8].map((id) => mon(200 + id, `Deck ${id}`)));
+  state.players.p1.zones.hand.push(mon(210, 'Hand'));
+};
+
+test('ability: Kilowattrel Flashing Draw discards an attached Basic {L} Energy, then draws to 6', () => {
+  const { state, rng } = board(FLASHING_DRAW);
+  withDeckAndHand(state);
+  state.players.p1.zones.active.push(energy(60, 'Water', { attachedTo: 70 }), energy(61, 'Lightning', { attachedTo: 70 }));
+  const res = resolveAll(use70(state, rng), rng);
+  assert.equal(zoneOf(res, 'p1', 61), 'discard');
+  assert.equal(zoneOf(res, 'p1', 60), 'active');
+  assert.equal(res.state.players.p1.zones.hand.length, 6);
+});
+
+test('ability: Kilowattrel Flashing Draw draws nothing with no Basic {L} Energy attached', () => {
+  const { state, rng } = board(FLASHING_DRAW);
+  withDeckAndHand(state);
+  state.players.p1.zones.active.push(energy(60, 'Water', { attachedTo: 70 }), specialEnergy(62, { attachedTo: 70 }));
+  const res = resolveAll(use70(state, rng), rng);
+  assert.equal(zoneOf(res, 'p1', 60), 'active');
+  assert.equal(zoneOf(res, 'p1', 62), 'active');
+  assert.equal(res.state.players.p1.zones.hand.length, 1);
+});
+
 // Ampharos, Lost Thunder 78.
 const UNSEEN_FLASH =
   "Once during your turn (before your attack), you may put 2 {L} Energy cards from your hand in the Lost Zone. If you do, your opponent's Active Pokémon is now Paralyzed.";
