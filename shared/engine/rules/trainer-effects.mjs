@@ -2276,6 +2276,10 @@ function parseTrainerStepsInner(lower) {
     if (/if you do, you may move any amount of energy from the pokémon you moved to your bench to the new active pokémon/.test(lower)) {
       steps.push({ type: 'moveEnergyToNewActive' });
     }
+    // AZ's Tranquility (Chaos Rising): "If you moved a Pokémon ex to your Bench in this way, heal 80
+    // damage from that Pokémon." The heal runs only when the benched Pokémon is an ex.
+    const exHeal = lower.match(/if you moved a pok[ée]mon ex to your bench in this way, heal (\d+) damage from that pok[ée]mon/);
+    if (exHeal) steps.push({ type: 'healAmount', amount: Number(exHeal[1]), target: 'switchedOut', subtypes: ['ex'] });
     appendTrailingDraw(steps, lower);
     return { steps, recognizable: true };
   }

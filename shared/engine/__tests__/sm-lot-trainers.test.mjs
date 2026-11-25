@@ -353,3 +353,20 @@ test('Beast Energy ◇ (sm6-117): any type and 30 more damage, on an Ultra Beast
   assert.equal(attackWith(['Fighting'], beast), null);
   assert.equal(attackWith(['Colorless'], beast), 50);
 });
+
+// Text: AZ's Tranquility, Chaos Rising 076 (out/pkmn-trainer-cards.json).
+test("AZ's Tranquility heals 80 from the Pokémon moved to the Bench only when it is an ex", () => {
+  const card = () => trainer("AZ's Tranquility", 'Supporter', 'Switch your Active Pokémon with 1 of your Benched Pokémon. If you moved a Pokémon ex to your Bench in this way, heal 80 damage from that Pokémon.');
+  const run = (activeName, benchName) => play(card, (state) => {
+    Object.assign(state.players.p1.zones.active[0], { name: activeName, damage: 100 });
+    state.players.p1.zones.bench.push(mon(benchName, { damage: 100 }));
+  });
+  const ex = run('Active ex', 'Bench');
+  assert.equal(ex.error ?? null, null, ex.reason);
+  assert.equal(ex.state.players.p1.zones.active[0].name, 'Bench');
+  assert.equal(ex.state.players.p1.zones.bench.find((c) => c.name === 'Active ex').damage, 20);
+  const plain = run('Active', 'Bench ex');
+  assert.equal(plain.error ?? null, null, plain.reason);
+  assert.equal(plain.state.players.p1.zones.bench.find((c) => c.name === 'Active').damage, 100);
+  assert.equal(plain.state.players.p1.zones.active[0].damage, 100);
+});
