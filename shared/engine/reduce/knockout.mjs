@@ -5,7 +5,7 @@
  * reduce.mjs stays the public entry.
  */
 
-import { findCard, discardCardToPlayerZone } from '../state.mjs';
+import { findCard, discardCardToPlayerZone, moveStackBetweenZones } from '../state.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { prizeFilterMatches, prizeRuleBoxes } from '../rules/damage-parser.mjs';
@@ -644,13 +644,7 @@ export function promoteBenchToActive(draft, { playerId, instanceId, events }) {
   );
   if (!isRoot) return false;
 
-  for (let i = bench.length - 1; i >= 0; i--) {
-    const c = bench[i];
-    if (c.instanceId === instanceId || c.attachedTo === instanceId) {
-      bench.splice(i, 1);
-      active.push(c);
-    }
-  }
+  moveStackBetweenZones(bench, active, instanceId);
   const promoted = active.find((c) => c.instanceId === instanceId);
   if (promoted) promoted.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
   events.push({ type: 'pokemonPromoted', instanceId, playerId });

@@ -4,7 +4,7 @@
  * entry.
  */
 
-import { discardCardToPlayerZone } from '../state.mjs';
+import { discardCardToPlayerZone, moveStackBetweenZones } from '../state.mjs';
 import { isEnergy, getRetreatCostCount } from '../cards.mjs';
 import { flipCoin } from '../rng.mjs';
 import { expandEnergyEntries, canPayAttackCost } from '../rules/attack-engine.mjs';
@@ -247,27 +247,9 @@ export function applyRetreatSwap(
 
   if (active && benchPokemon) {
     // Move active + attachments to bench
-    for (let i = player.zones.active.length - 1; i >= 0; i--) {
-      const c = player.zones.active[i];
-      if (
-        c.instanceId === active.instanceId ||
-        c.attachedTo === active.instanceId
-      ) {
-        player.zones.active.splice(i, 1);
-        player.zones.bench.push(c);
-      }
-    }
+    moveStackBetweenZones(player.zones.active, player.zones.bench, active.instanceId);
     // Move benchPokemon + attachments to active
-    for (let i = player.zones.bench.length - 1; i >= 0; i--) {
-      const c = player.zones.bench[i];
-      if (
-        c.instanceId === benchPokemon.instanceId ||
-        c.attachedTo === benchPokemon.instanceId
-      ) {
-        player.zones.bench.splice(i, 1);
-        player.zones.active.push(c);
-      }
-    }
+    moveStackBetweenZones(player.zones.bench, player.zones.active, benchPokemon.instanceId);
 
     // Stadium on-switch triggers (Spikemuth: damage the Pokémon moving to the
     // Bench) run before the outgoing Pokémon's conditions are cleared.

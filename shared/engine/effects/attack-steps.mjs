@@ -10,7 +10,7 @@
  * Pure and DOM-free: randomness only through ctx.activeRng (Invariant 6).
  */
 
-import { findCard, discardCardToPlayerZone } from '../state.mjs';
+import { findCard, discardCardToPlayerZone, moveStackBetweenZones } from '../state.mjs';
 import { getRetreatCostCount, isBasicPokemon, isEnergy, isPokemon, isTrainer } from '../cards.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
@@ -256,20 +256,8 @@ function shuffleOwnDeck(player, ctx) {
 
 /** Swaps a player's Active Pokémon (with attachments) for one of their Benched Pokémon. */
 function swapActive(player, active, benchRoot, events, turnNumber = 1) {
-  for (let i = player.zones.active.length - 1; i >= 0; i--) {
-    const c = player.zones.active[i];
-    if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
-      player.zones.active.splice(i, 1);
-      player.zones.bench.push(c);
-    }
-  }
-  for (let i = player.zones.bench.length - 1; i >= 0; i--) {
-    const c = player.zones.bench[i];
-    if (c.instanceId === benchRoot.instanceId || c.attachedTo === benchRoot.instanceId) {
-      player.zones.bench.splice(i, 1);
-      player.zones.active.push(c);
-    }
-  }
+  moveStackBetweenZones(player.zones.active, player.zones.bench, active.instanceId);
+  moveStackBetweenZones(player.zones.bench, player.zones.active, benchRoot.instanceId);
   benchRoot.movedToActiveTurn = Math.max(1, Number(turnNumber) || 1);
   clearConditions(active);
   events.push({

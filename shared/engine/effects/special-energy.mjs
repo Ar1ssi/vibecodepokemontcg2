@@ -26,7 +26,7 @@ import { clearConditions, hasCondition, removeCondition } from '../rules/special
 import { evolvedView, topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isEnergy } from '../cards.mjs';
-import { discardCardToPlayerZone, findCard } from '../state.mjs';
+import { discardCardToPlayerZone, findCard, moveStackBetweenZones } from '../state.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { applyStadiumSwitchTriggers } from './stadium-trigger-apply.mjs';
 import { BENCH_LIMIT } from './bench-limit.mjs';
@@ -75,13 +75,7 @@ function moveStackToZone(draft, playerId, root, toZoneId, events) {
   if (fromZoneId === toZoneId) return;
   const from = zones[fromZoneId];
   const to = zones[toZoneId];
-  for (let i = from.length - 1; i >= 0; i--) {
-    const c = from[i];
-    if (c === root || c.attachedTo === root.instanceId) {
-      from.splice(i, 1);
-      to.push(c);
-    }
-  }
+  moveStackBetweenZones(from, to, root.instanceId);
   events.push({
     type: 'cardMoved',
     instanceId: root.instanceId,

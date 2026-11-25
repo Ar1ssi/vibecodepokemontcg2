@@ -10,7 +10,7 @@
  * - 15: Step budget (MAX_STEPS = 200) prevents infinite recursion
  */
 
-import { findCard, discardCardToPlayerZone } from '../state.mjs';
+import { findCard, discardCardToPlayerZone, moveStackBetweenZones } from '../state.mjs';
 import { shuffleInPlace, flipCoin } from '../rng.mjs';
 import { isEnergy, isPokemon } from '../cards.mjs';
 import { createPendingChoice } from './pending-choice.mjs';
@@ -1435,20 +1435,8 @@ export function executeSteps(draft, {
           const benchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
           if (benchCard) {
             benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
-            for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
-              const c = opponent.zones.active[i];
-              if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
-                opponent.zones.active.splice(i, 1);
-                opponent.zones.bench.push(c);
-              }
-            }
-            for (let i = opponent.zones.bench.length - 1; i >= 0; i--) {
-              const c = opponent.zones.bench[i];
-              if (c.instanceId === benchCard.instanceId || c.attachedTo === benchCard.instanceId) {
-                opponent.zones.bench.splice(i, 1);
-                opponent.zones.active.push(c);
-              }
-            }
+            moveStackBetweenZones(opponent.zones.active, opponent.zones.bench, oppActive.instanceId);
+            moveStackBetweenZones(opponent.zones.bench, opponent.zones.active, benchCard.instanceId);
             // Stadium on-switch triggers run before the outgoing conditions clear.
             applyStadiumSwitchTriggers(draft, {
               switchedOut: oppActive,
@@ -1545,20 +1533,8 @@ export function executeSteps(draft, {
         const benchCard = bench.find((c) => c.instanceId === chosenBenchId);
         if (benchCard) {
           benchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
-          for (let i = player.zones.active.length - 1; i >= 0; i--) {
-            const c = player.zones.active[i];
-            if (c.instanceId === active.instanceId || c.attachedTo === active.instanceId) {
-              player.zones.active.splice(i, 1);
-              player.zones.bench.push(c);
-            }
-          }
-          for (let i = player.zones.bench.length - 1; i >= 0; i--) {
-            const c = player.zones.bench[i];
-            if (c.instanceId === benchCard.instanceId || c.attachedTo === benchCard.instanceId) {
-              player.zones.bench.splice(i, 1);
-              player.zones.active.push(c);
-            }
-          }
+          moveStackBetweenZones(player.zones.active, player.zones.bench, active.instanceId);
+          moveStackBetweenZones(player.zones.bench, player.zones.active, benchCard.instanceId);
           // Stadium on-switch triggers run before the outgoing conditions clear.
           applyStadiumSwitchTriggers(draft, {
             switchedOut: active,
@@ -1656,20 +1632,8 @@ export function executeSteps(draft, {
         const oppBenchCard = oppBench.find((c) => c.instanceId === chosenBenchId);
         if (oppBenchCard) {
           oppBenchCard.movedToActiveTurn = Math.max(1, Number(draft.turn?.number) || 1);
-          for (let i = opponent.zones.active.length - 1; i >= 0; i--) {
-            const c = opponent.zones.active[i];
-            if (c.instanceId === oppActive.instanceId || c.attachedTo === oppActive.instanceId) {
-              opponent.zones.active.splice(i, 1);
-              opponent.zones.bench.push(c);
-            }
-          }
-          for (let i = opponent.zones.bench.length - 1; i >= 0; i--) {
-            const c = opponent.zones.bench[i];
-            if (c.instanceId === oppBenchCard.instanceId || c.attachedTo === oppBenchCard.instanceId) {
-              opponent.zones.bench.splice(i, 1);
-              opponent.zones.active.push(c);
-            }
-          }
+          moveStackBetweenZones(opponent.zones.active, opponent.zones.bench, oppActive.instanceId);
+          moveStackBetweenZones(opponent.zones.bench, opponent.zones.active, oppBenchCard.instanceId);
           // Stadium on-switch triggers run before the outgoing conditions clear.
           applyStadiumSwitchTriggers(draft, {
             switchedOut: oppActive,

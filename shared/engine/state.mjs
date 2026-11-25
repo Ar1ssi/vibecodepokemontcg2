@@ -221,6 +221,19 @@ export function getZone(state, playerId, zoneId) {
  *   card: object
  * }|null}
  */
+/**
+ * Moves a Pokémon root and every card attached to it from one zone to another, keeping their
+ * order (root, then Evolutions, then Energy/Tools): the mat stacks cards in array order, so a
+ * reversed move would put the Basic on top of its Evolutions.
+ * @returns {object[]} the cards moved, in order
+ */
+export function moveStackBetweenZones(from, to, rootId) {
+  const members = from.filter((c) => c.instanceId === rootId || c.attachedTo === rootId);
+  for (const card of members) from.splice(from.indexOf(card), 1);
+  to.push(...members);
+  return members;
+}
+
 export function findCard(state, instanceId) {
   if (!state || instanceId == null) return null;
 
