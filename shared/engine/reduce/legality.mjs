@@ -46,7 +46,7 @@ import {
 } from '../rules/trainer-play-conditions.mjs';
 import { serverEnergyDescriptor } from '../rules/server-energy.mjs';
 import { trainerTargetCounts, ownedCards, topPokemonCard } from '../rules/evolved-pokemon.mjs';
-import { isNextStage, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
+import { isNextStage, isSameNameVmaxEvolution, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBabyEvolution } from '../rules/baby-rule.mjs';
 import { formMismatchReason, formsAllowEvolution } from '../rules/pokemon-forms.mjs';
 import { listConditions } from '../rules/special-conditions.mjs';
@@ -1109,6 +1109,7 @@ export function validateLegality(state, command) {
             reason: 'Already evolved that Pokémon this turn.',
           };
         }
+        if (isSameNameVmaxEvolution(cardRef.card, topTarget)) return { allowed: true };
         const baseStage = normalizeStage(topTarget?.stage) || 'Basic';
         const order = ['Basic', 'Stage 1', 'Stage 2'];
         // Stage-less Evolution (TCGdex Pokémon-GX): the evolvesFrom name check below

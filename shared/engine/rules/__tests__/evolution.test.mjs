@@ -523,3 +523,18 @@ test('Forest of Vitality: a {G} Pokémon played and evolved this turn can evolve
     rulesState.stadium = null;
   }
 });
+
+test('homebrew VMAX evolves onto a Pokémon with exactly its own name; printed VMAX does not', async () => {
+  startGame();
+  for (let i = 0; i < 4; i++) beginTurn(i % 2 ? 'opp' : 'self');
+  rulesState.enabled = true;
+  const name = 'Single Strike Urshifu VMAX';
+  const inPlay = { instanceId: 'u1', stage: 'Basic', name, id: 'customhb-600' };
+  const homebrew = { stage: 'Basic', name, id: 'customhb-601', evolvesFrom: 'Single Strike Urshifu V' };
+  assert.equal((await canEvolve('self', inPlay, homebrew, false)).allowed, true);
+  assert.equal((await canEvolve('self', inPlay, homebrew, true)).allowed, false, 'just-played gate still applies');
+  const otherName = { instanceId: 'u2', stage: 'Basic', name: 'Rapid Strike Urshifu VMAX', id: 'customhb-602' };
+  assert.equal((await canEvolve('self', otherName, homebrew, false)).allowed, false);
+  const printed = { ...homebrew, id: 'swsh5-088' };
+  assert.equal((await canEvolve('self', { ...inPlay, id: 'swsh5-089' }, printed, false)).allowed, false);
+});

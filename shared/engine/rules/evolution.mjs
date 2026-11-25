@@ -19,6 +19,7 @@ import {
 import { isBabyEvolution } from './baby-rule.mjs';
 import { formMismatchReason, formsAllowEvolution } from './pokemon-forms.mjs';
 import { isCustomCardId } from '../../custom-sets/custom-set-schema.mjs';
+import { isHomebrewVmaxCard } from './card-classify.mjs';
 
 export const STAGE1_EVOLVES_FROM = new Map([
   ['piloswine', 'swinub'],
@@ -255,10 +256,11 @@ export async function canEvolve(
   // legal Rare Candy jump from Basic to Stage 2)
   const baseStage = normalizeStage(baseCardInPlay.stage) || 'Basic';
   const evoStage = normalizeStage(evolutionCardInHand.stage);
+  const sameNameVmax = isSameNameVmaxEvolution(evolutionCardInHand, baseCardInPlay);
   // A card in hand that has no valid stage (e.g. a misclassified Energy
   // card) is not a Pokémon evolution — reject it instead of silently
   // defaulting to 'Stage 1' and mis-evaluating the stage chain.
-  if (!evoStage) {
+  if (!evoStage && !sameNameVmax) {
     return {
       allowed: false,
       reason: `${evolutionCardInHand.name} is not a Pokémon evolution card (no valid stage).`,
@@ -272,7 +274,9 @@ export async function canEvolve(
   // A Basic played onto the Baby it "Evolves into" is an Evolution card (baby-rule.mjs).
   const babyEvolution = evoStage === 'Basic' && isBabyEvolution(baseCardInPlay, evolutionCardInHand);
 
-  if (isRareCandy) {
+  if (sameNameVmax && !isRareCandy) {
+    // Stage and evolvesFrom checks do not apply; the gates below do.
+  } else if (isRareCandy) {
     if (!rareCandyJump) {
       return {
         allowed: false,
@@ -350,6 +354,15 @@ export async function canEvolve(
 // Stage strings vary by source: local card data uses 'Stage 1' while
 // TCGdex can return 'Stage1' (and case can differ). Canonicalize to the
 // 'Basic' | 'Stage 1' | 'Stage 2' forms used by the stage-order check.
+// Homebrew VMAX (card-classify.mjs) evolves from any Pokémon in play with exactly its own name:
+// Single Strike Urshifu VMAX can go onto another Single Strike Urshifu VMAX. It skips the stage
+// chain, and the turn gates still apply.
+export function isSameNameVmaxEvolution(evolutionCard, baseCard) {
+  if (!isHomebrewVmaxCard(evolutionCard)) return false;
+  const name = (card) => String(card?.name ?? '').trim().toLowerCase();
+  return name(evolutionCard) !== '' && name(evolutionCard) === name(baseCard);
+}
+
 export function normalizeStage(stage) {
   const s = String(stage || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   if (s === 'basic' || s.startsWith('basic')) return 'Basic';
