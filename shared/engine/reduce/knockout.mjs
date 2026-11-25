@@ -18,7 +18,7 @@ import { isAbilitySuppressed, sideContextFor, abilityBenchLimit } from '../rules
 import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
-  abilityPrizeModify, abilityPrizeToBench, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker, abilityKoCountersOnOpponent,
+  abilityPrizeModify, abilityPrizeToBench, abilityPrizesToLostZone, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker, abilityKoCountersOnOpponent,
 } from '../rules/ability-combat.mjs';
 import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
@@ -1074,6 +1074,23 @@ export function settleKoEnergyMoves(draft, { events }) {
 }
 
 /**
+ * Where the Prize cards `playerId` takes land: their hand, or their Lost Zone while an Ability
+ * on the opponent's side says so (Barbaracle Lost Block).
+ */
+function prizeLandingZone(draft, playerId) {
+  const player = draft.players[playerId];
+  const holder = Object.values(draft.players).find((p) => p.playerId !== playerId);
+  if (!holder) return { zone: player.zones.hand, lost: false };
+  const ctx = abilitySideContext(draft, holder.playerId);
+  const locked = [...rootsIn(holder.zones.active), ...rootsIn(holder.zones.bench)].some((root) =>
+    abilityPrizesToLostZone(inPlayView(draft, root), ctx)
+  );
+  if (!locked) return { zone: player.zones.hand, lost: false };
+  if (!Array.isArray(player.zones.lostZone)) player.zones.lostZone = [];
+  return { zone: player.zones.lostZone, lost: true };
+}
+
+/**
  * Collects a player's outstanding prize entitlement (flags.prizesOwed, granted by
  * handleKnockout) into their hand, so a Knockout can never leave prizes stranded.
  * takePrizes is the only other consumer of the entitlement, and it can only redeem
@@ -1090,7 +1107,8 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
   const taken = prizes.splice(0, actualCount);
   // A face-up Prize (Blaster-GX) stops being face up once it leaves the Prize zone.
   for (const card of taken) delete card.revealed;
-  player.zones.hand.push(...taken);
+  const landing = prizeLandingZone(draft, playerId);
+  landing.zone.push(...taken);
   // Drop the key rather than leaving a zeroed one behind, so a fully settled state
   // is byte-identical to one that never saw a Knockout (views and the state hash
   // both carry player.flags verbatim).
@@ -1105,6 +1123,7 @@ function collectPrizeEntitlement(draft, { playerId, events }) {
     playerId,
     count: actualCount,
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
+    ...(landing.lost ? { toLostZone: true } : {}),
   });
   if (prizes.length > 0) {
     offerPrizeToBench(draft, { playerId, taken });
@@ -1256,6 +1275,7 @@ export function resolvePrizeChoice(draft, { playerId, selection, events }) {
     playerId,
     count: taken.length,
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
+    ...(landing.lost ? { toLostZone: true } : {}),
   });
 
   if (player.zones.prizes.length === 0) {
@@ -1407,10 +1427,10 @@ export function takePrizesCommand({ payload, draft, playerId, events }) {
   const count = payload?.count ?? 1;
   const player = draft.players[playerId];
   const prizes = player.zones.prizes;
-  const hand = player.zones.hand;
+  const landing = prizeLandingZone(draft, playerId);
   const actualCount = Math.min(count, prizes.length);
   const drawnPrizes = prizes.splice(0, actualCount);
-  hand.push(...drawnPrizes);
+  landing.zone.push(...drawnPrizes);
   consumePrizeEntitlement(player, actualCount);
 
   events.push({
@@ -1418,6 +1438,7 @@ export function takePrizesCommand({ payload, draft, playerId, events }) {
     playerId,
     count: actualCount,
     cards: drawnPrizes.map((c) => ({ instanceId: c.instanceId })),
+    ...(landing.lost ? { toLostZone: true } : {}),
   });
 
   if (tiebreakActive(draft) && actualCount > 0) {
@@ -1438,14 +1459,14 @@ export function takePrizesCommand({ payload, draft, playerId, events }) {
 export function takePrizesByIndexCommand({ payload, draft, playerId, events }) {
   const indices = [...payload.indices].sort((a, b) => b - a);
   const prizes = draft.players[playerId].zones.prizes;
-  const hand = draft.players[playerId].zones.hand;
+  const landing = prizeLandingZone(draft, playerId);
   const taken = [];
 
   for (const idx of indices) {
     if (idx < prizes.length) {
       const [card] = prizes.splice(idx, 1);
       taken.push(card);
-      hand.push(card);
+      landing.zone.push(card);
     }
   }
   consumePrizeEntitlement(draft.players[playerId], taken.length);

@@ -4173,6 +4173,15 @@ function resolveSelfName(marker, ctx) {
 }
 
 // Timed effect for a later turn (design 031): marks the attacker or the opponent's Active.
+// Alcremie ex Bakery Bunker: reduce/attack-damage.mjs damageBenchedPokemon reads the window
+// (the Transparent Walls shield: no attack damage to the owner's Benched Pokémon until this turn).
+function atkBenchShield(ctx) {
+  const untilTurn = (ctx.draft.turn?.number || 1) + 1;
+  ctx.player.benchAttackShieldUntilTurn = Math.max(ctx.player.benchAttackShieldUntilTurn || 0, untilTurn);
+  ctx.events.push({ type: 'benchAttackShield', playerId: ctx.player.playerId, untilTurn });
+  return null;
+}
+
 function atkAddMarker(ctx) {
   const { step } = ctx;
   if (!extraEnergySatisfied(ctx, step.requiresExtraEnergy)) return skip(ctx, 'extra_energy_unmet');
@@ -5185,6 +5194,7 @@ export const ATTACK_STEP_HANDLERS = {
   atkMoveCounterToOpponent,
   atkLookDeckReorder,
   atkAttachEachBench,
+  atkBenchShield,
   atkShuffleFromDiscard: optional(atkShuffleFromDiscard, () => 'Shuffle cards from your discard pile into your deck'),
   atkShuffleOppActive,
   atkShuffleOwnBench,

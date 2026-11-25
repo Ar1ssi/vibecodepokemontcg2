@@ -51,6 +51,7 @@ import {
   abilitySleepLock,
   abilityEnergyAttackerShield,
   abilityDamagedReturnsAttackerEnergy,
+  abilityPrizesToLostZone,
 } from '../../shared/engine/rules/ability-combat.mjs';
 import {
   inPlayEntries,
@@ -60,6 +61,7 @@ import {
   parseOnDamageAbilities,
   parseOnDamageStatus,
   parseOnEnergyAttachAbilities,
+  parseAttachBenchSearch,
   parseOnKoAbilities,
   parseBetweenTurnsAbilities,
   parseSleepRecoveryLocks,
@@ -84,6 +86,7 @@ import { buildState, mon } from './oracle-harness.mjs';
 const BASIC_ENERGY_NAMES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal'].map(
   (type) => `${type} Energy`
 );
+const PROBE_ENERGY_TYPES = ['Grass', 'Fire', 'Water', 'Lightning', 'Psychic', 'Fighting', 'Darkness', 'Metal', 'Fairy'];
 const CONDITIONS = ['asleep', 'burned', 'confused', 'paralyzed', 'poisoned'];
 
 const roots = (cards) => (cards || []).filter((c) => !c.attachedTo);
@@ -352,6 +355,27 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
           ctx.sideActive
         )
       );
+      // "All of your Pokémon that have {Y} Energy attached have no Retreat Cost": the Active
+      // carrying one Energy of the type (Clefable ex Lunar Zone, Archaludon Metal Bridge).
+      for (const type of PROBE_ENERGY_TYPES) {
+        ask(`noRetreatForActive:${side}:${type}`, () => {
+          const active = roots(ctx.sideActive)[0];
+          const attached = createCard({
+            instanceId: 9400,
+            name: `Basic ${type} Energy`,
+            supertype: 'Energy',
+            subtypes: ['Basic'],
+            types: [type],
+            energyType: type,
+            attachedTo: active.instanceId,
+          });
+          return teamNoRetreatCostForActive(
+            viewOf(ctx.sideActive, active),
+            roots(ctx.sideBench).map((root) => viewOf(ctx.sideBench, root)),
+            [...ctx.sideActive, attached]
+          );
+        });
+      }
     }
     ask('counterMoveLock', () => abilityCounterMoveLock(p1));
     // Customhb passives: each reader sees a board that can show it (a Dragon / Metal / EX
@@ -364,6 +388,31 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       ask(`ignoresDefenderAbilities:${card.name}`, () => abilityIgnoresDefenderAbilities(card, ctx));
       ask(`energyAttackerShield:${card.name}`, () => abilityEnergyAttackerShield(card, ['water'], ctx));
       ask(`flipPreventsDamage:${card.name}`, () => abilityFlipPreventsAttackDamage(card, ctx));
+      // Fezandipiti Adrena-Pheromone: the flip needs a {D} Energy on the holder.
+      for (const type of PROBE_ENERGY_TYPES) {
+        const attached = createCard({
+          instanceId: 9401,
+          name: `Basic ${type} Energy`,
+          supertype: 'Energy',
+          subtypes: ['Basic'],
+          types: [type],
+          energyType: type,
+          attachedTo: card.instanceId,
+        });
+        ask(`flipPreventsDamage:${type}:${card.name}`, () =>
+          abilityFlipPreventsAttackDamage(card, { ...ctx, sideCards: [...ctx.sideCards, attached] })
+        );
+      }
+      // Barbaracle Lost Block: the holder's side makes the opponent's Prizes go to the Lost Zone.
+      ask(`prizesToLostZone:${card.name}`, () => abilityPrizesToLostZone(card, ctx));
+      // Cramorant Lost Provisions: the Lost Zone holds enough cards.
+      ask(`costDiscount:lostZone:${card.name}`, () => abilityAttackCostDiscount(card, { ...ctx, ownLostZoneCount: 10 }));
+      // Mimikyu Safeguard / Decidueye Deep Forest Camo: a rule-box attacker (ex, V, GX, VMAX).
+      for (const subtypes of [['Basic', 'ex'], ['Basic', 'V'], ['Basic', 'GX'], ['VMAX']]) {
+        ask(`damagePrevention:${subtypes.join('+')}:${card.name}`, () =>
+          abilityDamagePrevention(card, { ...p2Active, subtypes }, ctx)
+        );
+      }
       ask(`koDiscardsHand:${card.name}`, () => abilityKoDiscardsOpponentHand(card, ctx));
       ask(`koConfuses:${card.name}`, () => abilityKoConfusesAttacker(card, ctx));
       ask(`energyAttachCounters:${card.name}`, () => abilityEnergyAttachCounters(card, ctx));
@@ -423,6 +472,12 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
     ask('onEnergyAttach', () =>
       BASIC_ENERGY_NAMES.map((name) =>
         parseOnEnergyAttachAbilities(holderCard, createCard({ name, supertype: 'Energy', subtypes: ['Basic'] }), p1)
+      )
+    );
+    // Goomy Water Down: a matching Energy attached from the hand offers a search for the holder.
+    ask('attachBenchSearch', () =>
+      BASIC_ENERGY_NAMES.map((name) =>
+        parseAttachBenchSearch(holderCard, createCard({ name, supertype: 'Energy', subtypes: ['Basic'] }), p1)
       )
     );
     ask('ignoresDefenderEffects', () => abilityIgnoresDefenderEffects(holderCard));

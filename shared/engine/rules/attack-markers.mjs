@@ -11,7 +11,7 @@
  */
 
 import { topPokemonCard } from './evolved-pokemon.mjs';
-import { isGxCard, isTagTeamCard, isVmaxCard } from './card-classify.mjs';
+import { isExCard, isGxCard, isTagTeamCard, isVCard, isVmaxCard } from './card-classify.mjs';
 import { attackerTypes, cardHasAbility, isEvolutionCard, TYPE_LETTER } from './tool-combat.mjs';
 
 /**
@@ -106,6 +106,9 @@ const FILTER_KINDS = {
   stage2: (card) => stageOf(card) === 2,
   vmax: (card) => isVmaxCard(card),
   gx: (card) => isGxCard(card),
+  // Modern lowercase "ex" and "V" (Fantina: "from your opponent's Pokémon ex").
+  ex: (card) => isExCard(card),
+  v: (card) => isVCard(card),
   // Uppercase "-EX" only: the old Pokémon-EX, not the modern lowercase "ex".
   EX: (card) => /-EX$/.test(String(card?.name || '')),
   // "Pokémon-ex" of the EX era (Deoxys ex): normalized text cannot tell it from "Pokémon-EX".

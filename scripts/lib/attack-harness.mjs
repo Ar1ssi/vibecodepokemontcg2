@@ -108,6 +108,9 @@ function enrich(state, costPool) {
     energy('Fighting'),
     energy('Darkness'),
     energy('Metal'),
+    // Fairy and Dragon Basic Energy, so "search your deck for a {Y} Energy card" has a match.
+    energy('Fairy'),
+    energy('Dragon'),
     trainer('Deck Item', 'Item'),
     trainer('Deck Supporter', 'Supporter'),
     // Stadium searches (Land Maker, Spacial Rend, Sunshine) need a real Stadium: until S333 the
@@ -149,6 +152,12 @@ function enrich(state, costPool) {
     // createCard defaults retreatCost to [], so set it unconditionally.
     oppActive.retreatCost = 2;
   }
+  // A Pokémon ex, a GX and a V on the opposing Bench, so "for each Pokémon ex and Pokémon-GX your
+  // opponent has in play" (Gengar VMAX Fear and Panic) counts something.
+  const oppBench = state.players.p2.zones.bench.filter((c) => !c.attachedTo);
+  [['Basic', 'ex'], ['Basic', 'GX'], ['Basic', 'V']].forEach((subtypes, i) => {
+    if (oppBench[i]) oppBench[i].subtypes = subtypes;
+  });
   // A plain attack on every opposing Pokémon so copy-attack clauses ("use it as this
   // attack") have something to copy.
   for (const c of [...state.players.p2.zones.active, ...state.players.p2.zones.bench]) {

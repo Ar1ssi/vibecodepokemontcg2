@@ -5,7 +5,7 @@
  */
 
 import { findCard, attachmentHostId } from '../state.mjs';
-import { isEnergy, isPokemon } from '../cards.mjs';
+import { isEnergy, isPokemon, isBasicPokemon } from '../cards.mjs';
 import { isPokemonToolCard } from '../rules/tool-combat.mjs';
 import {
   stadiumOnAttachTriggers, stadiumOnEvolveTriggers, stadiumEvolveSearchEnergy,
@@ -13,7 +13,7 @@ import {
 import { applyStadiumTriggerEffect } from '../effects/stadium-trigger-apply.mjs';
 import {
   inPlayEntries, parseOnOpponentEvolveAbilities, parseOnEnergyAttachAbilities,
-  parseAlphaGrowthAttach,
+  parseAlphaGrowthAttach, parseAttachBenchSearch,
 } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
 import { isSpecialEnergyCard } from '../rules/special-energy-parse.mjs';
@@ -24,7 +24,7 @@ import {
 } from '../rules/stadium-effects.mjs';
 import {
   abilityEnergyAttachCounters, healBlockedByAbility, abilityAttachMakesSelfAsleep, abilityDoubleHandAttach,
-  abilityEnergyEvolution, abilityToolAttachCondition,
+  abilityEnergyEvolution, abilityToolAttachCondition, abilityBenchLimit,
 } from '../rules/ability-combat.mjs';
 import { pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBasicEnergy } from '../rules/card-classify.mjs';
@@ -32,7 +32,7 @@ import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { requiresTurnEndOnEvolve } from '../rules/evolution.mjs';
 import { shuffleInPlace } from '../rng.mjs';
 import { addCondition, removeCondition, clearConditions, listConditions } from '../rules/special-conditions.mjs';
-import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext, conditionsUpdatedEvent } from './shared.mjs';
+import { inPlayView, cardEffectiveHp, isGameConcluded, abilitySideContext, conditionsUpdatedEvent, rootsIn } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
 import { resolveCheckup, advanceTurn } from './turn.mjs';
 import { chaosGymBlocks } from './trainer.mjs';
@@ -177,6 +177,7 @@ function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, eve
     if (addCondition(host, 'Asleep')) events.push(conditionsUpdatedEvent(host, 'Asleep'));
   }
   if (isBasicEnergy(energy) && abilityEnergyEvolution(top, side) && offerEnergyEvolution(draft, { host, top, energy, playerId })) return;
+  if (offerAttachBenchSearch(draft, { top, energy, playerId, side })) return;
 
   // Ancient Trait α Growth (Primal Kyogre-EX, PRC 149): after the normal hand attach the
   // player may attach up to 2 more Energy cards from hand to this Pokémon. Primarina Harmonics
@@ -205,6 +206,55 @@ function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, eve
       hostInstanceId: host.instanceId,
     },
   });
+}
+
+export const ATTACH_BENCH_SEARCH_EFFECT = 'attachBenchSearch';
+
+/**
+ * Goomy Water Down: after the matching Energy attach, the player may search their deck for the
+ * named Basic Pokémon and put it onto their Bench. Nothing is offered with no copy in the deck
+ * or a full Bench (the "may" has nothing to do).
+ */
+function offerAttachBenchSearch(draft, { top, energy, playerId, side }) {
+  const offer = parseAttachBenchSearch(top, energy, side);
+  if (!offer) return false;
+  const player = draft.players[playerId];
+  if (rootsIn(player.zones.bench).length >= abilityBenchLimit(side)) return false;
+  const wanted = offer.name.toLowerCase();
+  const options = (player.zones.deck || []).filter(
+    (c) => isPokemon(c) && isBasicPokemon(c) && String(c.name || '').toLowerCase() === wanted
+  );
+  if (options.length === 0) return false;
+  draft.pendingChoice = createPendingChoice({
+    player: playerId,
+    prompt: `${offer.source}: search your deck for ${offer.name} and put it onto your Bench?`,
+    source: offer.source,
+    options,
+    min: 0,
+    max: 1,
+    cancellable: true,
+    stateVersion: draft.stateVersion,
+    resumeToken: { effectType: ATTACH_BENCH_SEARCH_EFFECT, initiatorPlayerId: playerId },
+  });
+  return true;
+}
+
+/** Resumes Water Down: the picked Pokémon goes onto the Bench, then the deck is shuffled. */
+export function resumeAttachBenchSearch(draft, { selection, resumeToken, activeRng: rng, events }) {
+  draft.pendingChoice = null;
+  const token = resumeToken || {};
+  const player = draft.players[token.initiatorPlayerId];
+  if (!player) return;
+  const deck = player.zones.deck || [];
+  const picked = deck.find((c) => (selection || []).includes(c.instanceId) && isPokemon(c));
+  if (picked && rootsIn(player.zones.bench).length < abilityBenchLimit(abilitySideContext(draft, token.initiatorPlayerId))) {
+    deck.splice(deck.indexOf(picked), 1);
+    picked.enteredPlayTurn = draft.turn?.number ?? null;
+    player.zones.bench.push(picked);
+    events.push({ type: 'cardMoved', instanceId: picked.instanceId, from: 'deck', to: 'bench', playerId: player.playerId });
+  }
+  if (rng) shuffleInPlace(rng, deck);
+  events.push({ type: 'deckShuffled', playerId: token.initiatorPlayerId });
 }
 
 export const ENERGY_EVOLUTION_EFFECT = 'energyEvolution';
