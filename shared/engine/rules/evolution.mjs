@@ -354,13 +354,19 @@ export async function canEvolve(
 // Stage strings vary by source: local card data uses 'Stage 1' while
 // TCGdex can return 'Stage1' (and case can differ). Canonicalize to the
 // 'Basic' | 'Stage 1' | 'Stage 2' forms used by the stage-order check.
-// Homebrew VMAX (card-classify.mjs) evolves from any Pokémon in play with exactly its own name:
-// Single Strike Urshifu VMAX can go onto another Single Strike Urshifu VMAX. It skips the stage
-// chain, and the turn gates still apply.
+// Homebrew VMAX (card-classify.mjs) evolves from any Pokémon in play that shares its name once the
+// V/VMAX/VSTAR/ex/GX suffix is dropped: Single Strike Urshifu VMAX goes onto any Single Strike
+// Urshifu (plain, V, ex or VMAX). It skips the stage chain; the turn gates still apply.
+const speciesKey = (card) =>
+  String(card?.name ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+(?:vmax|vstar|v|ex|gx)$/, '');
+
 export function isSameNameVmaxEvolution(evolutionCard, baseCard) {
   if (!isHomebrewVmaxCard(evolutionCard)) return false;
-  const name = (card) => String(card?.name ?? '').trim().toLowerCase();
-  return name(evolutionCard) !== '' && name(evolutionCard) === name(baseCard);
+  const species = speciesKey(evolutionCard);
+  return species !== '' && species === speciesKey(baseCard);
 }
 
 export function normalizeStage(stage) {

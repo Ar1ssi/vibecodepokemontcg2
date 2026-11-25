@@ -28,7 +28,13 @@ test('homebrew VMAX evolves onto a same-name VMAX in play', () => {
   assert.equal(evolveState(vmax('customhb-600'), vmax('customhb-601')).allowed, true);
 });
 
-test('homebrew VMAX does not evolve onto a different name or onto itself when printed', () => {
-  assert.equal(evolveState({ ...vmax('customhb-600'), name: 'Rapid Strike Urshifu VMAX' }, vmax('customhb-601')).allowed, false);
-  assert.equal(evolveState(vmax('swsh5-089'), vmax('swsh5-088')).allowed, false);
+test('homebrew VMAX evolves onto any card with its base name (plain, V, ex)', () => {
+  for (const name of ['Single Strike Urshifu', 'Single Strike Urshifu V', 'Single Strike Urshifu ex']) {
+    assert.equal(evolveState({ name, stage: 'Basic', id: 'swsh5-085' }, vmax('customhb-601')).allowed, true, name);
+  }
+});
+
+test('homebrew VMAX does not evolve onto a different name, and a printed VMAX keeps the normal rule', () => {
+  assert.equal(evolveState({ name: 'Rapid Strike Urshifu V', stage: 'Basic', id: 'swsh5-086' }, vmax('customhb-601')).allowed, false);
+  assert.equal(evolveState({ name: 'Single Strike Urshifu', stage: 'Basic', id: 'swsh5-085' }, vmax('swsh5-088')).allowed, false);
 });
