@@ -17,7 +17,7 @@
 // so it stays light, not stone), the tongue's hot pass a soft tube, the rings lit tubes orbiting
 // above the body; every pass stands at its own height over the drawer's lift.
 import { rgbCss } from '../../fx-colors.mjs';
-import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { rootFaded } from './_root-fade.js';
 import { grainPass, parseHex, sphere, tonguePath } from './_shared.js';
 
@@ -58,9 +58,7 @@ const NORMAL_PALETTE = Object.freeze({
 /** The normal material drawn in `palette` (any palette with the same keys). */
 function normalKit(palette) {
   const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.body, width: 0.12, gain: 1.4 }) });
-  /** `draw` with this kit's dissolve edge named for every fill it makes. */
-  const edged = (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+  const edged = edgedBy(edge);
 
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;

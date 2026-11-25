@@ -42,7 +42,7 @@ import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps, glslColour } from './stadium-kit.mjs';
 import { GLOW } from './stadium-env-ground.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
-import { boardContext, hash, patchy, shuffled } from './stadium-env-spots.mjs';
+import { boardContext, distanceToRect, hash, patchy, shuffled } from './stadium-env-spots.mjs';
 import { EDGE_HAZE, STANDARD_TERRAIN_VERTEX } from './stadium-env-surfaces.mjs';
 
 export const STORM_KEY = 'magnetic-storm';
@@ -71,13 +71,6 @@ const BOLT_POINTS = 16;
 /** Heights of the coil posts (card-scale px): a pad's, a pole's. */
 const PAD_POST_PX = 46;
 const POLE_PX = 150;
-
-/** A signed distance in px from the clearing's edge at (x, y), negative on it (the shader's `clearingDistance`). */
-export const clearingWobble = (x, y) =>
-  0.5 +
-  0.3 * Math.sin(x * 0.021 + 1.3) * Math.sin(y * 0.017 + 0.4) +
-  0.2 * Math.sin((x + y) * 0.013 + 2.2) +
-  0.16 * Math.sin(x * 0.047 - y * 0.039 + 0.7);
 
 /**
  * One lightning bolt from `from` to `to` ([x, y, z]), jagged: each point pushed a little aside in the
@@ -193,7 +186,7 @@ export function stormSpots(layout) {
   const step = 150 * u;
   const reedFits = (x, y) =>
     ctx.inScene(x, y, 10 * u) &&
-    distanceOut(ctx.core, x, y) >= (CLEARING_PX + CLEARING_WOBBLE_PX * 0.7) * u + 40 * u &&
+    distanceToRect(x, y, ctx.core) >= (CLEARING_PX + CLEARING_WOBBLE_PX * 0.7) * u + 40 * u &&
     nearPylon(x, y, 22 * u) &&
     ctx.clear(x, y, 10 * u, 18 * u);
   for (let gy = scene.y + step / 2; gy < scene.y + scene.h; gy += step) {
@@ -223,8 +216,6 @@ export function stormSpots(layout) {
   ];
   return { ...ctx, handEnd, pads, poles, dome, arcs, trees, boulders, clumps, ring, glows };
 }
-
-const distanceOut = (rect, x, y) => Math.hypot(Math.max(rect.x - x, 0, x - rect.x - rect.w), Math.max(rect.y - y, 0, y - rect.y - rect.h));
 
 const STORM = /* glsl */ `
 // The cards' box (x0, y0, x1, y1); the ring (x, y, radius; 0: none); the scale of a card (u); every
@@ -268,12 +259,6 @@ float fieldPresence(vec2 p) {
   float gate = smoothstep(-0.25, 0.55, sin(uTime * 0.23 + 1.0));
   float swell = smoothstep(0.1, 0.95, 0.5 + 0.5 * sin(uTime * 0.55 - atan(rel.y, rel.x) + length(rel) * 2.0));
   return gate * (0.2 + 0.8 * swell);
-}
-// The strike's flash 0..1: a quick flicker up, then a slow fade, once every period, offset by phase.
-float strike(float period, float phase) {
-  float t = fract(uTime / period + phase);
-  float flash = smoothstep(0.0, 0.012, t) * (1.0 - smoothstep(0.03, 0.2, t));
-  return flash * 0.85 + 0.18 * smoothstep(0.0, 0.03, t) * (1.0 - smoothstep(0.2, 0.5, t));
 }
 `;
 

@@ -158,7 +158,7 @@ const PRIZE_SLOTS = 6;
 
 const CARD_ASPECT = CARD_UNITS.h / CARD_UNITS.w;
 
-const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
+export const isRect = (rect) => rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) && rect.w > 0 && rect.h > 0;
 
 const centreOf = (rect) => ({ x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 });
 
@@ -168,7 +168,7 @@ const cardRect = (centre, widthPx) => {
   return { x: centre.x - widthPx / 2, y: centre.y - h / 2, w: widthPx, h };
 };
 
-const union = (rects) => {
+export const union = (rects) => {
   const x = Math.min(...rects.map((r) => r.x));
   const y = Math.min(...rects.map((r) => r.y));
   return { x, y, w: Math.max(...rects.map((r) => r.x + r.w)) - x, h: Math.max(...rects.map((r) => r.y + r.h)) - y };
@@ -288,7 +288,8 @@ export function sceneBounds(layout, key) {
   return { x: bounds.x - side, y: bounds.y - near, w: bounds.w + 2 * side, h: bounds.h * (1 + margins.near + margins.far) };
 }
 
-const distanceToRect = (x, y, rect) => {
+/** px from (x, y) to the rect (0 inside it). */
+export const distanceToRect = (x, y, rect) => {
   const dx = Math.max(rect.x - x, 0, x - (rect.x + rect.w));
   const dy = Math.max(rect.y - y, 0, y - (rect.y + rect.h));
   return Math.hypot(dx, dy);

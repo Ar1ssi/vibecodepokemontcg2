@@ -43,7 +43,7 @@ import { LOOK, createPropBuilder } from './stadium-env-props.mjs';
 import { createKitProps } from './stadium-kit.mjs';
 import { placeAsset } from './stadium-kit-assets.mjs';
 import { disc, wallBand, windowRun } from './stadium-env-buildings.mjs';
-import { boardContext, hash } from './stadium-env-spots.mjs';
+import { boardContext, hash, smoothstep } from './stadium-env-spots.mjs';
 import { BOX_SHADOW, EDGE_HAZE, PAVING } from './stadium-env-surfaces.mjs';
 
 export const LUMIOSE_KEY = 'lumiose-city';
@@ -65,11 +65,6 @@ export const MAX_CASTERS = MAX_TREES + MAX_LAMPS;
 const BUILDING_GAP_PX = 14;
 /** The Prism Tower's height in card-scale px. */
 export const TOWER_HEIGHT_PX = 460;
-
-const smoothstep = (a, b, x) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
-};
 
 /**
  * The Prism Tower's radius at share `s` (0 foot, 1 tip) of its height `h`: legs flaring from the foot, a

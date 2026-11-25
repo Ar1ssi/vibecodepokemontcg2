@@ -1,9 +1,17 @@
 // Server side of client log shipping (design 088 §5): hello/batch/ping/level sockets and the pagehide beacon.
-import { CATEGORIES, LEVEL_RANK, LIMITS } from '../../shared/log/log-schema.mjs';
-
-const CLIENT_ID = /^[0-9a-f]{16}$/;
-const LOAD_ID = /^[0-9a-f]{8}$/;
-const NOT_A_ROOM = 'lobby:watchers';
+import {
+  CATEGORIES,
+  LEVEL_RANK,
+  LIMITS,
+  LOBBY_WATCHERS,
+  LOG_EVENTS,
+  isCaptureLevel,
+  isClientId,
+  isGameRoom,
+  isLoadId,
+} from '../../shared/log/log-schema.mjs';
+import { alignedTs } from '../../shared/log/export-format.mjs';
+import { clientStreamId } from './log-store.mjs';
 const CATEGORY_SET = new Set(CATEGORIES);
 const EVENT_NAME_MAX = 120;
 const BUILD_MAX = 80;
@@ -46,8 +54,8 @@ export function ingestLines({ store, clientId, loadId, lines, offset = 0, lastSe
       continue;
     }
     if (entry.seq <= lastSeq) continue;
-    const ts = Math.round((entry.t + offset) * 10) / 10;
-    store.append(`client:${clientId}`, {
+    const ts = alignedTs(entry.t, offset);
+    store.append(clientStreamId(clientId), {
       seq: entry.seq,
       t: entry.t,
       ts,
@@ -63,19 +71,41 @@ export function ingestLines({ store, clientId, loadId, lines, offset = 0, lastSe
 }
 
 export function createLogIngest({ store, log, io, now = Date.now, limits = LIMITS }) {
-  const seqByLoad = new Map();
+  // clientId -> loadId -> { seq: last stored seq, window: the batch byte-rate window }
+  const loadStates = new Map();
   const roomLevels = new Map();
   // A client outside any room (deck builder, lobby) can still ask for verbose capture.
   const clientLevels = new Map();
-  const windows = new WeakMap();
 
   const adapter = io.of('/').adapter;
   adapter.on('delete-room', (room) => roomLevels.delete(room));
   adapter.on('join-room', (room, id) => {
-    if (roomLevels.get(room) === 'trace') io.to(id).emit('log:level', { level: 'trace', by: 'room' });
+    if (roomLevels.get(room) === 'trace') io.to(id).emit(LOG_EVENTS.level, { level: 'trace', by: 'room' });
   });
 
-  const levelFor = (roomId) => roomLevels.get(roomId) ?? 'debug';
+  // A client's own verbose request counts as well as its room's.
+  const levelFor = (roomId, clientId) =>
+    roomLevels.get(roomId) === 'trace' || clientLevels.get(clientId) === 'trace' ? 'trace' : 'debug';
+
+  function loadState(clientId, loadId) {
+    let loads = loadStates.get(clientId);
+    if (!loads) {
+      loads = new Map();
+      loadStates.set(clientId, loads);
+    }
+    let state = loads.get(loadId);
+    if (!state) {
+      state = { seq: 0, window: null };
+      loads.set(loadId, state);
+    }
+    return state;
+  }
+
+  // The line-array shape every path in (batch, snapshot tail, beacon) must meet.
+  function linesRefusal(lines) {
+    if (!Array.isArray(lines)) return 'bad_batch';
+    return lines.length > limits.ingestMaxLines ? 'too_many' : null;
+  }
 
   function levelForSocket(socket) {
     if (clientLevels.get(socket.data?.logClientId) === 'trace') return 'trace';
@@ -84,11 +114,12 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
   }
 
   function storeBatch({ clientId, loadId, lines, payload }) {
-    const key = `${clientId}/${loadId}`;
-    const offset = Math.abs(payload.offset) < OFFSET_MAX ? payload.offset : 0;
-    const result = ingestLines({ store, clientId, loadId, lines, offset, lastSeq: seqByLoad.get(key) ?? 0, limits });
-    seqByLoad.set(key, result.lastSeq);
-    store.setMeta(`client:${clientId}`, {
+    const state = loadState(clientId, loadId);
+    // A numeric string or array would pass a coercing range check and then concatenate into `t + offset`.
+    const offset = Number.isFinite(payload.offset) && Math.abs(payload.offset) < OFFSET_MAX ? payload.offset : 0;
+    const result = ingestLines({ store, clientId, loadId, lines, offset, lastSeq: state.seq, limits });
+    state.seq = result.lastSeq;
+    store.setMeta(clientStreamId(clientId), {
       offset,
       rtt: Number.isFinite(payload.rtt) ? payload.rtt : null,
       lastBatchAt: now(),
@@ -100,7 +131,7 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
   function hello(socket, payload, ack) {
     const clientId = payload?.clientId;
     const loadId = payload?.loadId;
-    if (!CLIENT_ID.test(clientId ?? '') || !LOAD_ID.test(loadId ?? '')) {
+    if (!isClientId(clientId) || !isLoadId(loadId)) {
       ack({ ok: false, reason: 'bad_hello' });
       return;
     }
@@ -113,7 +144,7 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
     }
     socket.data.logClientId = clientId;
     socket.data.logLoadId = loadId;
-    const streamId = `client:${clientId}`;
+    const streamId = clientStreamId(clientId);
     const page = shortString(payload.page, 200) ?? '';
     const build = shortString(payload.build, BUILD_MAX);
     const loads = { ...(store.stream(streamId)?.meta?.loads ?? {}), [loadId]: { helloAt: now(), page, build } };
@@ -123,33 +154,34 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
     store.setMeta(streamId, { ua: shortString(payload.ua, 300) ?? '', build, loads: Object.fromEntries(kept) });
     store.reopen(streamId);
     for (const room of socket.rooms) {
-      if (room === socket.id || room === NOT_A_ROOM) continue;
+      if (room === socket.id || room === LOBBY_WATCHERS) continue;
       store.link(clientId, room, { socketId: socket.id });
     }
     log.info('log', 'hello', { clientId, loadId, page, build });
-    const key = `${clientId}/${loadId}`;
-    for (const known of seqByLoad.keys()) {
-      if (known !== key && store.stream(`client:${known.split('/')[0]}`) === null) seqByLoad.delete(known);
+    for (const known of loadStates.keys()) {
+      if (known !== clientId && store.stream(clientStreamId(known)) === null) loadStates.delete(known);
     }
     for (const known of clientLevels.keys()) {
-      if (known !== clientId && store.stream(`client:${known}`) === null) clientLevels.delete(known);
+      if (known !== clientId && store.stream(clientStreamId(known)) === null) clientLevels.delete(known);
     }
-    ack({ ok: true, serverT: now(), level: levelForSocket(socket), acked: seqByLoad.get(key) ?? 0 });
+    ack({ ok: true, serverT: now(), level: levelForSocket(socket), acked: loadState(clientId, loadId).seq });
   }
 
   function batch(socket, payload, ack) {
     const clientId = socket.data.logClientId;
     if (!clientId) return ack({ ok: false, reason: 'no_hello' });
     if (payload?.loadId !== socket.data.logLoadId) return ack({ ok: false, reason: 'bad_load' });
-    if (!Array.isArray(payload.lines)) return ack({ ok: false, reason: 'bad_batch' });
-    if (payload.lines.length > limits.ingestMaxLines) {
-      log.warn('log', 'batch.refused', { clientId, reason: 'too_many', lines: payload.lines.length });
-      return ack({ ok: false, reason: 'too_many' });
+    const refusal = linesRefusal(payload.lines);
+    if (refusal) {
+      if (refusal === 'too_many') log.warn('log', 'batch.refused', { clientId, reason: refusal, lines: payload.lines.length });
+      return ack({ ok: false, reason: refusal });
     }
-    let window = windows.get(socket);
+    // The rate window guards the socket path only: a snapshot tail and a beacon are each one bounded message.
+    const state = loadState(clientId, socket.data.logLoadId);
+    let window = state.window;
     if (!window || now() - window.start > limits.ingestWindowMs) {
       window = { start: now(), bytes: 0, warned: false };
-      windows.set(socket, window);
+      state.window = window;
     }
     for (const line of payload.lines) if (typeof line === 'string') window.bytes += line.length;
     if (window.bytes > limits.ingestWindowBytes) {
@@ -159,22 +191,20 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
       }
       return ack({ ok: false, reason: 'rate' });
     }
-    store.reopen(`client:${clientId}`);
+    store.reopen(clientStreamId(clientId));
     const result = storeBatch({ clientId, loadId: socket.data.logLoadId, lines: payload.lines, payload });
     return ack({ ok: true, acked: result.lastSeq, bad: result.bad, level: levelForSocket(socket) });
   }
 
   function setLevel(socket, payload, ack) {
     const level = payload?.level;
-    if (level !== 'debug' && level !== 'trace') return ack({ ok: false, reason: 'bad_request' });
+    if (!isCaptureLevel(level)) return ack({ ok: false, reason: 'bad_request' });
     if (payload.roomId == null) return setClientLevel(socket, level, ack);
-    // The lobby channel and a socket's own room are Socket.IO rooms too, but never a game room.
-    const isGameRoom = typeof payload.roomId === 'string' && payload.roomId !== NOT_A_ROOM && payload.roomId !== socket.id;
-    if (!isGameRoom || !socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
+    if (!isGameRoom(payload.roomId, socket.id) || !socket.rooms.has(payload.roomId)) return ack({ ok: false, reason: 'bad_request' });
     if (level === 'trace') roomLevels.set(payload.roomId, 'trace');
     else roomLevels.delete(payload.roomId);
     const by = socket.data.logClientId ?? socket.id;
-    io.to(payload.roomId).emit('log:level', { level, by });
+    io.to(payload.roomId).emit(LOG_EVENTS.level, { level, by });
     log.info('log', 'level', { level, by }, { room: payload.roomId });
     return ack({ ok: true, level });
   }
@@ -184,7 +214,7 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
     if (!clientId) return ack({ ok: false, reason: 'no_hello' });
     if (level === 'trace') clientLevels.set(clientId, 'trace');
     else clientLevels.delete(clientId);
-    socket.emit?.('log:level', { level: levelForSocket(socket), by: clientId });
+    socket.emit?.(LOG_EVENTS.level, { level: levelForSocket(socket), by: clientId });
     log.info('log', 'level', { level, by: clientId, scope: 'client' });
     return ack({ ok: true, level: levelForSocket(socket) });
   }
@@ -206,13 +236,13 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
 
   return {
     attachSocket(socket) {
-      socket.on('log:hello', guarded((payload, ack) => hello(socket, payload, ack)));
-      socket.on('log:batch', guarded((payload, ack) => batch(socket, payload, ack)));
-      socket.on('log:ping', guarded((payload, ack) => ack({ t0: payload?.t0 ?? null, serverT: now() })));
-      socket.on('log:setLevel', guarded((payload, ack) => setLevel(socket, payload, ack)));
+      socket.on(LOG_EVENTS.hello, guarded((payload, ack) => hello(socket, payload, ack)));
+      socket.on(LOG_EVENTS.batch, guarded((payload, ack) => batch(socket, payload, ack)));
+      socket.on(LOG_EVENTS.ping, guarded((payload, ack) => ack({ t0: payload?.t0 ?? null, serverT: now() })));
+      socket.on(LOG_EVENTS.setLevel, guarded((payload, ack) => setLevel(socket, payload, ack)));
       socket.on('disconnect', () => {
         try {
-          if (socket.data.logClientId) store.close(`client:${socket.data.logClientId}`);
+          if (socket.data.logClientId) store.close(clientStreamId(socket.data.logClientId));
         } catch {
           // closing is best effort
         }
@@ -222,9 +252,9 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
       try {
         const body = JSON.parse(typeof req.body === 'string' ? req.body : '');
         const { clientId, loadId, lines } = body ?? {};
-        const valid = CLIENT_ID.test(clientId ?? '') && LOAD_ID.test(loadId ?? '');
-        if (valid && Array.isArray(lines) && lines.length <= limits.ingestMaxLines) {
-          if (store.stream(`client:${clientId}`)?.meta?.loads?.[loadId]) storeBatch({ clientId, loadId, lines, payload: body });
+        const admitted = isClientId(clientId) && isLoadId(loadId) && linesRefusal(lines) === null;
+        if (admitted && store.stream(clientStreamId(clientId))?.meta?.loads?.[loadId]) {
+          storeBatch({ clientId, loadId, lines, payload: body });
         }
       } catch {
         // a bad beacon is dropped; the endpoint always answers 204
@@ -237,12 +267,17 @@ export function createLogIngest({ store, log, io, now = Date.now, limits = LIMIT
      * a second round trip. Same validation and seq dedupe as a batch; the later batch is a no-op.
      */
     acceptTail(socket, tail) {
+      const clientId = socket?.data?.logClientId ?? null;
       try {
-        const clientId = socket?.data?.logClientId;
-        if (!clientId || tail?.loadId !== socket.data.logLoadId) return 0;
-        if (!Array.isArray(tail.lines) || tail.lines.length > limits.ingestMaxLines) return 0;
+        const refusal =
+          !clientId || tail?.loadId !== socket.data.logLoadId ? 'bad_load' : linesRefusal(tail.lines);
+        if (refusal) {
+          log.warn('log', 'tail.refused', { clientId, reason: refusal });
+          return 0;
+        }
         return storeBatch({ clientId, loadId: tail.loadId, lines: tail.lines, payload: tail }).stored;
-      } catch {
+      } catch (error) {
+        log.warn('log', 'tail.failed', { clientId, error: String(error?.message ?? error) });
         return 0;
       }
     },

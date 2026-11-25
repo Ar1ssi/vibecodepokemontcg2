@@ -156,7 +156,8 @@ const cardImageOf = (card) => card?.images?.large || card?.image || card?.images
 /**
  * @returns {Promise<{unmount: () => void}|null>} null when WebGL is unavailable or the start was
  *   cancelled (`isCancelled()`): the caller mounts the DOM scene instead. A start that throws has
- *   already released everything it made, WebGL context included.
+ *   already released everything it made once the stage exists (WebGL context included), and its
+ *   host element before that.
  */
 export async function createTabletopApp(options) {
   const life = { teardown: null };
@@ -197,6 +198,8 @@ async function buildTabletopApp(options, life) {
 
   const host = el('div', 'tt-root');
   root.append(host);
+  // Until the stage exists there is only the host to release; `teardown` replaces this below.
+  life.teardown = () => host.remove();
   const stage = createStage({ host, quality, instant, timeScale, manual: manualClock, onLost: () => onLost() });
   if (!stage) {
     host.remove();
@@ -2000,6 +2003,9 @@ async function buildTabletopApp(options, life) {
   // The table's surface (a mat's print loads over the network) starts now and is waited for before
   // the warm-up draws: the mat in the frame is one more set of shaders.
   const surfaceReady = stage.setSurface(surface);
+  // A rejection while the shaders warm is reported by the await below; this only keeps it from
+  // being unhandled in the meantime, or if the warm-up throws first and nothing awaits it.
+  surfaceReady.catch(() => {});
   await warmShaders();
   if (stopped()) return abandon();
   settle();

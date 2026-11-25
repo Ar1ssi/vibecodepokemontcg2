@@ -31,7 +31,7 @@ import { clothNormalTexture, loadTexture } from './tt-textures.js';
  * backstop so a hidden tab never parks one half-way. The loop sleeps when nothing moves.
  */
 
-// With 4× MSAA on the canvas, 1.5 device pixels per CSS pixel looks as crisp as 2 for 44 % fewer
+// With the browser's default MSAA on the canvas (antialias: true; typically 4×), 1.5 device pixels per CSS pixel looks as crisp as 2 for 44 % fewer
 // fragments in every pass (a retina or 4K screen at 2 was the frame's main cost).
 const PIXEL_RATIO_MAX = 1.5;
 // While only tickers run (a held thing's sway, a carried thing following the pointer) a display

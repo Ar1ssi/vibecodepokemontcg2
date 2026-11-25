@@ -107,7 +107,7 @@ export function startSpectatorSession() {
 export function endSpectatorSession() {
   const wasBroadcast = active && mode === 'broadcast';
   // syncUsernames lent this client the watched seat's name; give its own back.
-  if (active && systemState.spectatorUsername) {
+  if (active && typeof systemState.spectatorUsername === 'string') {
     systemState.p2SelfUsername = systemState.spectatorUsername;
   }
   active = false;

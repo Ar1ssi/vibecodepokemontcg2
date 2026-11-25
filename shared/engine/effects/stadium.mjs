@@ -11,6 +11,7 @@ import {
   stadiumOnceConditionMet,
 } from '../rules/stadium-effects.mjs';
 import { executeSteps, matchesEnergyTypeFilter, attachToRoot, createPendingChoice } from './executor.mjs';
+import { BENCH_LIMIT } from './bench-limit.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { isEnergy as isEnergyCard } from '../cards.mjs';
 import { hasCondition } from '../rules/special-conditions.mjs';
@@ -36,13 +37,12 @@ function stadiumServerConditionMet(condition, player, opponent = null) {
   }
   if (condition.type === 'bench-not-full') {
     const bench = (player.zones.bench || []).filter((c) => !c.attachedTo);
-    return bench.length < 5;
+    return bench.length < BENCH_LIMIT;
   }
   if (condition.type === 'no-special-energy-in-discard') {
     return !(player.zones.discard || []).some(
       (c) =>
-        /energy/i.test(String(c?.type || c?.name || '')) &&
-        classifyEnergyEffect(c) !== 'basic'
+        isEnergyCard(c) && classifyEnergyEffect(c) !== 'basic'
     );
   }
   if (condition.type === 'supporter-played' || condition.type === 'named-supporter') {
@@ -162,6 +162,17 @@ function runTypedEnergyMove(draft, { playerId, player, stadium, opt, memo = { ph
   });
 }
 
+/** The discardCost step that pays a parsed Stadium hand-discard cost. */
+function discardCostStep(parsedCost) {
+  const cost = parsedCost || {};
+  const step = { type: 'discardCost', count: cost.n || 1 };
+  if (cost.type === 'discard-energy') step.energyOnly = true;
+  if (cost.type === 'discard-single-strike') step.tagFilter = 'single-strike';
+  if (cost.basicOnly) step.basicOnly = true;
+  if (Array.isArray(cost.types) && cost.types.length) step.energyTypes = cost.types;
+  return step;
+}
+
 /**
  * Executes the active stadium effect or resumes a suspended stadium choice.
  *
@@ -195,8 +206,6 @@ export function executeStadium(draft, {
   // activation ends the turn even though it re-enters without the preview.
   const preview = parseStadiumOncePerTurn(stadium);
   const turnEndsOnResolve = !!preview?.turnEnds;
-  const isEnergy = (c) =>
-    /energy/i.test(String(c?.type || '') + String(c?.name || ''));
 
   if (resumeToken?.typedMove) {
     return runTypedEnergyMove(draft, {
@@ -249,7 +258,7 @@ export function executeStadium(draft, {
   if (
     preview?.cost?.type === 'discard-energy' &&
     !(player.zones.hand || []).some(
-      (c) => isEnergy(c) && matchesEnergyTypeFilter(c, preview.cost.types)
+      (c) => isEnergyCard(c) && matchesEnergyTypeFilter(c, preview.cost.types)
     )
   ) {
     draft.pendingChoice = null;
@@ -357,28 +366,12 @@ export function executeStadium(draft, {
         ...(opt.types ? { types: opt.types } : {}),
       });
     } else if (opt.kind === 'discard-draw') {
-      const cost = opt.cost || {};
-      const discardStep = { type: 'discardCost', count: cost.n || 1 };
-      if (cost.type === 'discard-energy') discardStep.energyOnly = true;
-      if (cost.type === 'discard-single-strike') {
-        discardStep.tagFilter = 'single-strike';
-      }
-      if (cost.basicOnly) discardStep.basicOnly = true;
-      if (Array.isArray(cost.types) && cost.types.length) {
-        discardStep.energyTypes = cost.types;
-      }
-      steps.push(discardStep);
+      steps.push(discardCostStep(opt.cost));
       steps.push({ type: 'draw', count: opt.n || 1 });
     } else if (opt.kind === 'draw-until-type') {
       // Mystery Garden: pay the Energy cost, then draw until the hand reaches
       // the count of matching Pokémon in play (evaluated at execution time).
-      const cost = opt.cost || {};
-      const discardStep = { type: 'discardCost', count: cost.n || 1 };
-      if (cost.type === 'discard-energy') discardStep.energyOnly = true;
-      if (Array.isArray(cost.types) && cost.types.length) {
-        discardStep.energyTypes = cost.types;
-      }
-      steps.push(discardStep);
+      steps.push(discardCostStep(opt.cost));
       steps.push({
         type: 'drawUntil',
         ...(opt.targetType ? { targetType: opt.targetType } : { target: 5 }),
@@ -386,14 +379,7 @@ export function executeStadium(draft, {
     } else if (opt.kind === 'discard-search') {
       // Giant Hearth / Viridian Forest: pay the hand-discard cost, then search
       // the deck for the printed Energy.
-      const cost = opt.cost || {};
-      const discardStep = { type: 'discardCost', count: cost.n || 1 };
-      if (cost.type === 'discard-energy') discardStep.energyOnly = true;
-      if (cost.basicOnly) discardStep.basicOnly = true;
-      if (Array.isArray(cost.types) && cost.types.length) {
-        discardStep.energyTypes = cost.types;
-      }
-      steps.push(discardStep);
+      steps.push(discardCostStep(opt.cost));
       steps.push({
         type: 'searchDeck',
         what: opt.searchWhat || 'Energy',

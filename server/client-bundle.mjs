@@ -5,18 +5,14 @@
 // `pnpm build` once and then edited the source must keep seeing the source.
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeployHost, isOff, isOn } from './env-settings.mjs';
 
 export const BUNDLE_DIR_NAME = 'dist';
 export const BUNDLE_URL_PREFIX = `/${BUNDLE_DIR_NAME}/`;
 export const BUNDLE_MANIFEST_FILE = 'manifest.json';
 
-const isOn = (value) => /^(1|true|on|yes)$/i.test(String(value ?? '').trim());
-const isOff = (value) => /^(0|false|off|no)$/i.test(String(value ?? '').trim());
-
-/** True on a host that deploys the site: Render sets `RENDER`; anything else sets NODE_ENV. */
-export function isDeployHost(env = {}) {
-  return isOn(env.RENDER) || env.NODE_ENV === 'production';
-}
+// The deployment rule lives in env-settings.mjs; scripts/build-client.mjs still imports it from here.
+export { isDeployHost };
 
 /** `CLIENT_BUNDLE=1|0` decides; unset, a deploy host serves the bundle and a dev machine does not. */
 export function wantsClientBundle(env = {}) {

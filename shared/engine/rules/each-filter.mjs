@@ -67,6 +67,8 @@ export function eachFilterMatches(owner, root, filter = {}) {
     return false;
   }
   // Pupitar Dust Devil: "each non-{F} Pokémon".
-  if (filter.excludeTypes?.some((type) => (top.types || []).some((t) => String(t).toLowerCase() === type))) return false;
+  // The board spells the Darkness type 'Dark' or 'Darkness'.
+  const typeKey = (t) => (String(t).toLowerCase() === 'dark' ? 'darkness' : String(t).toLowerCase());
+  if (filter.excludeTypes?.some((type) => (top.types || []).some((t) => typeKey(t) === typeKey(type)))) return false;
   return true;
 }

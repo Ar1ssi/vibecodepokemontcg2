@@ -10,7 +10,7 @@ const templatePath = fileURLToPath(new URL('../../client/index.ejs', import.meta
 const template = readFileSync(templatePath, 'utf8');
 
 const render = (locals) =>
-  ejs.render(template, { importDataJSON: null, e2eAllowed: false, ...locals }, { filename: templatePath });
+  ejs.render(template, { e2eAllowed: false, ...locals }, { filename: templatePath });
 
 const ETB_IDS = ['etbTabShelf', 'etbTabCollection', 'etbShelfPanel', 'etbCollectionPanel'];
 const hasId = (html, id) => html.includes(`id="${id}"`);

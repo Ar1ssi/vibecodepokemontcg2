@@ -20,7 +20,16 @@ test('053 row 4: only a two-seat room chooses, and the seat must still be listed
   assert.equal(roomFormatSeatRefusal({ seat, requestRoomId: 'r1', room: three, socketId: 's1' }), 'not_seated');
   const left = { players: new Set(['Gary', 'Misty']) };
   assert.equal(roomFormatSeatRefusal({ seat, requestRoomId: 'r1', room: left, socketId: 's1' }), 'not_seated');
-  assert.equal(roomFormatSeatRefusal({ seat, requestRoomId: 'r1', room: room(), socketId: 's1' }), null);
+  const held = gameRoom([['s1', 'p1']]);
+  assert.equal(roomFormatSeatRefusal({ seat, requestRoomId: 'r1', room: room(), gameRoom: held, socketId: 's1' }), null);
+});
+
+test('053 row 4: without an authoritative room nothing proves the socket holds the seat', () => {
+  assert.equal(roomFormatSeatRefusal({ seat, requestRoomId: 'r1', room: room(), socketId: 's1' }), 'not_seated');
+  assert.equal(
+    roomFormatSeatRefusal({ seat, requestRoomId: 'r1', room: room(), gameRoom: undefined, socketId: 's1' }),
+    'not_seated',
+  );
 });
 
 test('053 row 4: authoritative mode needs the socket that holds the seat, not just the username', () => {

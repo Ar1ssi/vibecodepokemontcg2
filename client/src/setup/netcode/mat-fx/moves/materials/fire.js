@@ -18,7 +18,7 @@
 // passes stand at rising heights over the drawer's lift, so the white-hot core rides above the
 // body and the cast pass pools the flame's light on the cloth beside it.
 import { rgbCss } from '../../fx-colors.mjs';
-import { mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, mergeFxMods, withFxMod, withLiftZ } from './_mods.js';
 import { grainPass, sphere, tonguePath, wobble } from './_shared.js';
 
 const TAU = Math.PI * 2;
@@ -76,9 +76,7 @@ const PALETTE = Object.freeze({
 /** The fire material drawn in `palette` (any palette with the same keys). */
 function fireKit(palette) {
   const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.body, width: 0.14, gain: 1.8 }) });
-  /** `draw` with this kit's dissolve edge named for every fill it makes. */
-  const edged = (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+  const edged = edgedBy(edge);
 
   /** A soft radial glow, red at the rim. */
   function glow(ctx, x, y, r, alpha) {

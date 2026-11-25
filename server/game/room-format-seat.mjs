@@ -4,24 +4,25 @@
 
 /**
  * Refuses a `roomFormatAction` unless it comes from one of exactly two seated players, from the
- * socket that holds that seat. A username alone is not proof: in authoritative mode the engine
- * room's socket map must name this socket for that player.
+ * socket that holds that seat. A username alone is not proof: the engine room's socket map must
+ * name this socket for that player.
  *
  * @param {object} input
  * @param {{ roomId: string, username: string }|null} input.seat what this socket joined as
  * @param {string} [input.requestRoomId] the room the action names
  * @param {{ players: Set<string> }|null} input.room the roomInfo entry
  * @param {{ socketToPlayer: Map<string, string>,
- *   getPlayerIdByUsername: (username: string) => string|null }|null} [input.gameRoom]
+ *   getPlayerIdByUsername: (username: string) => string|null }|null|undefined} input.gameRoom
+ *   the room's authority; without one nothing proves the socket holds the seat
  * @param {string} input.socketId
  * @returns {string|null} a refusal reason, or null when the sender may act
  */
-export function roomFormatSeatRefusal({ seat, requestRoomId, room, gameRoom = null, socketId }) {
+export function roomFormatSeatRefusal({ seat, requestRoomId, room, gameRoom, socketId }) {
   if (!seat || !room || requestRoomId !== seat.roomId) return 'not_seated';
   if (!room.players.has(seat.username)) return 'not_seated';
   // Legacy relay can list a third player on reconnect; the choice belongs to a two-seat room.
   if (room.players.size !== 2) return 'not_seated';
-  if (!gameRoom) return null;
+  if (!gameRoom) return 'not_seated';
   const playerId = gameRoom.getPlayerIdByUsername(seat.username);
   if (!playerId || gameRoom.socketToPlayer.get(socketId) !== playerId) return 'not_seated';
   return null;

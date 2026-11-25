@@ -16,12 +16,23 @@
 
 import { getCardRegistry } from './apply-view.js';
 import { translateActionToCmd } from './dual-run-bridge.js';
+import { soloCommandSeat } from './solo-seat.mjs';
 import { DISPOSITION_TABLE } from '../../../../shared/engine/commands.mjs';
+import { log } from '../../log/client-log.js';
+
+export const NO_ROOM_MESSAGE = 'Join a room or open Solo to play.';
+export const DISPATCH_MISS_MESSAGE = "That action can't be sent to the server.";
+
+// One chat line per user action: a click can reach several dispatch calls (a board-wide zone op
+// loops), so refusals inside this window share the line already posted.
+const NOTICE_WINDOW_MS = 1000;
 
 let dispatchContext = {
   processAction: null,
   systemState: null,
+  notify: null,
 };
+let lastNoticeAt = -Infinity;
 
 /**
  * Wires the production dependencies this module cannot statically import.
@@ -31,19 +42,82 @@ let dispatchContext = {
  * @param {Function} [ctx.processAction] `(user, emit, action, parameters) => void`
  *   from `client/src/setup/general/process-action.js`.
  * @param {object} [ctx.systemState] Live `systemState` — read for `serverAuthoritative`.
+ * @param {Function} [ctx.notify] `(text) => void` — posts one chat line to the player.
  */
 export function setAuthoritativeDispatchContext(ctx = {}) {
   if (ctx.processAction !== undefined)
     dispatchContext.processAction = ctx.processAction;
   if (ctx.systemState !== undefined)
     dispatchContext.systemState = ctx.systemState;
+  if (ctx.notify !== undefined) dispatchContext.notify = ctx.notify;
 }
 
 /**
  * Clears the injected context (room teardown, and between test cases).
  */
 export function resetAuthoritativeDispatchContext() {
-  dispatchContext = { processAction: null, systemState: null };
+  dispatchContext = { processAction: null, systemState: null, notify: null };
+  lastNoticeAt = -Infinity;
+}
+
+/**
+ * True when this client is in a room the server runs: seated in a two-player or solo room, or
+ * watching one. False before the join acknowledgement, in the Multiplayer lobby, and after a
+ * leave, since each of those clears the three flags this reads.
+ *
+ * @param {object} [options={}] Test seam: `options.systemState`.
+ * @returns {boolean}
+ */
+export function isInRoom(options = {}) {
+  const systemState = options.systemState || dispatchContext.systemState;
+  return Boolean(
+    systemState?.serverAuthoritative || systemState?.solo || systemState?.isTwoPlayer
+  );
+}
+
+function postNotice(text, options) {
+  const now = (options.now || Date.now)();
+  if (now - lastNoticeAt < NOTICE_WINDOW_MS) return;
+  lastNoticeAt = now;
+  const notify = options.notify || dispatchContext.notify;
+  if (typeof notify === 'function') notify(text);
+}
+
+/**
+ * The no-room refusal. When the client is in no room, tells the player once ("Join a room or
+ * open Solo to play."), logs `dispatch.refused`, and returns true: the caller must stop, not
+ * fall through to a local body. Returns false in a room, and when no `systemState` has been
+ * wired (module tests; the page wires it before any action can fire).
+ *
+ * @param {object} [options={}] Test seams: `systemState`, `notify`, `now`; `options.action`
+ *   names the refused action in the log line.
+ * @returns {boolean} True when the action was refused.
+ */
+export function refuseWithoutRoom(options = {}) {
+  const systemState = options.systemState || dispatchContext.systemState;
+  if (!systemState || isInRoom(options)) return false;
+  log.warn('cmd', 'dispatch.refused', {
+    action: options.action ?? null,
+    reason: 'no_room',
+  });
+  postNotice(NO_ROOM_MESSAGE, options);
+  return true;
+}
+
+/**
+ * The in-room gate-miss refusal for a caller with no local body to fall back on (attack,
+ * retreat, pass, Stadium, ability): logs `dispatch.refused`, tells the player once, and
+ * returns true so the caller stops.
+ *
+ * @param {string} action The action that could not be sent.
+ * @param {string} reason Why: `untranslatable`, `unregistered_card`, `not_wired`.
+ * @param {object} [options={}] Test seams: `notify`, `now`.
+ * @returns {true}
+ */
+function refuseGateMiss(action, reason, options) {
+  log.warn('cmd', 'dispatch.refused', { action, reason });
+  postNotice(DISPATCH_MISS_MESSAGE, options);
+  return true;
 }
 
 /**
@@ -134,20 +208,22 @@ export function buildAuthoritativeCardHints(instanceIds = {}, options = {}) {
 /**
  * Sends a `server_command` action to the server without running its legacy local body.
  *
- * Fails **open** — returns false without emitting — whenever the command cannot be built:
- * no `processAction` wired, or `translateActionToCmd` yields null for this
- * action/parameters pair. A false return means "this action was not dispatched"; the
- * gated call site must then fall through to its legacy body, so an unresolvable action
- * degrades to today's behavior rather than silently discarding the player's move.
- * (Design deviation, slice 0 — see design 003 §Deviations.)
+ * Returns false without emitting whenever the command cannot be built: no `processAction`
+ * wired, or `translateActionToCmd` yields null for this action/parameters pair. A false
+ * return means "this action was not dispatched"; a call site that still has a local body
+ * (the zone ops) falls through to it, and one that has none refuses (`failClosed` on
+ * `dispatchAuthoritativeAction`). (Design 003 slice 0, design 090.)
+ *
+ * With the client in no room it returns **true** after refusing (`refuseWithoutRoom`): the
+ * return value means "the caller must stop", whether the command was sent or refused.
  *
  * One exception to failing open: `translateActionToCmd` throws in dev-like environments for
  * an action with no `DISPOSITION_TABLE` entry (its own edge case 14 — an unclassified action
  * "must never silently no-op"). That throw is deliberately not caught here; a missing
  * classification is a build-time bug, not a runtime fallback.
  *
- * `pushAction` relaying and the `exportActionData` append both live inside
- * `processAction` and are untouched by this path (design 003 §Constraints, edge case 8).
+ * `pushAction` relaying lives inside `processAction` and is untouched by this path
+ * (design 003 §Constraints, edge case 8).
  *
  * @param {string} action Legacy action name, e.g. `'moveCardBundle'`.
  * @param {any[]} parameters Parameters exactly as the legacy call site would have passed
@@ -155,7 +231,8 @@ export function buildAuthoritativeCardHints(instanceIds = {}, options = {}) {
  * @param {object} [options={}] `options.user` ('self' | 'opp', default 'self'): the side
  *   acting, which a solo room turns into the command's seat. Test seams:
  *   `options.processAction`, `options.translate`.
- * @returns {boolean} True when the action was handed to `processAction`.
+ * @returns {boolean} True when the action was handed to `processAction`, or refused for want
+ *   of a room — either way the caller stops.
  */
 export function emitAuthoritativeCommand(
   action,
@@ -163,14 +240,20 @@ export function emitAuthoritativeCommand(
   options = {}
 ) {
   if (!action || typeof action !== 'string') return false;
+  if (refuseWithoutRoom({ ...options, action })) return true;
 
   const processAction = options.processAction || dispatchContext.processAction;
   if (typeof processAction !== 'function') return false;
 
   const translate = options.translate || translateActionToCmd;
-  if (!translate(action, parameters)) return false;
+  const user = options.user === 'opp' ? 'opp' : 'self';
+  // The seat processAction will translate for: a solo room holds one instance map per seat,
+  // so a seatless check cannot resolve a syncInstance the send itself can.
+  const systemState = options.systemState || dispatchContext.systemState;
+  const seat = soloCommandSeat({ ...systemState, user });
+  if (!translate(action, parameters, { seat })) return false;
 
-  processAction(options.user === 'opp' ? 'opp' : 'self', true, action, parameters);
+  processAction(user, true, action, parameters);
   return true;
 }
 
@@ -205,11 +288,12 @@ export function readCardInstanceId(element) {
  * is unit-testable: `move-card-bundle.js` itself imports `state.js` and cannot be
  * loaded under `node --test`.
  *
- * Returns true only when the action was actually handed to the server. A true return is
- * the caller's instruction to skip its legacy local-mutation body entirely (`moveCard`,
- * `moveCardMessage`, the rules-bridge dispatch). Every false path — flag off, relayed
- * mirror-apply, a card this client cannot identify from the authoritative registry, an
- * untranslatable action — leaves the caller running exactly the code it runs today.
+ * Returns true when the action was handed to the server, or refused because the client is in
+ * no room (`refuseWithoutRoom`). A true return is the caller's instruction to skip its legacy
+ * local-mutation body entirely (`moveCard`, `moveCardMessage`, the rules-bridge dispatch).
+ * Every false path — relayed mirror-apply, a card this client cannot identify from the
+ * authoritative registry, an untranslatable action — leaves the caller running the kept
+ * local body.
  *
  * Scope, deliberately tight: only a locally-initiated action on this client's own side
  * (`user === 'self'`, or either side in a solo room — `actsForSide`; `emit` true, no
@@ -247,9 +331,10 @@ export function readCardInstanceId(element) {
  * gate just forwards the same `[oInitiator, ...commandArgs]` shape the legacy call site
  * already builds for its own `processAction` call, unchanged.
  *
- * Same scope and fail-open contract as `dispatchAuthoritativeMoveCardBundle`: only a
- * locally-initiated call (`user === 'self'`, `emit` true) is gated; a relayed mirror-apply
- * (`emit` false) or an untranslatable action falls through to the legacy body.
+ * Same scope as `dispatchAuthoritativeMoveCardBundle`: only a locally-initiated call
+ * (`user === 'self'`, `emit` true) is gated; a relayed mirror-apply (`emit` false) or, in a
+ * room, an untranslatable action falls through to the kept local body (design 090 Options 3).
+ * With the client in no room a local call is refused instead: one chat line, return true.
  *
  * @param {string} action Legacy action name, e.g. `'shuffleZone'`.
  * @param {object} params
@@ -282,9 +367,13 @@ export function dispatchAuthoritativeZoneOp(action, params = {}, options = {}) {
  * exactly as the legacy call site already builds it. The server resolves the acting
  * Pokemon itself (its own `active` zone), which is why no registry lookup is needed here.
  *
- * Same scope and fail-open contract as every other gate in this module: only a
- * locally-initiated call (`user === 'self'`, `emit` true) is gated; a relayed mirror-apply
- * or an untranslatable action falls through to the legacy body.
+ * Same scope as every other gate in this module: only a locally-initiated call
+ * (`user === 'self'`, `emit` true) is gated; a relayed mirror-apply (`emit` false) returns
+ * false. With the client in no room a local call is refused (design 090): one chat line,
+ * return true, the caller stops. In a room an untranslatable action returns false so a call
+ * site with a local body falls through to it, unless `params.failClosed` — for a caller with
+ * no body to fall back on — which logs `dispatch.refused`, tells the player once and
+ * returns true.
  *
  * @param {string} action Legacy action name, e.g. `'attack'`.
  * @param {object} params
@@ -292,16 +381,21 @@ export function dispatchAuthoritativeZoneOp(action, params = {}, options = {}) {
  * @param {boolean} params.emit
  * @param {any[]} params.commandArgs Parameters in the exact order the legacy call site
  *   already passes to its own `processAction`.
- * @param {object} [options={}] Test seams: `systemState`, `processAction`, `translate`.
- * @returns {boolean} True when dispatched — caller must skip its legacy body.
+ * @param {boolean} [params.failClosed=false] Refuse on a gate miss in a room.
+ * @param {object} [options={}] Test seams: `systemState`, `processAction`, `translate`,
+ *   `notify`, `now`.
+ * @returns {boolean} True when dispatched or refused — caller must stop, not run a local body.
  */
 export function dispatchAuthoritativeAction(action, params = {}, options = {}) {
-  const { user, emit, commandArgs = [] } = params;
+  const { user, emit, commandArgs = [], failClosed = false } = params;
 
+  if (emit && refuseWithoutRoom({ ...options, action })) return true;
   if (!isAuthoritativeDispatchActive(options)) return false;
   if (!actsForSide(user, options) || !emit) return false;
 
-  return emitAuthoritativeCommand(action, commandArgs, { ...options, user });
+  const sent = emitAuthoritativeCommand(action, commandArgs, { ...options, user });
+  if (!sent && failClosed) return refuseGateMiss(action, 'not_dispatched', options);
+  return sent;
 }
 
 /**
@@ -320,8 +414,10 @@ export function dispatchAuthoritativeAction(action, params = {}, options = {}) {
  * (the legacy index) is carried through for the mirror relay only; the server addresses
  * the card by the hint's `instanceId`.
  *
- * Fails open when the card is not in the registry (a legacy-rendered card, a stale click,
- * or a card removed by a concurrent view) — the call site then runs its legacy body.
+ * When the card is not in the registry (a stale click, or a card removed by a concurrent
+ * view) it returns false so a call site with a local body runs it; `params.failClosed` — for
+ * a caller with no body — logs `dispatch.refused`, tells the player once and returns true.
+ * With the client in no room a local call is refused and returns true (design 090).
  *
  * @param {object} params
  * @param {string} params.user 'self' | 'opp'.
@@ -332,9 +428,10 @@ export function dispatchAuthoritativeAction(action, params = {}, options = {}) {
  * @param {number|boolean} params.index Legacy resolved index (relayed verbatim).
  * @param {number|string|null} params.authoritativeId Server instanceId captured at the
  *   interaction site.
+ * @param {boolean} [params.failClosed=false] Refuse on a gate miss in a room.
  * @param {object} [options={}] Test seams: `systemState`, `registry`, `processAction`,
- *   `translate`.
- * @returns {boolean} True when dispatched — caller must skip its legacy body.
+ *   `translate`, `notify`, `now`.
+ * @returns {boolean} True when dispatched or refused — caller must stop.
  */
 export function dispatchAuthoritativeUseAbility(params = {}, options = {}) {
   const {
@@ -345,20 +442,28 @@ export function dispatchAuthoritativeUseAbility(params = {}, options = {}) {
     zoneId,
     index,
     authoritativeId,
+    failClosed = false,
   } = params;
 
+  if (emit && !incomingHint && refuseWithoutRoom({ ...options, action: 'useAbility' })) {
+    return true;
+  }
   if (!isAuthoritativeDispatchActive(options)) return false;
   if (!actsForSide(user, options) || !emit) return false;
   if (incomingHint) return false;
 
   const hint = buildAuthoritativeCardHint(authoritativeId, options);
-  if (!hint) return false;
+  if (!hint) {
+    return failClosed ? refuseGateMiss('useAbility', 'unregistered_card', options) : false;
+  }
 
-  return emitAuthoritativeCommand(
+  const sent = emitAuthoritativeCommand(
     'useAbility',
     [oInitiator, zoneId, index, hint],
     { ...options, user }
   );
+  if (!sent && failClosed) return refuseGateMiss('useAbility', 'not_dispatched', options);
+  return sent;
 }
 
 /**
@@ -400,6 +505,9 @@ export function dispatchAuthoritativeMoveCardBundle(params = {}, options = {}) {
     authoritativeIds,
   } = params;
 
+  if (emit && !cardHints && refuseWithoutRoom({ ...options, action: 'moveCardBundle' })) {
+    return true;
+  }
   if (!isAuthoritativeDispatchActive(options)) return false;
   if (!actsForSide(user, options) || !emit) return false;
   if (cardHints) return false;

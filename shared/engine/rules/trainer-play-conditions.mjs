@@ -5,6 +5,7 @@
 import { parseTrainerEffect } from './trainer-effects.mjs';
 import { hasCondition } from './special-conditions.mjs';
 import { normalizeStage } from './evolution.mjs';
+import { cardPrintedText } from './trainer-card-text.mjs';
 
 function kindText(card) {
   const subtypes = Array.isArray(card?.subtypes) ? card.subtypes.join(' ') : card?.subtypes || '';
@@ -79,8 +80,7 @@ export function trainerPlayBlockReason({
   evolutionCardsLocked = false,
 }) {
   if (!card) return null;
-  const text = card.text || card.effect || card.cardText || '';
-  const parsed = parseTrainerEffect(Array.isArray(text) ? text.join(' ') : text);
+  const parsed = parseTrainerEffect(cardPrintedText(card));
   if (isSupporterTrainer(card) && turnNumber === 1 && !parsed.turnOnePermission) {
     return "The player going first can't play a Supporter on turn 1.";
   }
@@ -117,7 +117,7 @@ export function trainerPlayBlockReason({
   ) {
     return 'bench_full';
   }
-  if (effectSteps.some((step) => step.type === 'switchOwn' || step.type === 'switch') && benchCount === 0) {
+  if (effectSteps.some((step) => step.type === 'switchOwn') && benchCount === 0) {
     return 'No Benched Pokémon to switch with.';
   }
   if (

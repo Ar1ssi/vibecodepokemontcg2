@@ -23,7 +23,7 @@ export function settleOpeningDraw(draft, { events }) {
     delete draft.openingDrawPending;
     return;
   }
-  if (players.length === 0 || !players.every(hasActive)) return;
+  if (!players.every(hasActive)) return;
   delete draft.openingDrawPending;
   const deck = player.zones?.deck || [];
   if (deck.length === 0) return;

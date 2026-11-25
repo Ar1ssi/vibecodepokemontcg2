@@ -10,6 +10,8 @@
 import { gzip } from 'node:zlib';
 import { promisify } from 'node:util';
 
+import { createFailureLog, createLimiter } from './upstream-limits.mjs';
+
 export const TCGDEX_UPSTREAM = 'https://api.tcgdex.net';
 
 const gzipAsync = promisify(gzip);
@@ -29,7 +31,8 @@ const COOLDOWN_MS = 30 * 1000;
 const UPSTREAM_TIMEOUT_MS = 10 * 1000;
 
 const ALLOWED_PATH = /^\/v2\/en\/(cards|sets|series)(\/[A-Za-z0-9._%-]{1,64})?$/;
-const RECORD_PATH = /^\/v2\/en\/(cards|sets|series)\/[^/]+$/;
+// A canonical key's path: a resource list (/v2/en/cards) or one record of it (/v2/en/cards/xy7-97).
+const KEY_PATH = /^\/v2\/en\/(cards|sets|series)(?:\/([^/]+))?$/;
 const MAX_QUERY_LENGTH = 300;
 
 /**
@@ -51,8 +54,20 @@ export function canonicalTcgdexPath(path, query = {}) {
   return qs ? `${path}?${qs}` : path;
 }
 
+/**
+ * Splits a canonical key once, for everything that needs to know what it asks for.
+ * @param {string} canonical a key from canonicalTcgdexPath
+ * @returns {{ path: string, params: [string, string][], resource: 'cards'|'sets'|'series'|null, id: string|null }}
+ *   `id` is null for a list; `resource` is null for a path outside the three resources.
+ */
+export function parseTcgdexKey(canonical) {
+  const [path, query = ''] = String(canonical).split('?');
+  const match = KEY_PATH.exec(path);
+  return { path, params: [...new URLSearchParams(query)], resource: match?.[1] ?? null, id: match?.[2] ?? null };
+}
+
 export function ttlForTcgdexPath(canonical) {
-  return RECORD_PATH.test(canonical) ? RECORD_TTL_MS : LIST_TTL_MS;
+  return parseTcgdexKey(canonical).id === null ? LIST_TTL_MS : RECORD_TTL_MS;
 }
 
 function isBlockStatus(status) {
@@ -65,6 +80,7 @@ function isBlockStatus(status) {
  * @param {() => number} [options.now]
  * @param {number} [options.maxEntries] LRU bound on cached responses.
  * @param {number} [options.concurrency] Upstream requests in flight at once.
+ * @param {(line: string) => void} [options.log] Told once when TCGdex starts failing or blocking, and once when it recovers.
  * @returns {{ get(canonical: string): Promise<{status: number, body: string, cacheControl: string, gzip: (() => Promise<Buffer>)|null}>, size(): number }}
  */
 export function createTcgdexProxy({
@@ -72,11 +88,12 @@ export function createTcgdexProxy({
   now = () => Date.now(),
   maxEntries = 5000,
   concurrency = 4,
+  log = () => {},
 } = {}) {
   const cache = new Map(); // canonical -> { status, body, expiresAt, gzipped? }
   const inFlight = new Map(); // canonical -> Promise<entry>
-  const waiting = [];
-  let active = 0;
+  const limiter = createLimiter(concurrency);
+  const outage = createFailureLog(log);
   let cooldownUntil = 0;
 
   function remember(key, entry) {
@@ -92,17 +109,6 @@ export function createTcgdexProxy({
       throw error;
     });
     return entry.gzipped;
-  }
-
-  async function withSlot(task) {
-    if (active >= concurrency) await new Promise((resolve) => waiting.push(resolve));
-    active += 1;
-    try {
-      return await task();
-    } finally {
-      active -= 1;
-      waiting.shift()?.();
-    }
   }
 
   async function fetchUpstream(key) {
@@ -140,10 +146,12 @@ export function createTcgdexProxy({
     if (now() < cooldownUntil) return unavailable(stale);
     let upstream;
     try {
-      upstream = await withSlot(() => fetchUpstream(key));
-    } catch {
+      upstream = await limiter.run(() => fetchUpstream(key));
+    } catch (error) {
+      outage.failed('unreachable', `tcgdex proxy: upstream unreachable (${error.message})`);
       return unavailable(stale);
     }
+    if (upstream.status === 200 || upstream.status === 404) outage.recovered('tcgdex proxy: upstream answering again');
     if (upstream.status === 200) {
       const ttl = ttlForTcgdexPath(key);
       const entry = {
@@ -173,6 +181,10 @@ export function createTcgdexProxy({
       };
     }
     if (isBlockStatus(upstream.status)) cooldownUntil = now() + COOLDOWN_MS;
+    outage.failed(
+      `status-${upstream.status}`,
+      `tcgdex proxy: upstream answered ${upstream.status}${isBlockStatus(upstream.status) ? `; no upstream requests for ${COOLDOWN_MS / 1000} s` : ''}`
+    );
     return unavailable(stale);
   }
 

@@ -37,14 +37,12 @@ const dragState = () => ({
 /**
  * Picks the card up as dragStart does: closes popups, identifies it into `mouseClick`, lights
  * the Trainer board for an Item/Supporter, plays the pick-up cue. Null when no drag may start
- * (a replay outside a two-player room, as dragStart refuses, or a spectator, whose drop
- * drag.js refuses).
+ * (a spectator, whose drop drag.js refuses).
  * @param {HTMLImageElement} image the card's mirror <img>
  * @returns {import('./drop-router.mjs').Dragging|null}
  */
 const begin = (image) => {
   if (!image) return null;
-  if (systemState.isReplay && !systemState.isTwoPlayer) return null;
   if (isSpectating()) return null;
   closePopups({ target: image });
   identifyCardElement(image);

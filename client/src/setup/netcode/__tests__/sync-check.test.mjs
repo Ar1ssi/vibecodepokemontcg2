@@ -4,10 +4,9 @@ import {
   computeSyncCheckZones,
   emitSyncCheck,
   shouldTriggerDesyncRecovery,
-  viewBackedGetZone,
   SYNC_CHECK_INTERVAL_MS,
 } from '../sync-check.js';
-import { resetRenderState, applyView } from '../apply-view.js';
+import { resetRenderState, applyView, viewBackedGetZone } from '../apply-view.js';
 
 function makeCard(name) {
   return { name, number: '1', set: 'base1', syncInstance: 1 };

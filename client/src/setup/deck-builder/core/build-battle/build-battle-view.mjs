@@ -6,6 +6,7 @@ import {
   DECK_FORMAT_TCG,
 } from '../../../../../../shared/engine/formats.mjs';
 import { BUILD_BATTLE_BOXES, getBuildBattleBox } from './box-catalog.mjs';
+import { deckVariants } from '../deck-variants.mjs';
 
 /** @returns {object} the editor's `{ [name]: { cards: [{ data, count }], totalCount } }` map for box deck rows. */
 export function deckFromRows(rows = []) {
@@ -142,12 +143,10 @@ export function boxContentsLine(box, setName = box.shortName) {
 
 function deckCountsById(deck) {
   const counts = new Map();
-  for (const group of Object.values(deck || {})) {
-    for (const variant of group?.cards || []) {
-      const id = variant?.data?.id;
-      if (!id) continue;
-      counts.set(id, (counts.get(id) || 0) + (Number(variant.count) || 0));
-    }
+  for (const variant of deckVariants(deck)) {
+    const id = variant?.data?.id;
+    if (!id) continue;
+    counts.set(id, (counts.get(id) || 0) + (Number(variant.count) || 0));
   }
   return counts;
 }

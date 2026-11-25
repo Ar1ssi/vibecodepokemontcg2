@@ -21,8 +21,6 @@ export const BED_KEYS = Object.freeze({ small: 'crowd-amb-small', large: 'crowd-
 export const CRAZY_KEY = 'crowd-crazy';
 export const SWELL_KEY = 'to-large';
 
-const SIGNATURE_ENTRIES = new Set(['mega', 'tera']);
-
 const side = (plan, self, opp) => (plan?.user === 'self' ? self : plan?.user === 'opp' ? opp : null);
 
 function damageReaction(plan) {
@@ -37,7 +35,7 @@ const chance = (key, rng) => (rng() < SMALL_REACTION_CHANCE ? key : null);
 const REACTION_FOR_EFFECT = {
   knockout: (plan) => side(plan, 'cheer-disappoint', plan?.ruleBoxes > 0 ? 'cheer-large' : 'cheer-medium'),
   damage: damageReaction,
-  enter: (plan) => (SIGNATURE_ENTRIES.has(signatureEntryKind(plan?.soundCard)) ? 'additional-reactions' : null),
+  enter: (plan) => (signatureEntryKind(plan?.soundCard) !== null ? 'additional-reactions' : null),
   'gx-used': () => 'additional-reactions',
   'vstar-used': () => 'additional-reactions',
   evolve: (_plan, rng) => chance('small-reactions', rng),

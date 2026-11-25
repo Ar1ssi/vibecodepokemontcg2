@@ -26,9 +26,11 @@ import {
   isTeraCard,
   isRuleBoxPokemon,
 } from './card-classify.mjs';
-import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
+import { stadiumBlocksToolEffects, isEvolutionCard } from './stadium-effects.mjs';
 import { isSpecialEnergyCard } from './special-energy-parse.mjs';
 import { prizesTakenFor } from '../formats.mjs';
+import { SYMBOL_TO_TYPE } from './energy-symbols.mjs';
+import { isAttachedToHost } from './energy-attachment.mjs';
 import {
   holderView,
   parseToolCondition,
@@ -42,19 +44,7 @@ const lower = (v) =>
     .toLowerCase()
     .replace(/[‘’]/g, "'");
 
-export const TYPE_LETTER = {
-  g: 'grass',
-  r: 'fire',
-  w: 'water',
-  l: 'lightning',
-  p: 'psychic',
-  f: 'fighting',
-  d: 'darkness',
-  m: 'metal',
-  y: 'fairy',
-  n: 'dragon',
-  c: 'colorless',
-};
+export const TYPE_LETTER = SYMBOL_TO_TYPE;
 
 export {
   isExCard,
@@ -64,6 +54,7 @@ export {
   isTeraCard,
   isPokemonToolCard,
   attachedTools,
+  isEvolutionCard,
 };
 
 export function attackerTypes(attacker) {
@@ -75,24 +66,6 @@ export function cardHasAbility(card = {}) {
   if (card.ability && (card.ability.name || card.ability.text)) return true;
   if (card.abilityName || card.abilityText) return true;
   if (Array.isArray(card.abilities) && card.abilities.length > 0) return true;
-  return false;
-}
-
-export function isEvolutionCard(card = {}) {
-  if (!card) return false;
-  const stage = String(card.stage || '').toLowerCase();
-  if (stage === 'stage 1' || stage === 'stage 2' || stage === 'evolution')
-    return true;
-  const subs = (card.subtypes || []).map((s) => String(s).toLowerCase());
-  if (
-    subs.includes('stage 1') ||
-    subs.includes('stage 2') ||
-    subs.includes('evolution') ||
-    subs.includes('vmax') ||
-    subs.includes('vstar')
-  ) {
-    return true;
-  }
   return false;
 }
 
@@ -123,13 +96,7 @@ export function isStage2Card(card = {}) {
 
 export function attachedCards(pokemon, zoneCards = []) {
   if (!pokemon) return [];
-  return (zoneCards || []).filter((c) => {
-    if (c === pokemon) return false;
-    if (pokemon.instanceId != null && c.attachedTo === pokemon.instanceId)
-      return true;
-    if (pokemon.image && c.image?.relative === pokemon.image) return true;
-    return false;
-  });
+  return (zoneCards || []).filter((c) => isAttachedToHost(c, pokemon));
 }
 
 function toolBlocked(blockTools, stadium = null) {
@@ -212,7 +179,7 @@ export function preventionForCard(card, attacker, ctx = {}) {
   return base;
 }
 
-export function reductionForCard(card, defender, attacker, { skipSymbolFilter = false, ...ctx } = {}) {
+export function reductionForCard(card, defender, attacker, ctx = {}) {
   if (!card) return 0;
   const t = cardAbilityText(card);
   const red = parseDamageReduction(card).reduce;
@@ -240,17 +207,6 @@ export function reductionForCard(card, defender, attacker, { skipSymbolFilter = 
   if (!attackerMatchesPrintedRuleBox(t, attacker)) {
     return 0;
   }
-  if (!skipSymbolFilter && /\{g\}|\{r\}|\{w\}|\{l\}/i.test(t)) {
-    const letters = [...t.matchAll(/\{([a-z])\}/gi)]
-      .map((m) => TYPE_LETTER[m[1].toLowerCase()])
-      .filter(Boolean);
-    if (
-      letters.length &&
-      !letters.some((ty) => attackerTypes(attacker).includes(ty))
-    )
-      return 0;
-  }
-
   // Defender requirements (e.g. "The Fighting Pokémon this card is attached to takes 30 less damage")
   if (/the fighting pokémon|the \{f\} pokémon/i.test(t)) {
     if (!attackerTypes(defender).includes('fighting')) return 0;
@@ -624,15 +580,16 @@ export function evaluateToolKoPrevention(
   }
 
   const candidates = [];
+  // A survive effect prints the HP the Pokémon is left with ("its remaining HP becomes 10").
   const selfKo = parseKoPrevention(defender);
-  if (selfKo.fullHpOnly || selfKo.surviveHp != null) {
+  if (selfKo.surviveHp != null) {
     candidates.push({ source: defender, ko: selfKo, isTool: false });
   }
 
   if (!isBlocked) {
     for (const tool of attachedTools(defender, zoneCards)) {
       const ko = parseKoPrevention(tool);
-      if (ko.fullHpOnly || ko.surviveHp != null) {
+      if (ko.surviveHp != null) {
         candidates.push({ source: tool, ko, isTool: true });
       }
     }
@@ -645,7 +602,6 @@ export function evaluateToolKoPrevention(
   // A tails flip still happened, so it is reported even when nothing prevented the KO.
   let lastCoinFace = null;
   for (const { source, ko, isTool } of candidates) {
-    if (!ko.fullHpOnly && ko.surviveHp == null) continue;
     if (ko.fullHpOnly && dmgCurrent > 0) continue;
     if (ko.onlyPokemonInPlay && !onlyPokemonInPlay) continue;
     if (dmgTotal < hpThreshold) continue;
@@ -656,7 +612,7 @@ export function evaluateToolKoPrevention(
       if (coinFace !== 'heads') continue;
     }
 
-    const surviveHp = ko.surviveHp ?? 10;
+    const { surviveHp } = ko;
     const hp = baseHp || 0;
     const maxDamageHp = Math.max(0, hp - surviveHp);
     const maxDamageCounters = Math.max(

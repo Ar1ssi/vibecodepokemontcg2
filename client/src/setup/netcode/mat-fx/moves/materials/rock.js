@@ -14,7 +14,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 import { litSideLight, moddedKit, unstyled } from './_kit-mod.js';
 import { mergeFxMods, withFxMod } from './_mods.js';
-import { grainPass, inShadow, shardOutline, styledKit, traceOutline } from './_shared.js';
+import { grainPass, inShadow, seedHash, shardOutline, styledKit, traceOutline } from './_shared.js';
 
 // Design 075 slices 12–14: GPU styles by paint kind (styledKit, _shared.js).
 // Stone: matte faces (few, dim facets), dust halos churn. Ancient: stone with a violet glint.
@@ -54,12 +54,6 @@ const edgeOf = (rgb, gain) => Object.freeze({ dissolve: Object.freeze({ edge: rg
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
-
-/** A stable pseudo-random value in [0, 1) for (seed, index). */
-const hash = (seed, index) => {
-  const v = Math.sin(seed * 12.9898 + index * 78.233) * 43758.5453;
-  return v - Math.floor(v);
-};
 
 const STONE_CORNERS = 5;
 // Flying stones share one outline: the drawers' projectile seed drifts with the flight path
@@ -115,8 +109,8 @@ const angleDiff = (a, b) => {
 export function stoneOutline(x, y, r, seed = 0, spin = 0) {
   const points = [];
   for (let i = 0; i < STONE_CORNERS; i += 1) {
-    const theta = spin + ((i + 0.4 * (hash(seed, i) - 0.5)) / STONE_CORNERS) * TAU;
-    const radius = r * (0.78 + 0.32 * hash(seed, i + 17));
+    const theta = spin + ((i + 0.4 * (seedHash(seed, i) - 0.5)) / STONE_CORNERS) * TAU;
+    const radius = r * (0.78 + 0.32 * seedHash(seed, i + 17));
     points.push([x + Math.cos(theta) * radius, y + Math.sin(theta) * radius]);
   }
   return points;
@@ -144,7 +138,7 @@ export function shadowFacet(points, x, y, r, seed = 0) {
   return run.length === 0 ? [] : [ridgePoint(x, y, r, seed), ...run];
 }
 
-const ridgePoint = (x, y, r, seed) => [x + r * (0.06 + 0.26 * hash(seed, 31)), y + r * (0.04 + 0.26 * hash(seed, 37))];
+const ridgePoint = (x, y, r, seed) => [x + r * (0.06 + 0.26 * seedHash(seed, 31)), y + r * (0.04 + 0.26 * seedHash(seed, 37))];
 
 /** The contiguous run of outline corners within `span` degrees of screen direction `deg`. */
 function cornersFacing(points, x, y, deg, span) {
@@ -175,10 +169,10 @@ export function spireOutline({ x, y, angleDeg, length, width, seed = 0 }) {
   const nx = -uy;
   const ny = ux;
   const at = (f, side) => [x + ux * length * f + nx * width * side, y + uy * length * f + ny * width * side];
-  const lean = (hash(seed, 1) - 0.5) * 0.14;
+  const lean = (seedHash(seed, 1) - 0.5) * 0.14;
   const tip = at(1, lean);
   return {
-    left: [at(0, 0.5), at(SPIRE_SHOULDER, 0.3 + 0.06 * hash(seed, 2)), tip],
+    left: [at(0, 0.5), at(SPIRE_SHOULDER, 0.3 + 0.06 * seedHash(seed, 2)), tip],
     right: [at(0, -0.5), at(SPIRE_SHOULDER - 0.08, -0.32), tip],
   };
 }

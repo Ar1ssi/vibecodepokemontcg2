@@ -95,11 +95,6 @@ function amount(text, re) {
 }
 
 /**
- * The whole-attack condition vocabulary (attack-conditions.mjs) read against a server-built
- * ctx (buildServerAttackContext: `benchNames` marks it). One vocabulary for "does nothing"
- * gates and "N more damage" bonuses. null = unread wording or no server ctx.
- */
-/**
  * Tiered coin bonuses → Map(heads → bonus), or null. Reads "If 1 of them is heads" / "If you
  * get 2 heads" / "If all (both) of them are heads" sentences after a "Flip N coins".
  */
@@ -129,6 +124,11 @@ function serverCount(unit, ctx, attacker) {
   return countUnit(normalizeUnit(unit, attacker?.name), ctx);
 }
 
+/**
+ * The whole-attack condition vocabulary (attack-conditions.mjs) read against a server-built
+ * ctx (buildServerAttackContext: `benchNames` marks it). One vocabulary for "does nothing"
+ * gates and "N more damage" bonuses. null = unread wording or no server ctx.
+ */
 function sharedCondition(cond, ctx, attacker) {
   if (!Array.isArray(ctx?.benchNames)) return null;
   const desc = parseConditionClause(normalizeAttackText(cond, attacker?.name));
@@ -1079,7 +1079,8 @@ export function parseAttackDamage(
     /(?:this pok[ée]mon|it) (?:also )?does (\d+) damage to itself for each damage counter on it/
   );
   if (perCounterSelf > 0) {
-    const counters = ctx.attackerDamage || 0;
+    // The server ctx carries damage points in attackerDamage and counters in attackerDamageCounters.
+    const counters = ctx.attackerDamageCounters ?? ctx.attackerDamage ?? 0;
     selfDamage += perCounterSelf * counters;
     if (!components.includes('self-damage')) components.push('self-damage');
     notes.push(

@@ -188,7 +188,10 @@ function coinPlays(plan) {
   const plays = [['coin-appear', 0]];
   landsAt.forEach((landedAt, i) => {
     const tossMs = tossesMs[i];
-    if (tossMs > 0) plays.push([tossMs >= FULL_TOSS_MS ? `coin-toss-${material}` : `coin-spin-${material}`, landedAt - tossMs]);
+    if (tossMs > 0) {
+      const tossCue = tossMs >= FULL_TOSS_MS ? 'coin-toss' : 'coin-spin';
+      plays.push([`${tossCue}-${material}`, landedAt - tossMs]);
+    }
     plays.push([faces[i] === 'heads' ? 'coin-win' : 'coin-loss', landedAt]);
   });
   return plays;

@@ -11,7 +11,6 @@ import {
 } from '../../state.js';
 import { determineUsername } from '../general/determine-username.js';
 import { getZone } from '../zones/get-zone.js';
-import { isBlockedByReplay } from '../../setup/general/replay-block.js';
 import { fullViewHost } from '../deck-constructor/hydrate-holo.js';
 import { findZoneCardIndex } from './zone-card-lookup.js';
 import { readCardInstanceId } from '../netcode/authoritative-dispatch.js';
@@ -191,18 +190,12 @@ export const openCardContextMenu = (event) => {
       const [userCondition, containerCondition] = conditions;
       return (
         userCondition &&
-        !isBlockedByReplay('contextMenu', buttonId) &&
         containerCondition === mouseClick.zoneId
       );
     });
     button.style.display = shouldDisplay ? 'block' : 'none';
   }
-  document.getElementById('moveButton').style.display = !isBlockedByReplay(
-    'contextMenu',
-    'moveButton'
-  )
-    ? 'block'
-    : 'none';
+  document.getElementById('moveButton').style.display = 'block';
 
   const atLeastOneButtonVisible = Array.from(cardContextMenu.children).some(
     (button) => button.style.display !== 'none'

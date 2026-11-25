@@ -385,7 +385,7 @@ void main() {
   float kind;
   if (d < 0.0) {
     // The canvas, stretched taut: a faint sag toward the middle.
-    h = -1.2 * smoothstep(0.0, -300.0, d);
+    h = -1.2 * (1.0 - smoothstep(-300.0, 0.0, d));
     kind = -1.0;
   } else if (d < ${STAGE_PX.width}.0) {
     h = d < ${APRON_PX.slope}.0 ? mix(0.0, -${APRON_PX.drop}.0, d / ${APRON_PX.slope}.0) : -${APRON_PX.drop}.0;

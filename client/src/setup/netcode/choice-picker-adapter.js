@@ -15,9 +15,8 @@ export const CHOICE_PICKER = {
       cardBackSrc: systemState.cardBackSrc,
     });
     if (!request) throw new Error('pendingChoice has no card options');
-    openCardPicker(request).catch((err) => {
-      console.error('[choice-picker] failed to open:', err);
-    });
+    // Returned so apply-view can fall back to the choice modal if the picker fails to open.
+    return openCardPicker(request);
   },
   close() {
     closeCardPicker(null, true);

@@ -19,6 +19,7 @@ export function createTabletopAudio({ muted = () => false, volume = () => 0.8 } 
   let noise = null;
   let manifest = null;
   const buffers = new Map();
+  const warnedNames = new Set();
   let closed = false;
 
   const ensure = () => {
@@ -132,6 +133,11 @@ export function createTabletopAudio({ muted = () => false, volume = () => 0.8 } 
     osc.stop(start + dur + 0.05);
   };
 
+  // The recorded sample when it loaded, else the synthesized stand-in.
+  const cue = (sampleKey, sampleOptions, synthesize) => {
+    if (!playSample(sampleKey, sampleOptions)) synthesize();
+  };
+
   const VOICES = {
     // Fingers digging into shrink-wrap, the film splitting, then balled up.
     'wrap-tear': () => {
@@ -160,27 +166,22 @@ export function createTabletopAudio({ muted = () => false, volume = () => 0.8 } 
       burst({ at: 0.32, dur: 0.05, gain: 0.25, type: 'highpass', freq: 3000, q: 0.7 });
     },
     'pack-peel': () => crinkle({ dur: 0.08, grains: 10, gain: 0.16, low: 2500, high: 8000 }),
-    'cards-out': () => {
-      if (!playSample('card-drawn', { gain: 0.9 })) burst({ dur: 0.25, gain: 0.1, type: 'lowpass', freq: 2400, attack: 0.05 });
-    },
-    'card-slide': () => {
-      if (!playSample('card-swoosh', { gain: 1.4, rate: 1.1 })) {
-        burst({ dur: 0.14, gain: 0.1, type: 'lowpass', freq: 3000, q: 0.6, attack: 0.03 });
-      }
-    },
-    'card-land': () => {
-      if (!playSample('card-place', { gain: 0.9 })) burst({ dur: 0.03, gain: 0.08, type: 'lowpass', freq: 1500 });
-    },
-    'card-flip': () => {
-      if (!playSample('card-flip', { gain: 0.5 })) burst({ dur: 0.06, gain: 0.08, type: 'bandpass', freq: 1800 });
-    },
+    'cards-out': () =>
+      cue('card-drawn', { gain: 0.9 }, () => burst({ dur: 0.25, gain: 0.1, type: 'lowpass', freq: 2400, attack: 0.05 })),
+    'card-slide': () =>
+      cue('card-swoosh', { gain: 1.4, rate: 1.1 }, () =>
+        burst({ dur: 0.14, gain: 0.1, type: 'lowpass', freq: 3000, q: 0.6, attack: 0.03 })
+      ),
+    'card-land': () =>
+      cue('card-place', { gain: 0.9 }, () => burst({ dur: 0.03, gain: 0.08, type: 'lowpass', freq: 1500 })),
+    'card-flip': () =>
+      cue('card-flip', { gain: 0.5 }, () => burst({ dur: 0.06, gain: 0.08, type: 'bandpass', freq: 1800 })),
     'deck-unwrap': () => {
       burst({ dur: 0.06, gain: 0.2, freq: 3200, freqTo: 6000, q: 1 });
       crinkle({ dur: 0.6, grains: 80, gain: 0.24, low: 3000, high: 10000, shape: (t) => 1 - 0.5 * t });
     },
-    'deck-down': () => {
-      if (!playSample('shuffle', { gain: 0.35, rate: 1.2 })) burst({ dur: 0.08, gain: 0.08, type: 'lowpass', freq: 1200 });
-    },
+    'deck-down': () =>
+      cue('shuffle', { gain: 0.35, rate: 1.2 }, () => burst({ dur: 0.08, gain: 0.08, type: 'lowpass', freq: 1200 })),
   };
 
   return {
@@ -192,7 +193,14 @@ export function createTabletopAudio({ muted = () => false, volume = () => 0.8 } 
       if (muted()) return;
       const context = ensure();
       const voice = VOICES[name];
-      if (!context || !voice) return;
+      if (!voice) {
+        if (!warnedNames.has(name)) {
+          warnedNames.add(name);
+          console.warn('tt-audio: unknown cue', name);
+        }
+        return;
+      }
+      if (!context) return;
       try {
         voice();
       } catch {

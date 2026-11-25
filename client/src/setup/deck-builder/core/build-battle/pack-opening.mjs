@@ -70,14 +70,26 @@ export function openPack({ cards = [], packModel, rng }) {
 // ── The Evolution pack (design 054 § Opening a box, § Deviations D1) ────────────────────────
 const between = (min, max, rng) => min + rng.int(Math.max(0, max - min) + 1);
 
+const hasAlts = (entry) => Array.isArray(entry.alts) && entry.alts.length > 0;
+
+// The copy count of an entry that has one (a pair of prints, or an integer qty); null for a min..max range.
+function fixedCopies(entry) {
+  if (hasAlts(entry)) return Math.max(0, entry.qty ?? 1);
+  return Number.isInteger(entry.qty) ? Math.max(0, entry.qty) : null;
+}
+
+// The fewest and most copies one group or common entry can put in the pack.
+function entryBounds(entry) {
+  const fixed = fixedCopies(entry);
+  return fixed === null ? [entry.min ?? 0, entry.max ?? 0] : [fixed, fixed];
+}
+
 /** One group or common entry → its card ids: a fixed count, a copy range, or one of two prints. */
 function entryIds(entry, rng) {
-  if (Array.isArray(entry.alts) && entry.alts.length) {
-    const id = entry.alts[rng.int(entry.alts.length)];
-    return Array(Math.max(0, entry.qty ?? 1)).fill(id);
-  }
-  const copies = Number.isInteger(entry.qty) ? entry.qty : between(entry.min ?? 0, entry.max ?? 0, rng);
-  return Array(Math.max(0, copies)).fill(entry.id);
+  const id = hasAlts(entry) ? entry.alts[rng.int(entry.alts.length)] : entry.id;
+  const [low, high] = entryBounds(entry);
+  const copies = fixedCopies(entry) ?? between(low, high, rng);
+  return Array(Math.max(0, copies)).fill(id);
 }
 
 function poolBounds(pool) {
@@ -216,15 +228,6 @@ export function evolutionEnergy({ data, groupKeys, packSize }) {
   return BASIC_ENERGY_LABELS.filter((label) => merged.has(label)).map((label) => [label, merged.get(label)]);
 }
 
-// The fewest and most copies one group or common entry can put in the pack.
-function entryBounds(entry) {
-  if (Array.isArray(entry.alts) || Number.isInteger(entry.qty)) {
-    const copies = entry.qty ?? 1;
-    return [copies, copies];
-  }
-  return [entry.min ?? 0, entry.max ?? 0];
-}
-
 /**
  * Every way a pairing can fall that the box cannot hold (design 054 row 4, A4): with each range at
  * both ends, a 23-card Evolution pack must come out at exactly 23; an Evolution deck must fit 40
@@ -241,11 +244,11 @@ export function evolutionPairingProblems({ box, data }) {
     for (const other of keys.filter((key) => key !== deckKey)) {
       const entries = [...(data.groups?.[deckKey] || []), ...(data.groups?.[other] || []), ...(data.common || [])];
       const [low, high] = sumBounds([[1, 1], ...entries.map(entryBounds)]);
-      const swaps = (data.energySwaps || [])
+      const swapRows = (data.energySwaps || [])
         .filter((swap) => swap.when?.some((key) => key === deckKey || key === other))
-        .flatMap((swap) => swap.rows || [])
-        .reduce((sum, entry) => sum + (entry.qty ?? 1), 0);
-      for (const fixed of new Set([low, high])) {
+        .flatMap((swap) => swap.rows || []);
+      const swapEnds = sumBounds(swapRows.map(entryBounds));
+      for (const [fixed, swaps] of [low, high].flatMap((end) => swapEnds.map((swapEnd) => [end, swapEnd]))) {
         const trainers = pools.length ? trainerTarget(pools, EVOLUTION_PACK_SIZE - fixed) : 0;
         const packSize = fixed + trainers + swaps;
         const pair = `${deckKey} + ${other} (${fixed} fixed cards)`;
@@ -264,7 +267,7 @@ export function evolutionPairingProblems({ box, data }) {
       }
     }
   }
-  return problems;
+  return [...new Set(problems)];
 }
 
 /**
@@ -326,6 +329,13 @@ function rowsFromIds(ids, cardsById) {
 
 const isKnownDeck = (box, deckKey) => Boolean(box?.decks?.some((deck) => deck.key === deckKey));
 
+// The box's own cards for the opened deck as rows with `qty`: the printed deck, or the Evolution pack.
+function boxOwnRows({ box, data, opened }) {
+  if (!isKnownDeck(box, opened?.deckKey)) return [];
+  if (box.kind === 'fixed-decks') return data?.decks?.[opened.deckKey] || [];
+  return rowsFromIds(opened.evolutionPack, data?.cardsById);
+}
+
 /**
  * The deck the editor holds when the box opens: a fixed deck as printed; an Evolution pack's 23
  * cards; an Evolution deck's pack plus its Basic Energy (40 cards).
@@ -333,8 +343,7 @@ const isKnownDeck = (box, deckKey) => Boolean(box?.decks?.some((deck) => deck.ke
  */
 export function startingDeckRows({ box, data, opened }) {
   if (!isKnownDeck(box, opened?.deckKey)) return [];
-  if (box.kind === 'fixed-decks') return (data?.decks?.[opened.deckKey] || []).map((row) => ({ ...row }));
-  const rows = rowsFromIds(opened.evolutionPack, data?.cardsById);
+  const rows = boxOwnRows({ box, data, opened }).map((row) => ({ ...row }));
   for (const [label, qty] of opened.energy || []) rows.push(basicEnergyRow(label, qty));
   return rows;
 }
@@ -379,11 +388,7 @@ export function poolFromBox({ box, data, cards = [], opened }) {
     else byId.set(card.id, { card: withoutQty(card), count });
   };
 
-  if (box?.kind === 'fixed-decks' && isKnownDeck(box, opened?.deckKey)) {
-    for (const row of data?.decks?.[opened.deckKey] || []) add(row, Number(row.qty) || 0);
-  } else if (isKnownDeck(box, opened?.deckKey)) {
-    for (const row of rowsFromIds(opened.evolutionPack, data?.cardsById)) add(row, row.qty);
-  }
+  for (const row of boxOwnRows({ box, data, opened })) add(row, Number(row.qty) || 0);
 
   const cardsById = new Map(cards.map((card) => [card.id, card]));
   for (const pack of opened?.packs || []) {

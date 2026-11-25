@@ -150,6 +150,14 @@ test('parseRun refuses malformed or untrustworthy runs', () => {
   assert.notEqual(bad({}), null);
 });
 
+test('parseRun refuses an ended run that neither played every match nor was forfeited', () => {
+  const good = JSON.parse(JSON.stringify(freshRun()));
+  const stored = (patch) => parseRun(JSON.stringify({ ...good, ...patch }));
+  assert.equal(stored({ status: RUN_ENDED, endedEarly: false, results: [true] }), null);
+  assert.equal(stored({ status: RUN_IN_PROGRESS, endedEarly: true, results: [true] }), null);
+  assert.notEqual(stored({ status: RUN_ENDED, endedEarly: true, results: [true] }), null);
+});
+
 test('parseRun ends a run that already has every result', () => {
   const stored = { ...freshRun(), results: [true, false, true, true, false], armedAt: 9000 };
   const run = parseRun(JSON.stringify(stored));

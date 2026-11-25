@@ -60,15 +60,20 @@ function playLayer(host, layer, rect, durationMs) {
   return done;
 }
 
-export const status = (plan) => {
+/** The condition's effect, the card's rect and an overlay over it; null when either is unknown. */
+function openStatusOverlay(plan, kindClass) {
   const fx = statusFxFor(plan.condition);
-  if (!fx) return 0;
+  if (!fx) return null;
   const rect = rectForInstance(plan.instanceId, getCardRegistry());
-  if (!rect) return 0;
-  const host = spawnOverlay({
-    rect,
-    className: `fx-overlay fx-status-apply fx-status--${fx.key}`,
-  });
+  if (!rect) return null;
+  const host = spawnOverlay({ rect, className: `fx-overlay ${kindClass} fx-status--${fx.key}` });
+  return { fx, rect, host };
+}
+
+export const status = (plan) => {
+  const opened = openStatusOverlay(plan, 'fx-status-apply');
+  if (!opened) return 0;
+  const { fx, rect, host } = opened;
   const done = fx.layers.flatMap((layer) => playLayer(host, layer, rect, STATUS_APPLY_MS));
 
   const label = document.createElement('div');
@@ -90,14 +95,9 @@ export const status = (plan) => {
  * Status_Remove, a green heal of square, ring, shockwave and thrown stars. No label.
  */
 export const statusClear = (plan) => {
-  const fx = statusFxFor(plan.condition);
-  if (!fx) return 0;
-  const rect = rectForInstance(plan.instanceId, getCardRegistry());
-  if (!rect) return 0;
-  const host = spawnOverlay({
-    rect,
-    className: `fx-overlay fx-status-clear fx-status--${fx.key}`,
-  });
+  const opened = openStatusOverlay(plan, 'fx-status-clear');
+  if (!opened) return 0;
+  const { rect, host } = opened;
   const done = STATUS_CLEAR_LAYERS.flatMap((layer) => playLayer(host, layer, rect, STATUS_CLEAR_MS));
   removeWhen(host, done, STATUS_CLEAR_MS + 400);
 };

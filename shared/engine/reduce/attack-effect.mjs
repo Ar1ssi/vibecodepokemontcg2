@@ -664,26 +664,32 @@ export function resolveAttackEffectPhase(draft, ctx) {
   }
   // Cards a before-damage Lost Zone cost moved (Rotom V Scrap Short). The cost is those
   // attacks' only before-damage step, so it moves in the command that reaches damage.
-  const handDiscarded = ctx.handDiscarded ?? attackSteps.before.some(
-    (step) =>
-      step.countsForDamage &&
-      ['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkDiscardBenchEnergy'].includes(step.type)
-  )
-    ? events
-        .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
-        .reduce((total, e) => total + e.cards.length, 0)
-    : // "Put any number of Basic Energy cards from your hand into the Lost Zone. This attack does 50
-      // damage for each card you discarded in this way": the Lost Zone move is the counted discard.
-      attackSteps.before.some((step) => step.countsForDamage && step.type === 'atkLostZoneFromHand')
+  // A resumed effect phase (Charity, hand-discard protector) carries the counts in ctx; its own
+  // events no longer hold the cost's events.
+  const handDiscarded =
+    ctx.handDiscarded ??
+    (attackSteps.before.some(
+      (step) =>
+        step.countsForDamage &&
+        ['atkDiscardOwnHand', 'atkDiscardHandEnergy', 'atkDiscardBenchEnergy'].includes(step.type)
+    )
+      ? events
+          .filter((e) => e.type === 'cardsDiscarded' && e.forDamage)
+          .reduce((total, e) => total + e.cards.length, 0)
+      : // "Put any number of Basic Energy cards from your hand into the Lost Zone. This attack does 50
+        // damage for each card you discarded in this way": the Lost Zone move is the counted discard.
+        attackSteps.before.some((step) => step.countsForDamage && step.type === 'atkLostZoneFromHand')
+        ? events
+            .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
+            .reduce((total, e) => total + e.count, 0)
+        : undefined);
+  const lostZoned =
+    ctx.lostZoned ??
+    (attackSteps.before.some((step) => step.countsForDamage)
       ? events
           .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
           .reduce((total, e) => total + e.count, 0)
-      : undefined;
-  const lostZoned = ctx.lostZoned ?? attackSteps.before.some((step) => step.countsForDamage)
-    ? events
-        .filter((e) => e.type === 'cardsLostZoned' && e.forDamage)
-        .reduce((total, e) => total + e.count, 0)
-    : undefined;
+      : undefined);
 
       const parsed = parseAttackDamage(
         attack,

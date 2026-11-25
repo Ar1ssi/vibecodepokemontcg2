@@ -3,7 +3,9 @@
 // target predicates (drag.js:133-196) plus drop's target rule (:303-339); `routeDrop` is drop's
 // branches (:341-453), returning the call to make instead of making it. DOM-free.
 
-const PLAY_ZONES = new Set(['active', 'bench']);
+import { PLAY_ZONES } from '../netcode/view-card-vocabulary.mjs';
+
+const PLAY_ZONE_SET = new Set(PLAY_ZONES);
 /** Piles whose drop target in the DOM is their cover (`#deckCover`, …), drawn or empty. */
 const COVER_ZONES = new Set(['deck', 'discard', 'lostZone']);
 /** Zones a manual deck action leaves from (drag.js:390, :407). */
@@ -47,9 +49,9 @@ const kindOf = (hit) => {
 const highlightFor = (kind, zone, dragging) => {
   const ownZone = dragging.zone;
   const attached = Boolean(dragging.attached);
-  const fromPlay = PLAY_ZONES.has(ownZone);
+  const fromPlay = PLAY_ZONE_SET.has(ownZone);
   if (kind === 'rail') return 'zone';
-  const inPlay = PLAY_ZONES.has(zone);
+  const inPlay = PLAY_ZONE_SET.has(zone);
   if (kind !== 'card') {
     // A zone <div>: movingValidCardToContainer.
     return zone !== ownZone && (!attached || !inPlay) ? 'zone' : null;
@@ -125,7 +127,7 @@ export function routeDrop(target, dragging, state) {
   if (target.kind === 'rail' && target.side !== dragging.side) return null;
 
   const dZoneId = target.zone;
-  const onPlayCard = target.kind === 'card' && PLAY_ZONES.has(dZoneId);
+  const onPlayCard = target.kind === 'card' && PLAY_ZONE_SET.has(dZoneId);
   const targetIndex = onPlayCard ? (target.targetIndex ?? -1) : undefined;
   const targetInstanceId = onPlayCard ? target.instanceId : null;
   const attached = Boolean(dragging.attached);
@@ -139,7 +141,7 @@ export function routeDrop(target, dragging, state) {
   // The scene draws an open pile's top card on the pile, so its card (zone `discard`) dropped back
   // on that pile (`discardCover`) stays put.
   const moves = pileOf(fromZone) !== pileOf(dZoneId) || attached;
-  const lands = !attached || !PLAY_ZONES.has(dZoneId) || targetIndex !== undefined;
+  const lands = !attached || !PLAY_ZONE_SET.has(dZoneId) || targetIndex !== undefined;
   if (!moves || !lands) return null;
 
   if (dZoneId === 'deckCover') {

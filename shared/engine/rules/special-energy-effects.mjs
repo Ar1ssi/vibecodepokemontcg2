@@ -11,7 +11,6 @@ export const TYPED_SPECIAL_ENERGY_DEFS = [
     nameMatch: /growing grass energy/i,
     providedType: 'Grass',
     requiredPokemonType: 'Grass',
-    hpBonus: 20,
     description:
       'Growing Grass Energy: provides Grass Energy; the Grass Pokémon it is attached to gets +20 HP.',
   },
@@ -75,7 +74,6 @@ export const TYPED_SPECIAL_ENERGY_DEFS = [
     nameMatch: /voltaic lightning energy/i,
     providedType: 'Lightning',
     requiredPokemonType: 'Lightning',
-    activeDamageBonus: 20,
     description:
       'Voltaic Lightning Energy: provides Lightning Energy; attacks used by the attached Lightning Pokémon do 20 more damage to your opponent\'s Active Pokémon.',
   },
@@ -97,15 +95,21 @@ export function describeTypedSpecialEnergy(card) {
 export function pokemonMatchesEnergyType(pokemon, energyType) {
   if (!pokemon || !energyType) return false;
   const want = energyType.toLowerCase();
-  // Every printed type counts: a dual-type Pokémon is found by either type.
-  for (const type of Array.isArray(pokemon?.types) ? pokemon.types : []) {
-    const fromData = String(type ?? '').trim().toLowerCase();
-    if (fromData === want) return true;
-    if (want === 'darkness' && fromData === 'dark') return true;
-    if (want === 'dark' && fromData === 'darkness') return true;
+  const types = (Array.isArray(pokemon?.types) ? pokemon.types : [])
+    .map((type) => String(type ?? '').trim().toLowerCase())
+    .filter(Boolean);
+  // Every printed type counts: a dual-type Pokémon is found by either type. The name is only
+  // a stand-in for cards whose types have not synced; with types present, "Dark Dragonite"
+  // is not {D} (the same rule as special-energy-parse.mjs hostIsType).
+  if (types.length > 0) {
+    return types.some(
+      (type) =>
+        type === want ||
+        (want === 'darkness' && type === 'dark') ||
+        (want === 'dark' && type === 'darkness')
+    );
   }
-  const name = lower(pokemon?.name);
-  return name.includes(want);
+  return lower(pokemon?.name).includes(want);
 }
 
 // "Basic {X} Pokémon" search filter. Cards can arrive with the Pokémon marker

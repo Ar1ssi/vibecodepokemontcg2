@@ -70,7 +70,7 @@ import {
 } from './card-classify.mjs';
 import { isAttachedAsEnergy, isAttachedAsTool, isBasicPokemon, isPokemon } from '../cards.mjs';
 import { stadiumBlocksToolEffects } from './stadium-effects.mjs';
-import { parseAbility, isAncientTraitAbility, automaticEvolveSteps } from './abilities.mjs';
+import { parseAbility, isAncientTraitAbility, automaticEvolveSteps, PLAY_LOCK_CLAUSE, EACH_PLAYER_LOCK } from './abilities.mjs';
 import { isAbilityCard } from './ability-effects.mjs';
 import { evolvedView, topPokemonCard } from './evolved-pokemon.mjs';
 import { isAncientCard, isFutureCard } from './paradox-tags.mjs';
@@ -702,9 +702,7 @@ export function abilityDamageReduction(defender, attacker, ctx = {}) {
     if (!reductionKindMet(t, defender)) continue;
     if (!sourceConditionMet(t, holder, defender, attacker, ctx)) continue;
     if (!attackerTypeRequirementMet(t, attacker)) continue;
-    const red = reductionForCard(holder, defender, attacker, {
-      skipSymbolFilter: true,
-    });
+    const red = reductionForCard(holder, defender, attacker);
     if (!red) continue;
     const scaled = red * abilityHolderCount(t, ctx);
     if (/before applying weakness and resistance/.test(t)) out.beforeWR += scaled;
@@ -847,7 +845,10 @@ export function abilityLegacyDamageModifiers(defender, attacker, ctx = {}) {
  */
 export function sideContextFor(state, playerId) {
   const player = state.players?.[playerId];
-  const opponent = Object.values(state.players || {}).find((p) => p.playerId !== playerId);
+  // Players are keyed by id; an unknown caller has no side, so nobody is its opponent either.
+  const opponent = player
+    ? Object.entries(state.players).find(([id]) => id !== playerId)?.[1]
+    : undefined;
   const own = player?.zones || {};
   const other = opponent?.zones || {};
   return {
@@ -1709,10 +1710,14 @@ function selfExemptFromSuppression(text, holder, card) {
   return sameCard(holder, card);
 }
 
-/** Lowercased printed names of the Abilities `card` has (plural server shape or singular). */
+/** The Abilities `card` carries: the plural server shape (I128) or the singular `ability` slot. */
+function abilityEntriesOf(card) {
+  return Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
+}
+
+/** Lowercased printed names of the Abilities `card` has. */
 function abilityNamesOf(card) {
-  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
-  return entries.map((entry) => lower(typeof entry === 'string' ? entry : entry?.name)).filter(Boolean);
+  return abilityEntriesOf(card).map((entry) => lower(typeof entry === 'string' ? entry : entry?.name)).filter(Boolean);
 }
 
 /** True when the suppression text's target filter matches `card`. */
@@ -1769,7 +1774,7 @@ function suppressionTargets(text, holder, card, ctx) {
  */
 function attackLockedAbility(card, turnNumber) {
   if (typeof turnNumber !== 'number') return false;
-  const kinds = (card.abilities || []).map((a) => {
+  const kinds = abilityEntriesOf(card).map((a) => {
     const type = String(a?.type || '').toLowerCase();
     return /body/.test(type) ? 'body' : /power/.test(type) ? 'power' : 'ability';
   });
@@ -1801,8 +1806,7 @@ const TOXIC_GAS = /ignore all pok[eé]mon powers other than toxic gases/;
 
 /** The printed kind is the only mark of a Pokémon Power: the WotC texts carry none. */
 function hasPokemonPower(card) {
-  const entries = Array.isArray(card?.abilities) ? card.abilities : card?.ability ? [card.ability] : [];
-  return entries.some((entry) => /pok[eé]mon power/i.test(String(entry?.type || '')));
+  return abilityEntriesOf(card).some((entry) => /pok[eé]mon power/i.test(String(entry?.type || '')));
 }
 
 /**
@@ -1830,7 +1834,7 @@ export function isAbilitySuppressed(card, ctx = {}) {
   if (!card || !isPokemon(card)) return false;
   if (isAncientTraitAbility(card)) return false;
   // Goop Gas Attack: every Pokémon Power stops working (sideContextFor's powersOff).
-  if (ctx.powersOff && (card.abilities || []).some((a) => /power/i.test(String(a?.type || '')))) return true;
+  if (ctx.powersOff && abilityEntriesOf(card).some((a) => /power/i.test(String(a?.type || '')))) return true;
   // An activated Power's printed condition is its activation gate (abilityActivationBlockReason).
   if (legacyPowerStopped(card) && !isActivatedAbility(card)) return true;
   if (toxicGasIgnores(card, ctx)) return true;
@@ -2093,11 +2097,8 @@ function playableCategories(card) {
   return out;
 }
 
-const PLAY_LOCK_CLAUSE = /can'?t play [^.]*from (?:his or her|their) hand/;
 // A lock on "Trainer cards" (Dark Vileplume Hay Fever) covers every Trainer kind.
 const TRAINER_CATEGORIES = ['Item', 'Supporter', 'Stadium', 'Pokémon Tool', 'ACE SPEC'];
-const EACH_PLAYER_LOCK =
-  /(?:each player|neither player|each play) can'?t play any/;
 
 /**
  * Ability play locks ("your opponent can't play any Item cards from their

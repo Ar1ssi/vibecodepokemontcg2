@@ -3,14 +3,7 @@ import {
   searchMats,
 } from '../../../setup/deck-builder/core/mats.mjs';
 import { matThumbFallbackChain } from '../../../setup/deck-builder/core/mat-image-urls.mjs';
-
-const escapeHtml = (value = '') =>
-  String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
 /**
  * Playmat picker for the Customize tab. Renders a lazy-loaded grid of ~320px

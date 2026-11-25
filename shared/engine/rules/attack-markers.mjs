@@ -614,6 +614,14 @@ function splitWindow(sentence) {
   return { window: null, body: sentence };
 }
 
+/** Whether a sentence's window satisfies its body's requirement (a window, a list, or any opponent-turn window). */
+function windowFits(requiredWindow, window) {
+  if (Array.isArray(requiredWindow)) return requiredWindow.includes(window);
+  if (requiredWindow) return window === requiredWindow;
+  // Bonuses need "during your next turn"; protections need one of the opponent-turn windows.
+  return Boolean(window) && window !== 'yourNextTurn';
+}
+
 /**
  * A timed marker sentence as an `atkAddMarker` step, or null.
  * @param {string} sentence Normalized, gate-stripped sentence
@@ -624,13 +632,7 @@ export function parseMarkerSentence(sentence, context = {}) {
   for (const [re, target, requiredWindow, build] of MARKER_BODIES) {
     const m = re.exec(body);
     if (!m) continue;
-    // Bonuses need "during your next turn"; protections need one of the opponent-turn windows.
-    const windowFits = Array.isArray(requiredWindow)
-      ? requiredWindow.includes(window)
-      : requiredWindow
-        ? window === requiredWindow
-        : window && window !== 'yourNextTurn';
-    if (!windowFits) return null;
+    if (!windowFits(requiredWindow, window)) return null;
     const built = build(m, context);
     // One sentence can set two markers ("… cost {c} more, and its retreat cost is {c} more").
     const [marker, ...alsoMarkers] = Array.isArray(built) ? built : [built];

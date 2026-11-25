@@ -50,7 +50,10 @@ export function mountTabletopUnboxing(options) {
         if (!app) useFallback();
         else handle = app;
       })
-      .catch(() => useFallback());
+      .catch((error) => {
+        console.warn('[tabletop] the 3D opening failed to start; using the fallback scene.', error);
+        useFallback();
+      });
   }
 
   return {

@@ -3,6 +3,7 @@ import { determineDeckData } from '../general/determine-deckdata.js';
 import { getZone } from '../zones/get-zone.js';
 import { Card } from './card.js';
 import { Cover } from './cover.js';
+import { cardBackSrcFor } from './opponent-seat.mjs';
 import { isE2eMode, stampE2eCard } from '../general/e2e-mode.mjs';
 import { emitCardStats } from '../netcode/card-stats.js';
 import { soloCommandSeat } from '../netcode/solo-seat.mjs';
@@ -31,13 +32,7 @@ export const buildDeck = (user) => {
       deck.element.appendChild(card.image);
     }
   }
-  const targetCardBackSrc =
-    user === 'self'
-      ? systemState.cardBackSrc
-      : systemState.isTwoPlayer && !systemState.solo
-        ? systemState.p2OppCardBackSrc
-        : systemState.p1OppCardBackSrc;
-  const cover = new Cover(user, 'deckCover', targetCardBackSrc);
+  const cover = new Cover(user, 'deckCover', cardBackSrcFor(systemState, user));
   deck.elementCover.appendChild(cover.image);
 
   deck.array.forEach((card) => {
@@ -104,5 +99,7 @@ export const buildDeck = (user) => {
         seat: soloCommandSeat({ ...systemState, user }),
       });
     })
-    .catch(() => {});
+    .catch((error) => {
+      console.warn('buildDeck: card stats were not sent — the server cannot adjudicate this deck', error);
+    });
 };

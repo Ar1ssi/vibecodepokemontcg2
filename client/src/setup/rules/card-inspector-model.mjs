@@ -264,14 +264,15 @@ const ACTIVATED_ABILITY_TEXT =
 /**
  * Whether the engine would accept a retreat right now (turn, already retreated / attacked, and
  * whether the attached Energy covers the cost). The engine reads a numeric `retreatCost`, so the
- * printed symbols are reduced to a count. A gate that throws must not blank the tile.
+ * printed symbols are reduced to a count. A gate that throws must not blank the tile, and must not
+ * advertise a retreat it could not verify, so the tile stays but greys out.
  */
 function retreatGateFor({ card, cost, energyTypes, user, zoneCards, benchCards }) {
   try {
     const verdict = canRetreat(user, { ...card, retreatCost: cost }, energyTypes, zoneCards, benchCards);
     return { allowed: Boolean(verdict.allowed), reason: verdict.reason ?? null };
   } catch {
-    return { allowed: true, reason: null };
+    return { allowed: false, reason: 'Retreat could not be checked.' };
   }
 }
 

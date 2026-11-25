@@ -14,13 +14,21 @@ import {
   dispatchAuthoritativeUseAbility,
   isMirrorSuppressedAction,
   actsForSide,
+  isInRoom,
+  refuseWithoutRoom,
+  NO_ROOM_MESSAGE,
+  DISPATCH_MISS_MESSAGE,
 } from '../authoritative-dispatch.js';
 import { setInstanceMap } from '../dual-run-bridge.js';
+import { onEntry } from '../../../log/client-log.js';
 
 afterEach(() => {
   resetAuthoritativeDispatchContext();
   setInstanceMap(null);
 });
+
+// Wired but in no room: the Multiplayer lobby, or before the join acknowledgement.
+const NO_ROOM = { serverAuthoritative: false, solo: false, isTwoPlayer: false };
 
 /** Registry stub shaped exactly like apply-view.js's cardRegistry entries. */
 function stubRegistry(entries = []) {
@@ -324,20 +332,23 @@ test('moveCardBundle gate: dispatches a locally-initiated move and skips the leg
   ]);
 });
 
-test('moveCardBundle gate: flag off never dispatches (legacy path provably unchanged)', () => {
+test('moveCardBundle gate: no room refuses with one chat line and sends nothing (design 090 row 4)', () => {
   let called = false;
+  const notes = [];
   const dispatched = dispatchAuthoritativeMoveCardBundle(
     moveParams(),
     moveOptions({
-      systemState: { serverAuthoritative: false },
+      systemState: NO_ROOM,
+      notify: (text) => notes.push(text),
       processAction: () => {
         called = true;
       },
     })
   );
 
-  assert.equal(dispatched, false);
+  assert.equal(dispatched, true, 'refused: the caller stops, it does not run a local body');
   assert.equal(called, false);
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
 });
 
 test('moveCardBundle gate: relayed mirror-apply is not gated', () => {
@@ -504,21 +515,24 @@ test('zoneOp gate: dispatches a locally-initiated call, prefixing oInitiator ont
   assert.deepEqual(calls[0], ['self', true, 'discardAll', ['opp', 'hand']]);
 });
 
-test('zoneOp gate: flag off never dispatches (legacy path provably unchanged)', () => {
+test('zoneOp gate: no room refuses with one chat line and sends nothing (design 090 row 4)', () => {
   let called = false;
+  const notes = [];
   const dispatched = dispatchAuthoritativeZoneOp(
     'discardAll',
     { user: 'self', emit: true, oInitiator: 'opp', commandArgs: ['hand'] },
     zoneOpOptions({
-      systemState: { serverAuthoritative: false },
+      systemState: NO_ROOM,
+      notify: (text) => notes.push(text),
       processAction: () => {
         called = true;
       },
     })
   );
 
-  assert.equal(dispatched, false);
+  assert.equal(dispatched, true, 'refused: the caller stops, it does not run a local body');
   assert.equal(called, false);
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
 });
 
 test('zoneOp gate: relayed mirror-apply (emit false) is not gated', () => {
@@ -621,21 +635,24 @@ test('action gate: stadium-effect carries its payload through unchanged', () => 
   assert.deepEqual(calls[0], ['self', true, 'stadium-effect', [payload]]);
 });
 
-test('action gate: flag off never dispatches (legacy path provably unchanged)', () => {
+test('action gate: no room refuses with one chat line and sends nothing (design 090 row 4)', () => {
   let called = false;
+  const notes = [];
   const dispatched = dispatchAuthoritativeAction(
     'attack',
     { user: 'self', emit: true, commandArgs: [0, null] },
     actionOptions({
-      systemState: { serverAuthoritative: false },
+      systemState: NO_ROOM,
+      notify: (text) => notes.push(text),
       processAction: () => {
         called = true;
       },
     })
   );
 
-  assert.equal(dispatched, false);
+  assert.equal(dispatched, true, 'refused: the caller stops, it does not run a local body');
   assert.equal(called, false);
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
 });
 
 test('action gate: relayed mirror-apply (emit false) is not gated', () => {
@@ -800,8 +817,9 @@ test('useAbility gate: a relayed call carrying an incoming hint is not gated', (
   assert.equal(called, false);
 });
 
-test('useAbility gate: flag off never dispatches', () => {
+test('useAbility gate: no room refuses with one chat line and sends nothing (design 090 row 4)', () => {
   let called = false;
+  const notes = [];
   const dispatched = dispatchAuthoritativeUseAbility(
     {
       user: 'self',
@@ -812,15 +830,17 @@ test('useAbility gate: flag off never dispatches', () => {
       authoritativeId: 42,
     },
     useAbilityOptions({
-      systemState: { serverAuthoritative: false },
+      systemState: NO_ROOM,
+      notify: (text) => notes.push(text),
       processAction: () => {
         called = true;
       },
     })
   );
 
-  assert.equal(dispatched, false);
+  assert.equal(dispatched, true, 'refused: the caller stops, it does not run a local body');
   assert.equal(called, false);
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
 });
 
 test('useAbility gate: acting on the opponent side is not gated', () => {
@@ -889,4 +909,173 @@ test('isMirrorSuppressedAction: false for server_lifecycle/replaced/relay-only a
 
 test('isMirrorSuppressedAction: false for an unclassified action (fail open)', () => {
   assert.equal(isMirrorSuppressedAction('notARealAction'), false);
+});
+
+// -- design 090: no-room refusal and in-room gate misses ----------------------------
+
+/** Collects the log entries `fn` writes. */
+function logged(fn) {
+  const seen = [];
+  const off = onEntry((entry) => seen.push(entry));
+  try {
+    fn();
+  } finally {
+    off();
+  }
+  return seen;
+}
+
+test('isInRoom: seated in a room, solo, or watching; not in the lobby or before the join ack', () => {
+  assert.equal(isInRoom({ systemState: NO_ROOM }), false);
+  assert.equal(isInRoom({ systemState: { roomId: 'solo-abcd1234' } }), false);
+  assert.equal(isInRoom({ systemState: { serverAuthoritative: true } }), true);
+  assert.equal(isInRoom({ systemState: { solo: true } }), true);
+  assert.equal(isInRoom({ systemState: { isTwoPlayer: true } }), true);
+  assert.equal(isInRoom(), false);
+});
+
+test('refuseWithoutRoom: refuses and logs dispatch.refused in no room, never in a room', () => {
+  const notes = [];
+  const entries = logged(() => {
+    assert.equal(
+      refuseWithoutRoom({ systemState: NO_ROOM, action: 'undo', notify: (t) => notes.push(t) }),
+      true
+    );
+  });
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].ev, 'dispatch.refused');
+  assert.equal(
+    refuseWithoutRoom({ systemState: { solo: true }, notify: (t) => notes.push(t) }),
+    false
+  );
+  assert.equal(notes.length, 1);
+});
+
+test('refuseWithoutRoom: nothing is refused while no systemState is wired (module tests)', () => {
+  assert.equal(refuseWithoutRoom({ notify: () => assert.fail('must not post') }), false);
+});
+
+test('refuseWithoutRoom: one chat line per user action, a later action gets its own', () => {
+  const notes = [];
+  let clock = 10_000;
+  const options = { systemState: NO_ROOM, notify: (t) => notes.push(t), now: () => clock };
+  refuseWithoutRoom(options);
+  refuseWithoutRoom(options);
+  clock += 200;
+  refuseWithoutRoom(options);
+  assert.equal(notes.length, 1);
+  clock += 5_000;
+  refuseWithoutRoom(options);
+  assert.equal(notes.length, 2);
+});
+
+test('a board-wide action that reaches several gates in no room posts one line', () => {
+  const notes = [];
+  const options = { systemState: NO_ROOM, notify: (t) => notes.push(t), now: () => 1 };
+  dispatchAuthoritativeZoneOp('discardAll', { user: 'self', emit: true, oInitiator: 'opp' }, options);
+  dispatchAuthoritativeMoveCardBundle(moveParams(), options);
+  dispatchAuthoritativeAction('revealCards', { user: 'self', emit: true, commandArgs: ['hand'] }, options);
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
+});
+
+test('no room: a relayed mirror-apply (emit false) is not refused and keeps its local body', () => {
+  const options = { systemState: NO_ROOM, notify: () => assert.fail('must not post') };
+  assert.equal(
+    dispatchAuthoritativeZoneOp('discardAll', { user: 'opp', emit: false, oInitiator: 'self' }, options),
+    false
+  );
+  assert.equal(
+    dispatchAuthoritativeAction('attack', { user: 'opp', emit: false, commandArgs: [] }, options),
+    false
+  );
+  assert.equal(dispatchAuthoritativeMoveCardBundle(moveParams({ emit: false, cardHints: {} }), options), false);
+  assert.equal(
+    dispatchAuthoritativeUseAbility(
+      { user: 'opp', emit: false, incomingHint: { instanceId: 1 }, oInitiator: 'self', zoneId: 'active', index: 0 },
+      options
+    ),
+    false
+  );
+});
+
+test('emitAuthoritativeCommand: no room refuses (true) and never reaches processAction', () => {
+  const notes = [];
+  const sent = emitAuthoritativeCommand('shuffleZone', ['opp', 'deck'], {
+    systemState: NO_ROOM,
+    processAction: () => assert.fail('must not send'),
+    translate: ALWAYS_TRANSLATES,
+    notify: (t) => notes.push(t),
+  });
+  assert.equal(sent, true);
+  assert.deepEqual(notes, [NO_ROOM_MESSAGE]);
+});
+
+test('gate miss in a room: a zone op still returns false so its kept local body runs', () => {
+  const notes = [];
+  const dispatched = dispatchAuthoritativeZoneOp(
+    'discardAll',
+    { user: 'self', emit: true, oInitiator: 'opp', commandArgs: ['hand'] },
+    zoneOpOptions({ translate: () => null, notify: (t) => notes.push(t) })
+  );
+  assert.equal(dispatched, false);
+  assert.deepEqual(notes, []);
+});
+
+test('gate miss in a room: failClosed refuses an untranslatable action, logs dispatch.refused, no local run (design 090 row 5)', () => {
+  const notes = [];
+  let sent = false;
+  const entries = logged(() => {
+    const dispatched = dispatchAuthoritativeAction(
+      'attack',
+      { user: 'self', emit: true, commandArgs: [0, null], failClosed: true },
+      actionOptions({
+        translate: () => null,
+        processAction: () => {
+          sent = true;
+        },
+        notify: (t) => notes.push(t),
+      })
+    );
+    assert.equal(dispatched, true);
+  });
+  assert.equal(sent, false);
+  assert.deepEqual(notes, [DISPATCH_MISS_MESSAGE]);
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].ev, 'dispatch.refused');
+  assert.equal(JSON.parse(entries[0].line).d.reason, 'not_dispatched');
+});
+
+test('gate miss in a room: failClosed refuses an ability on an unregistered card (design 090 row 5)', () => {
+  const notes = [];
+  const entries = logged(() => {
+    const dispatched = dispatchAuthoritativeUseAbility(
+      {
+        user: 'self',
+        emit: true,
+        incomingHint: null,
+        oInitiator: 'opp',
+        zoneId: 'active',
+        index: 0,
+        authoritativeId: 999,
+        failClosed: true,
+      },
+      useAbilityOptions({
+        processAction: () => assert.fail('must not send'),
+        notify: (t) => notes.push(t),
+      })
+    );
+    assert.equal(dispatched, true);
+  });
+  assert.deepEqual(notes, [DISPATCH_MISS_MESSAGE]);
+  assert.equal(entries[0].ev, 'dispatch.refused');
+  assert.equal(JSON.parse(entries[0].line).d.reason, 'unregistered_card');
+});
+
+test('gate miss in a room: without failClosed an ability on an unregistered card still returns false', () => {
+  const dispatched = dispatchAuthoritativeUseAbility(
+    { user: 'self', emit: true, incomingHint: null, oInitiator: 'opp', zoneId: 'active', index: 0, authoritativeId: 999 },
+    useAbilityOptions({ notify: () => assert.fail('must not post') })
+  );
+  assert.equal(dispatched, false);
 });

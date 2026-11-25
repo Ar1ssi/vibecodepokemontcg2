@@ -200,8 +200,8 @@
       "unparsed": 0
     },
     "energy-redirect": {
-      "n": 95,
-      "runs": 86,
+      "n": 101,
+      "runs": 92,
       "partial": 1,
       "dead": 0,
       "consumed": 7,
@@ -272,11 +272,11 @@
       "unparsed": 0
     },
     "ko-prevention": {
-      "n": 63,
+      "n": 61,
       "runs": 9,
       "partial": 2,
       "dead": 0,
-      "consumed": 17,
+      "consumed": 15,
       "unconsumed": 35,
       "unparsed": 0
     },
@@ -299,11 +299,11 @@
       "unparsed": 0
     },
     "move-damage": {
-      "n": 294,
+      "n": 296,
       "runs": 152,
       "partial": 21,
       "dead": 0,
-      "consumed": 88,
+      "consumed": 90,
       "unconsumed": 33,
       "unparsed": 0
     },
@@ -317,8 +317,8 @@
       "unparsed": 0
     },
     "opponent-disrupt": {
-      "n": 223,
-      "runs": 45,
+      "n": 222,
+      "runs": 44,
       "partial": 34,
       "dead": 0,
       "consumed": 62,
@@ -326,11 +326,11 @@
       "unparsed": 0
     },
     "passive": {
-      "n": 167,
+      "n": 170,
       "runs": 26,
       "partial": 3,
       "dead": 0,
-      "consumed": 80,
+      "consumed": 83,
       "unconsumed": 57,
       "unparsed": 1
     },
@@ -353,11 +353,11 @@
       "unparsed": 0
     },
     "retreat-cost": {
-      "n": 172,
+      "n": 169,
       "runs": 0,
       "partial": 0,
       "dead": 0,
-      "consumed": 104,
+      "consumed": 101,
       "unconsumed": 68,
       "unparsed": 0
     },
@@ -398,8 +398,8 @@
       "unparsed": 0
     },
     "status": {
-      "n": 507,
-      "runs": 202,
+      "n": 501,
+      "runs": 196,
       "partial": 30,
       "dead": 10,
       "consumed": 135,
@@ -452,8 +452,8 @@
       "unparsed": 0
     },
     "when-played": {
-      "n": 39,
-      "runs": 21,
+      "n": 40,
+      "runs": 22,
       "partial": 17,
       "dead": 1,
       "consumed": 0,

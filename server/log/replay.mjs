@@ -22,9 +22,13 @@ export function replayJournal(records, { applyCommand, createRng, hashState, to 
       if (state) rng = createRng(seed, record.cursor);
       continue;
     }
-    if (record.k !== 'cmd' || !state) continue;
+    if (record.k !== 'cmd') continue;
 
     const { n, game } = record;
+    if (!state) {
+      divergence = { n, game, kind: 'no-base' };
+      break;
+    }
     if (record.cmd?._truncated) {
       divergence = { n, game, kind: 'truncated' };
       break;

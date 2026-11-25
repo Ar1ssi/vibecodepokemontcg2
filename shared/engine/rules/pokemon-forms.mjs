@@ -88,7 +88,7 @@ function formIndex(line, card) {
 }
 
 // Zygarde-EX / Zygarde-GX: a rule-box Pokémon of the same species, never a form of the line.
-const RULE_BOX_SUFFIX = /[s-](?:ex|gx|v|vmax|vstar)$/i;
+const RULE_BOX_SUFFIX = /[\s-](?:ex|gx|v|vmax|vstar)$/i;
 
 /**
  * Whether `evolution` may go onto `target` as far as forms go (the name and stage checks are the caller's):

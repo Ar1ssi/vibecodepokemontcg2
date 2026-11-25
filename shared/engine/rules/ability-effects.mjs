@@ -22,6 +22,8 @@
 // multi-step-out guidance; this one is card-in / single-family-out, like
 // `classifyEnergyEffect`.
 
+import { cardAbilityText } from './ability-executors.mjs';
+
 // Effect families a Pokémon ability can be classified into.
 export const ABILITY_FAMILIES = [
   'search',           // put a card from deck into hand / play area
@@ -85,16 +87,6 @@ const lower = (v) =>
   String(v ?? '')
     .toLowerCase()
     .replace(/[\u2018\u2019]/g, "'");
-
-const textOf = (card) => {
-  const arrText =
-    Array.isArray(card?.abilities) && card.abilities.length > 0
-      ? (typeof card.abilities[0] === 'string' ? card.abilities[0] : card.abilities[0]?.text)
-      : null;
-  return lower(
-    arrText ?? card?.ability?.text ?? card?.abilityText ?? card?.text ?? card?.effect ?? ''
-  );
-};
 
 const nameOf = (card) => lower(card?.name ?? '');
 
@@ -545,7 +537,7 @@ const FAMILY_ORDER = [
 export function classifyAbility(card) {
   if (!isAbilityCard(card)) return 'unknown';
 
-  const text = textOf(card);
+  const text = cardAbilityText(card);
   const name = nameOf(card);
   // Ability with no readable text (scraper gap): treat as a passive placeholder.
   if (!text) return 'passive';
@@ -561,7 +553,7 @@ export function classifyAbility(card) {
 export function classifyAbilityFamilies(card) {
   if (!isAbilityCard(card)) return ['unknown'];
 
-  const text = textOf(card);
+  const text = cardAbilityText(card);
   const name = nameOf(card);
   if (!text) return ['passive'];
   const t = text || name;
@@ -577,7 +569,7 @@ export function classifyAbilityFamilies(card) {
 // card's text. Returns 'Pokémon' (default), 'Energy', or 'Trainer'.
 export function searchTargetType(card) {
   if (!card) return 'Pokémon';
-  const text = textOf(card);
+  const text = cardAbilityText(card);
   const name = nameOf(card);
   const t = text || name;
 

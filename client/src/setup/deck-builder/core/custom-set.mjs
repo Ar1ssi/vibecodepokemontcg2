@@ -123,11 +123,25 @@ export function parseCustomSetFile(json = '') {
   };
 }
 
-export function loadCustomSetFromStorage(storage) {
+export const CUSTOM_SET_UNREADABLE_BACKUP_KEY = `${CUSTOM_SET_STORAGE_KEY}.unreadable`;
+
+// A stored set this build cannot read loads as empty, and the next save would overwrite it; the raw
+// text is kept under the backup key first (never over an earlier backup).
+function backUpUnreadableSet(storage, stored) {
   try {
-    const stored = storage?.getItem?.(CUSTOM_SET_STORAGE_KEY);
+    if (!storage.getItem(CUSTOM_SET_UNREADABLE_BACKUP_KEY)) storage.setItem(CUSTOM_SET_UNREADABLE_BACKUP_KEY, stored);
+  } catch {
+    // a full or blocked storage cannot take the backup either
+  }
+}
+
+export function loadCustomSetFromStorage(storage) {
+  let stored = null;
+  try {
+    stored = storage?.getItem?.(CUSTOM_SET_STORAGE_KEY);
     return stored ? normalizeCustomSet(JSON.parse(stored)) : createEmptyCustomSet();
   } catch {
+    if (stored) backUpUnreadableSet(storage, stored);
     return createEmptyCustomSet();
   }
 }

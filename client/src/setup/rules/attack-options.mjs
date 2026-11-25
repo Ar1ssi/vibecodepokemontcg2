@@ -15,15 +15,9 @@ import { ENERGY_SYMBOL_TO_TYPE } from '../../../../shared/engine/rules/energy-ef
 import { normalizeEnergyType } from '../../actions/move-card-bundle/energy-token-assets.mjs';
 import { TYPE_GLOW } from './card-glow-colors.mjs';
 import { formatWeakResist } from './card-inspector-model.mjs';
+import { el } from './overlay-chrome.mjs';
 
 const ICON_DIR = '/src/assets/attack-ui/';
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 // AttackEntryAssetRegistry indexes its sprites by the card's first type; a type it has no sprites
 // for falls back to Colorless, as the game's NONE entry does.

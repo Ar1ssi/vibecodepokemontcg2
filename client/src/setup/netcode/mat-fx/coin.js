@@ -5,11 +5,13 @@
 import { playCoinFlipCeremony } from '../../rules/coin-flip-ceremony.js';
 import { getSelectedCoin, pickDefaultCoin } from '../../rules/mat-coin.js';
 import { motionReduced } from '../../image-logic/mat-fx.mjs';
-import { coinCeremonyTimeline } from './coin-pose.mjs';
+import { chainedCeremonySlot, coinCeremonyTimeline } from './coin-pose.mjs';
 
 // Ceremonies never cut each other off: the FX queue drops its holds under a
 // flood, so a second flip can arrive while the first is still on screen.
 let ceremonyChain = Promise.resolve();
+// performance.now() at which the last chained ceremony is expected to end.
+let chainFreeAt = 0;
 
 const headingFor = (plan) => {
   const owner = plan.user === 'opp' ? "Opponent's" : 'Your';
@@ -33,6 +35,8 @@ export const coinFlip = (plan) => {
     .catch((err) => console.warn('[mat-fx] coin ceremony failed', err));
 
   // Hold the queue until the result has been read; later effects start as the overlay fades.
-  const timeline = coinCeremonyTimeline(faces.length, { reducedMotion });
-  return timeline.totalMs - timeline.fadeMs;
+  // A ceremony queued behind another starts when that one ends, so its hold includes the wait.
+  const slot = chainedCeremonySlot(coinCeremonyTimeline(faces.length, { reducedMotion }), performance.now(), chainFreeAt);
+  chainFreeAt = slot.endsAt;
+  return slot.holdMs;
 };

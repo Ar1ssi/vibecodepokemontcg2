@@ -47,9 +47,9 @@ export const PACK_TORN_AT = 0.4;
 // A press that moves less than this is a click, and a click tears.
 export const TAP_SLOP_PX = 6;
 
-const clamp01 = (value) =>
+export const clamp01 = (value) =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
-const lerp = (from, to, t) => from + (to - from) * t;
+export const lerp = (from, to, t) => from + (to - from) * t;
 const easeOutCubic = (t) => 1 - (1 - t) ** 3;
 // Symmetric, so a flip passes 90° exactly at the middle of its window: the card face is swapped
 // in at 50 % of CARD_FLIP_MS and is edge-on at that instant (design 052 row 14).
@@ -77,7 +77,7 @@ export function cubicBezier(x1, y1, x2, y2) {
 }
 
 const easeLid = cubicBezier(0.3, 1.2, 0.4, 1);
-const easeLift = cubicBezier(0.2, 0.8, 0.2, 1);
+export const easeLift = cubicBezier(0.2, 0.8, 0.2, 1);
 
 // ── State machine ────────────────────────────────────────────────────────────
 export const UNBOXING_STAGES = ['sealed', 'opened', 'deckShown', 'packs', 'done'];
@@ -400,6 +400,8 @@ export function packTornAt(progress) {
   return Number.isFinite(progress) && progress >= PACK_TORN_AT;
 }
 
+const isTapPress = (movedPx) => Number.isFinite(movedPx) && movedPx < TAP_SLOP_PX;
+
 /**
  * What a released press on the wrap or a pack top does: a press that barely moved is a click and
  * tears; a drag tears once it passed PACK_TORN_AT, else it springs back.
@@ -407,7 +409,7 @@ export function packTornAt(progress) {
  * @returns {'tear'|'spring'}
  */
 export function tearReleaseOutcome({ dxPx, movedPx, widthPx }) {
-  if (Number.isFinite(movedPx) && movedPx < TAP_SLOP_PX) return 'tear';
+  if (isTapPress(movedPx)) return 'tear';
   return packTornAt(packTearProgress(dxPx, widthPx)) ? 'tear' : 'spring';
 }
 
@@ -436,12 +438,15 @@ export function packSpillPose(t, cardIndex, { packWidthPx = 100, packHeightPx = 
   };
 }
 
+// A hit (tier 2 and up) lifts slower, holds, and flares.
+const isHitTier = (tier) => tier >= 2;
+
 /**
  * Where lift, flip and settle fall inside one card reveal, in ms. Tier ≥ 2 (a hit) lifts
  * slower and holds.
  */
 export function cardRevealPhases(tier = 0) {
-  const isHit = tier >= 2;
+  const isHit = isHitTier(tier);
   const liftMs = isHit ? HIT_LIFT_MS : CARD_LIFT_MS;
   const settleMs = isHit ? HIT_HOLD_MS : CARD_SETTLE_MS;
   const totalMs = liftMs + CARD_FLIP_MS + settleMs;
@@ -459,6 +464,10 @@ export function cardRevealPhases(tier = 0) {
 const FLARE_PEAK = 0.55;
 const FLARE_HALF_WIDTH = 0.3;
 
+// The flare's bell over a reveal's time `x` (0..1); only a hit has one.
+const flareAt = (x, tier) =>
+  isHitTier(tier) ? Math.max(0, 1 - Math.abs(x - FLARE_PEAK) / FLARE_HALF_WIDTH) : 0;
+
 /** One face-down card lifting, flipping 0 → 180°, and settling; `flare` > 0 only on hits. */
 export function cardRevealPose(t, { tier = 0 } = {}) {
   const x = clamp01(t);
@@ -468,8 +477,7 @@ export function cardRevealPose(t, { tier = 0 } = {}) {
   const settle = easeLift(clamp01((x - flipEnd) / (1 - flipEnd)));
   const height = lift * (1 - settle);
   const flip = easeInOutSine(clamp01((x - flipStart) / (flipEnd - flipStart)));
-  const flare =
-    tier >= 2 ? Math.max(0, 1 - Math.abs(x - FLARE_PEAK) / FLARE_HALF_WIDTH) : 0;
+  const flare = flareAt(x, tier);
   return {
     translateYPx: -liftPx * height,
     rotateYDeg: 180 * flip,
@@ -534,7 +542,7 @@ export function packFlyPose(t, { dxPx = 0, dyPx = 0, fromScale = 0.3 } = {}) {
 
 /** A released drag on the top card: swipe it away, treat it as a tap, or spring back. */
 export function swipeOutcome({ dxPx, movedPx, widthPx }) {
-  if (Number.isFinite(movedPx) && movedPx < TAP_SLOP_PX) return 'tap';
+  if (isTapPress(movedPx)) return 'tap';
   if (!(widthPx > 0) || !Number.isFinite(dxPx)) return 'spring';
   return Math.abs(dxPx) >= SWIPE_AT * widthPx ? 'swipe' : 'spring';
 }
@@ -558,7 +566,7 @@ export function swipeAwayPose(t, { direction = 1, fromPx = 0, distancePx = 400 }
 export function hitFlipPose(t, { tier = 2 } = {}) {
   const x = clamp01(t);
   const flip = easeInOutSine(x);
-  const flare = tier >= 2 ? Math.max(0, 1 - Math.abs(x - FLARE_PEAK) / FLARE_HALF_WIDTH) : 0;
+  const flare = flareAt(x, tier);
   return {
     rotateYDeg: 180 * (1 - flip),
     scale: 1 + HIT_FLIP_POP * Math.sin(Math.PI * x),
@@ -726,9 +734,9 @@ export function boxSkin({ box, setInfo = {}, cards = [], data = {} }) {
   };
 }
 
-const TEAR_LINE_PCT = 7;
+export const TEAR_LINE_PCT = 7;
 const TOOTH_MIN_PCT = 2;
-const TOOTH_MAX_PCT = 5;
+export const TOOTH_MAX_PCT = 5;
 
 /**
  * The jagged tear line of a pack in its own percent space, ordered right → left: points on the
@@ -749,13 +757,20 @@ export function packTearPoints(seed, packIndex, teeth = 12) {
   return points;
 }
 
+const tearLine = (seed, packIndex, teeth) =>
+  packTearPoints(seed, packIndex, teeth).map(({ xPct, yPct }) => `${pct(xPct)} ${pct(yPct)}`);
+
 /**
  * The torn top strip as a `clip-path` polygon in the pack's own percent space: the full top edge,
  * then the jagged `packTearPoints` whose teeth reach 2–5 % of the pack height below the crimp.
  */
 export function packTearEdge(seed, packIndex, teeth = 12) {
-  const line = packTearPoints(seed, packIndex, teeth).map(({ xPct, yPct }) => `${pct(xPct)} ${pct(yPct)}`);
-  return `polygon(${['0% 0%', '100% 0%', ...line].join(', ')})`;
+  return `polygon(${['0% 0%', '100% 0%', ...tearLine(seed, packIndex, teeth)].join(', ')})`;
+}
+
+/** The pack body left after the tear: the same jagged line, then the bottom corners. */
+export function packBodyEdge(seed, packIndex, teeth = 12) {
+  return `polygon(${[...tearLine(seed, packIndex, teeth), '0% 100%', '100% 100%'].join(', ')})`;
 }
 
 // ── Box face perspective ─────────────────────────────────────────────────────
@@ -855,7 +870,7 @@ export function unboxingTimeline(unboxing, { packIndex, tiers = [] } = {}) {
   for (let cardIndex = unboxing.revealed[pack]; cardIndex < unboxing.cardsPerPack; cardIndex += 1) {
     const tier = tiers[cardIndex] || 0;
     const { totalMs } = cardRevealPhases(tier);
-    const kind = tier >= 2 ? 'hit' : 'reveal';
+    const kind = isHitTier(tier) ? 'hit' : 'reveal';
     beats.push({ at, durationMs: totalMs, kind, packIndex: pack, cardIndex });
     end = Math.max(end, at + totalMs);
     at = kind === 'hit' ? at + totalMs : at + REVEAL_STAGGER_MS;

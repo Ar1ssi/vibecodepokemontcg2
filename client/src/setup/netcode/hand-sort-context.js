@@ -23,6 +23,7 @@ import {
 } from '../../state.js';
 import { determineDeckData } from '../general/determine-deckdata.js';
 import { sortCardsByDeckList } from '/shared/engine/zones/hand-sort.mjs';
+import { userOfSide } from './view-card-vocabulary.mjs';
 
 const SORTABLE_ZONES = ['hand', 'deck', 'discard', 'lostZone'];
 const FORCED_2P_SORT_ZONES = ['hand', 'discard', 'lostZone'];
@@ -55,7 +56,7 @@ export function sortZoneCardsForRender(side, zoneId, cards) {
     return cards;
   }
 
-  const user = side === 'you' ? 'self' : 'opp';
+  const user = userOfSide(side);
   const deckData = determineDeckData(user);
   if (!deckData) return cards;
 

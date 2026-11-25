@@ -1,5 +1,5 @@
 // Pure helpers: scan active + bench for once-per-turn abilities the player can
-// use interactively (same gate as runAbilitySteps / ability-picker).
+// use interactively.
 
 import { isAbilityCard, classifyAbility } from './ability-effects.mjs';
 import { parseAbility } from './abilities.mjs';

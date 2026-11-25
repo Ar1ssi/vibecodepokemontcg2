@@ -40,6 +40,7 @@ import {
 import { trainerEffectText } from './trainer.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { executeTrainer } from '../effects/trainer.mjs';
+import { BENCH_LIMIT } from '../effects/trainer-steps.mjs';
 
 const TOOL_KO_TARGET_KINDS = { holder: 'holder', bench: 'bench', hand: 'hand' };
 
@@ -1318,7 +1319,7 @@ export const PRIZE_BENCH_EFFECT = 'prizeBench';
 function offerPrizeToBench(draft, { playerId, taken }) {
   if (draft.pendingChoice || draft.turn?.player !== playerId || isGameConcluded(draft)) return;
   const player = draft.players[playerId];
-  if (rootsIn(player.zones.bench).length >= 5) return;
+  if (rootsIn(player.zones.bench).length >= BENCH_LIMIT) return;
   const card = taken.find(
     (c) => player.zones.hand.includes(c) && isPokemon(c) && abilityPrizeToBench(c)
   );
@@ -1385,7 +1386,7 @@ export function resumePrizeToBench(draft, { token, selection, activeRng, events 
   if (Number((selection || [])[0]) !== 1) return;
   const player = draft.players[token.initiatorPlayerId];
   const card = player?.zones?.hand?.find((c) => c.instanceId === token.cardId);
-  if (!card || rootsIn(player.zones.bench).length >= 5) return;
+  if (!card || rootsIn(player.zones.bench).length >= BENCH_LIMIT) return;
   player.zones.hand.splice(player.zones.hand.indexOf(card), 1);
   card.enteredPlayTurn = draft.turn?.number ?? null;
   player.zones.bench.push(card);
@@ -1420,18 +1421,15 @@ export function takePrizesCommand({ payload, draft, playerId, events }) {
     cards: drawnPrizes.map((c) => ({ instanceId: c.instanceId })),
   });
 
-  if (tiebreakActive(draft) && actualCount > 0) {
-    setGameEnded(draft, {
-      winner: playerId,
-      reason: 'tiebreak: first Prize card taken',
-      events,
-    });
-  } else if (prizes.length === 0) {
-    setGameEnded(draft, {
-      winner: playerId,
-      reason: 'all prize cards taken',
-      events,
-    });
+  settleManualPrizeWin(draft, { playerId, takenCount: actualCount, events });
+}
+
+/** A hand-taken Prize ends the game in a tiebreak game, or when it was the last one. */
+function settleManualPrizeWin(draft, { playerId, takenCount, events }) {
+  if (tiebreakActive(draft) && takenCount > 0) {
+    setGameEnded(draft, { winner: playerId, reason: 'tiebreak: first Prize card taken', events });
+  } else if (draft.players[playerId].zones.prizes.length === 0) {
+    setGameEnded(draft, { winner: playerId, reason: 'all prize cards taken', events });
   }
 }
 
@@ -1457,19 +1455,7 @@ export function takePrizesByIndexCommand({ payload, draft, playerId, events }) {
     cards: taken.map((c) => ({ instanceId: c.instanceId })),
   });
 
-  if (tiebreakActive(draft) && taken.length > 0) {
-    setGameEnded(draft, {
-      winner: playerId,
-      reason: 'tiebreak: first Prize card taken',
-      events,
-    });
-  } else if (prizes.length === 0) {
-    setGameEnded(draft, {
-      winner: playerId,
-      reason: 'all prize cards taken',
-      events,
-    });
-  }
+  settleManualPrizeWin(draft, { playerId, takenCount: taken.length, events });
 }
 
 export function promoteCommand({ draft, playerId, payload, events }) {
@@ -1678,7 +1664,7 @@ export function resolveKoToolCounter(draft, { playerId, targetPlayerId, selectio
 export function resolveKoHandDiscard(draft, { playerId, selection, events }) {
   const player = draft.players?.[playerId];
   if (!player) return;
-  for (const instanceId of selection) {
+  for (const instanceId of selection || []) {
     const hand = player.zones.hand || [];
     const index = hand.findIndex((c) => c.instanceId === instanceId);
     if (index < 0) continue;

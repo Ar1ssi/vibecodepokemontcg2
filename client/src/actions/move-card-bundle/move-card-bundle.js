@@ -21,13 +21,12 @@ import { dispatchAuthoritativeMoveCardBundle } from '../../setup/netcode/authori
  *
  * @returns {boolean} whether the divergence was reported to the server
  */
-function reportMirrorAbort(reason, oZoneId) {
+function reportMirrorAbort(oZoneId) {
   return reportMirrorDesync({
     socket,
     roomId: systemState.roomId,
     getZoneFn: getZone,
     zoneId: oZoneId,
-    reason,
   }).sent;
 }
 
@@ -129,8 +128,8 @@ export const moveCardBundle = async (
     // a Judge/Boss's-Orders-style effect racing the owner's own concurrent
     // action on that zone. Without this, a stale index silently moves the
     // wrong card on the owner's authoritative board with no verification
-    // and no resync trigger (see the isMirrorReplay/needsHintVerification
-    // block below, previously unreachable for this direction).
+    // and no resync trigger (see the needsHintVerification block below, which
+    // verifies these hints on the owner's side).
     const requestHints = buildMoveCardHints(user, oZoneId, dZoneId, index, targetIndex);
     processAction(user, emit, 'moveCardBundle', [
       oInitiator,
@@ -141,7 +140,7 @@ export const moveCardBundle = async (
       action,
       requestHints,
     ]);
-    return;
+    return true;
   }
 
   let resolvedIndex = index;
@@ -155,8 +154,7 @@ export const moveCardBundle = async (
     !!cardHints &&
     systemState.isTwoPlayer &&
     ((user === 'opp' && !emit) || (user === 'self' && emit));
-  const isMirrorReplay = needsHintVerification;
-  if (isMirrorReplay) {
+  if (needsHintVerification) {
     ({ index: resolvedIndex, targetIndex: resolvedTargetIndex } =
       resolveMoveCardIndices(
         user,
@@ -183,7 +181,7 @@ export const moveCardBundle = async (
         relayIndex: index,
         resolvedIndex,
         moving: cardHints.moving,
-        reported: reportMirrorAbort('hint_mismatch', oZoneId),
+        reported: reportMirrorAbort(oZoneId),
       });
       return false;
     }
@@ -196,7 +194,7 @@ export const moveCardBundle = async (
         reason: 'missing_card',
         oZoneId,
         resolvedIndex,
-        reported: reportMirrorAbort('missing_card', oZoneId),
+        reported: reportMirrorAbort(oZoneId),
       });
       return false;
     }
@@ -264,10 +262,9 @@ export const moveCardBundle = async (
       resolvedTargetIndex,
       syncOptions
     );
-    // Do not call refreshBoard here — it used to invoke moveCard on every
-    // active/bench Pokémon, recreating play-containers and re-firing rules
-    // hooks. Array sync is handled by the socket replay itself; refreshBoard
-    // remains available for resize / flip-board / manual image reload.
+    // No refreshBoard here: it calls moveCard on every active/bench Pokémon,
+    // recreating play-containers and re-firing rules hooks. The socket replay
+    // syncs the arrays; refreshBoard is for resize / flip-board / manual image reload.
   } catch (e) {
     console.error('Error in moveCardBundle:', e, {
       user,
@@ -284,14 +281,17 @@ export const moveCardBundle = async (
     return false;
   }
 
+  // The peer replays what actually happened: a special-energy discard redirect changes
+  // the destination (and, for a reattach, names the host as the target).
   const actualDest = moveResult.destZoneId || dZoneId;
+  const actualTargetIndex = moveResult.targetIndex ?? resolvedTargetIndex;
 
   processAction(user, emit, 'moveCardBundle', [
     oInitiator,
     oZoneId,
     actualDest,
     resolvedIndex,
-    resolvedTargetIndex,
+    actualTargetIndex,
     action,
     hintsToSend,
   ]);

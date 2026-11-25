@@ -64,7 +64,6 @@ import { shuffleZone } from '../../actions/zones/shuffle-zone.js';
 import { exchangeData } from '../deck-constructor/exchange-data.js';
 import { changeCardBack, loadDeckData } from '../deck-constructor/import.js';
 import { changePlaymat } from '../sizing/apply-mat-layout.js';
-import { isBlockedByReplay } from './replay-block.js';
 import { logSyncAction, logDecision } from '../../log/sync-log.js';
 import { systemState } from '../../state.js';
 import { isMirrorSuppressedAction } from '../netcode/authoritative-dispatch.js';
@@ -132,44 +131,30 @@ const functions = {
 };
 
 const actionToFunction = (action) => {
-  const selectedFunction = functions[action];
-
-  if (typeof selectedFunction === 'function') {
-    return selectedFunction;
-  } else {
-    return null;
-  }
+  // The name comes off the wire: only the table's own entries, never inherited members
+  // such as 'constructor' or 'toString'.
+  return Object.hasOwn(functions, action) ? functions[action] : null;
 };
 
-export const acceptAction = async (
-  user,
-  action,
-  parameters,
-  isStateImport = false,
-  isFromReplay = false
-) => {
+export const acceptAction = async (user, action, parameters) => {
   let actionName = action;
   let actionParams = parameters;
   if (typeof action === 'object' && action !== null) {
     actionName = action.type || action.action;
     actionParams = action.payload || action.parameters || [];
   }
-  if (isBlockedByReplay('action', actionName, isFromReplay)) {
-    return false;
-  }
   const selectedFunction = actionToFunction(actionName);
   if (typeof selectedFunction !== 'function') {
     console.warn('acceptAction: unknown action', actionName);
     return false;
   }
-  const emit = user === 'self' || isStateImport ? true : false;
-  if (systemState.isTwoPlayer && !isStateImport && user === 'opp') {
+  const emit = user === 'self';
+  if (systemState.isTwoPlayer && user === 'opp') {
     logSyncAction(actionName, actionParams, 'in');
     logDecision('opp', actionName, actionParams);
   }
   if (
     user === 'opp' &&
-    !isStateImport &&
     systemState.serverAuthoritative &&
     isMirrorSuppressedAction(actionName)
   ) {

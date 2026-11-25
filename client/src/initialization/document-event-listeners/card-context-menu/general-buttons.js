@@ -13,18 +13,8 @@ import {
   mouseClick,
   systemState,
 } from '../../../state.js';
-import { manualDeckActionAllowed } from '/shared/engine/rules/rules-state.mjs';
-import { appendMessage } from '../../../setup/chatbox/append-message.js';
-
-// Gate a manual (human-triggered) deck action through the rules layer.
-function gate(actionKey, initiator) {
-  const check = manualDeckActionAllowed(actionKey);
-  if (!check.allowed) {
-    appendMessage(initiator, '⛔ ' + check.reason, 'announcement', false);
-    return false;
-  }
-  return true;
-}
+import { gate } from './manual-deck-gate.js';
+import { clickedCardIsFaceDown } from './face-down-card.js';
 
 export const initializeGeneralButtons = () => {
   const moveToTopButton = document.getElementById('moveToTopButton');
@@ -85,13 +75,7 @@ export const initializeGeneralButtons = () => {
 
   const revealHideButton = document.getElementById('revealHideButton');
   revealHideButton.addEventListener('click', () => {
-    if (
-      [
-        systemState.cardBackSrc,
-        systemState.p1OppCardBackSrc,
-        systemState.p2OppCardBackSrc,
-      ].includes(mouseClick.card.image.src)
-    ) {
+    if (clickedCardIsFaceDown()) {
       revealShortcut(
         mouseClick.cardUser,
         systemState.initiator,

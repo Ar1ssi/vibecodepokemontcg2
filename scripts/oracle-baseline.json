@@ -86,8 +86,8 @@
       "observed": 0
     },
     "ability:energy-redirect": {
-      "n": 95,
-      "observed": 87
+      "n": 101,
+      "observed": 93
     },
     "ability:energy-type": {
       "n": 3,
@@ -138,11 +138,11 @@
       "observed": 27
     },
     "ability:opponent-disrupt": {
-      "n": 223,
-      "observed": 127
+      "n": 222,
+      "observed": 126
     },
     "ability:passive": {
-      "n": 167,
+      "n": 170,
       "observed": 30
     },
     "ability:prize-modify": {
@@ -154,7 +154,7 @@
       "observed": 110
     },
     "ability:retreat-cost": {
-      "n": 172,
+      "n": 169,
       "observed": 0
     },
     "ability:search": {
@@ -198,8 +198,8 @@
       "observed": 8
     },
     "ability:when-played": {
-      "n": 39,
-      "observed": 38
+      "n": 40,
+      "observed": 39
     },
     "attack:bench-damage": {
       "n": 850,

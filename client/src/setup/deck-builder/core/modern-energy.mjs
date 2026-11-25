@@ -13,7 +13,6 @@ const MODERN_BASIC_ENERGY = {
   'Basic Psychic Energy': { id: 'sve-005', file: 'SVE_005', name: 'Basic Psychic Energy' },
   'Basic Fighting Energy': { id: 'sve-006', file: 'SVE_006', name: 'Basic Fighting Energy' },
   'Basic Darkness Energy': { id: 'sve-007', file: 'SVE_007', name: 'Basic Darkness Energy' },
-  'Basic {D} Energy': { id: 'sve-007', file: 'SVE_007', name: 'Basic Darkness Energy' },
   'Basic Metal Energy': { id: 'sve-008', file: 'SVE_008', name: 'Basic Metal Energy' },
 };
 

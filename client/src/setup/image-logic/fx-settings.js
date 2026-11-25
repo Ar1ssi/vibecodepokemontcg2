@@ -7,7 +7,7 @@
 // iframes are same-origin and already reachable through state.js, so the
 // applier writes the same marker classes onto each iframe's <html> element and
 // the iframe stylesheets guard their idle keyframes on `:root(.fx-off)`.
-import { oppContainerDocument, selfContainerDocument, systemState } from '../../state.js';
+import { oppContainerDocument, selfContainerDocument } from '../../state.js';
 import {
   FX_OFF_CLASS,
   FX_OFF_KEY,
@@ -99,8 +99,7 @@ export const setHoloShapesOff = (off) => setFxSetting(HOLO_SHAPES_OFF_KEY, off);
 export const setCameraPreset = (preset) => setFxSetting(CAMERA_PRESET_KEY, preset);
 
 // The iframes are built after boot, so re-apply when the mats report ready.
-// `systemState` is imported for that hook's existence check only.
 export function watchFxSettingTargets() {
-  if (typeof document === 'undefined' || !systemState) return;
+  if (typeof document === 'undefined') return;
   document.addEventListener('rules-turn-view-applied', applyFxSettings);
 }

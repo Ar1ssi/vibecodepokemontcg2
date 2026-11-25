@@ -17,6 +17,7 @@
       wireCoinPointerLight,
     } from '../../../setup/deck-builder/core/coin-effects.mjs';
     import { coinTiltFromPointer } from '../../../setup/netcode/mat-fx/coin-stage-math.mjs';
+import { escapeHtml } from './native-deck-builder-shared-logic.js';
 
     const SOURCE_PHYSICAL = 'physical';
     const SOURCE_TCGL = 'tcgl';
@@ -80,13 +81,6 @@
       };
     };
 
-    const escapeHtml = (value = '') => String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
-    
     /**
      * Coin picker for the Customize tab. Renders a circular gallery of the
      * whole catalog (Gens I-IX) with material-adapted effects under a fixed

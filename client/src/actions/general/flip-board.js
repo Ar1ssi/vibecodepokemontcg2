@@ -19,31 +19,6 @@ export const flipBoard = () => {
     emitRequestView({ socket, roomId: systemState.roomId, nearSeat: requestNearSeat });
     return;
   }
-  const attackButton = document.getElementById('attackButton');
-  const retreatButton = document.getElementById('retreatButton');
-  const healButton = document.getElementById('healButton');
-  const switchButton = document.getElementById('switchButton');
-  const attachButton = document.getElementById('attachButton');
-  const searchButton = document.getElementById('searchButton');
-  const abilityButton = document.getElementById('abilityButton');
-  const energyRedirectButton = document.getElementById('energyRedirectButton');
-  const undoButton = document.getElementById('undoButton');
-  const FREEBUTTON = document.getElementById('FREEBUTTON');
-  const setupButton = document.getElementById('setupButton');
-  const resetButton = document.getElementById('resetButton');
-  const p2AttackButton = document.getElementById('p2AttackButton');
-  const p2RetreatButton = document.getElementById('p2RetreatButton');
-  const p2HealButton = document.getElementById('p2HealButton');
-  const p2SwitchButton = document.getElementById('p2SwitchButton');
-  const p2AttachButton = document.getElementById('p2AttachButton');
-  const p2SearchButton = document.getElementById('p2SearchButton');
-  const p2AbilityButton = document.getElementById('p2AbilityButton');
-  const p2EnergyRedirectButton = document.getElementById('p2EnergyRedirectButton');
-  const p2PassButton = document.getElementById('p2PassButton');
-  // const p2UndoButton = document.getElementById('p2UndoButton');
-  const p2FREEBUTTON = document.getElementById('p2FREEBUTTON');
-  const p2SetupButton = document.getElementById('p2SetupButton');
-  const p2ResetButton = document.getElementById('p2ResetButton');
   const boardElement = selfContainerDocument.getElementById('board');
   const oppBoardElement = oppContainerDocument.getElementById('board');
   const viewCardsElement = selfContainerDocument.getElementById('viewCards');
@@ -82,32 +57,21 @@ export const flipBoard = () => {
   applyBoardFlip(systemState);
   toggleClasses(boardElement, 'self-board', 'opp-board');
   toggleClasses(oppBoardElement, 'opp-board', 'self-board');
-  toggleClasses(attackButton, 'self-color', 'opp-color');
-  toggleClasses(retreatButton, 'self-color', 'opp-color');
-  toggleClasses(healButton, 'self-color', 'opp-color');
-  toggleClasses(switchButton, 'self-color', 'opp-color');
-  toggleClasses(attachButton, 'self-color', 'opp-color');
-  toggleClasses(searchButton, 'self-color', 'opp-color');
-  toggleClasses(abilityButton, 'self-color', 'opp-color');
-  toggleClasses(energyRedirectButton, 'self-color', 'opp-color');
-  toggleClasses(undoButton, 'self-color', 'opp-color');
-  toggleClasses(FREEBUTTON, 'self-color', 'opp-color');
-  toggleClasses(p2AttackButton, 'self-color', 'opp-color');
-  toggleClasses(p2RetreatButton, 'self-color', 'opp-color');
-  toggleClasses(p2HealButton, 'self-color', 'opp-color');
-  toggleClasses(p2SwitchButton, 'self-color', 'opp-color');
-  toggleClasses(p2AttachButton, 'self-color', 'opp-color');
-  toggleClasses(p2SearchButton, 'self-color', 'opp-color');
-  toggleClasses(p2AbilityButton, 'self-color', 'opp-color');
-  toggleClasses(p2EnergyRedirectButton, 'self-color', 'opp-color');
-  toggleClasses(p2PassButton, 'self-color', 'opp-color');
-  // toggleClasses(p2UndoButton, 'self-color', 'opp-color');
-  toggleClasses(p2FREEBUTTON, 'self-color', 'opp-color');
-  toggleClasses(p2SetupButton, 'self-color', 'opp-color');
-  toggleClasses(p2ResetButton, 'self-color', 'opp-color');
-  if (!systemState.isReplay) {
-    toggleClasses(setupButton, 'self-color', 'opp-color');
-    toggleClasses(resetButton, 'self-color', 'opp-color');
+  const colorToggledButtonIds = [
+    'attackButton',
+    'retreatButton',
+    'undoButton',
+    'FREEBUTTON',
+    'p2AttackButton',
+    'p2RetreatButton',
+    'p2PassButton',
+    'p2FREEBUTTON',
+    'p2SetupButton',
+    'p2ResetButton',
+  ];
+  colorToggledButtonIds.push('setupButton', 'resetButton');
+  for (const buttonId of colorToggledButtonIds) {
+    toggleClasses(document.getElementById(buttonId), 'self-color', 'opp-color');
   }
 
   const users = ['self', 'opp'];
@@ -127,26 +91,26 @@ export const flipBoard = () => {
   const headerIds = ['attachedCardsHeader', 'viewCardsHeader'];
 
   for (const user of users) {
-    const document =
+    const userDocument =
       user === 'self' ? selfContainerDocument : oppContainerDocument;
 
     for (const textId of textIds) {
-      const text = document.getElementById(textId);
+      const text = userDocument.getElementById(textId);
       text.classList.toggle('self-text');
       text.classList.toggle('opp-text');
     }
     for (const zoneId of zoneIds) {
-      const element = document.getElementById(zoneId);
+      const element = userDocument.getElementById(zoneId);
       element.classList.toggle('self-view');
       element.classList.toggle('opp-view');
     }
     for (const buttonContainerId of buttonContainers) {
-      const container = document.getElementById(buttonContainerId);
+      const container = userDocument.getElementById(buttonContainerId);
       container.classList.toggle('self-zone-button-container');
       container.classList.toggle('opp-zone-button-container');
     }
     for (const headerId of headerIds) {
-      const header = document.getElementById(headerId);
+      const header = userDocument.getElementById(headerId);
       header.classList.toggle('self-header');
       header.classList.toggle('opp-header');
       if (header.textContent === 'Move attached cards') {

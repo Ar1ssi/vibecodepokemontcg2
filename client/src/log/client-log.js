@@ -1,7 +1,7 @@
 // Client logging singleton (design 088 §5). Safe to import in Node: storage access is guarded.
 import { createLogger } from '../../../shared/log/logger.mjs';
 import { createRing } from '../../../shared/log/ring.mjs';
-import { LIMITS } from '../../../shared/log/log-schema.mjs';
+import { LIMITS, isClientId } from '../../../shared/log/log-schema.mjs';
 
 const CLIENT_KEY = 'ptcg-sim.log.client.v1';
 
@@ -16,7 +16,7 @@ function randomHex(chars) {
 function loadClientId() {
   try {
     const stored = globalThis.localStorage?.getItem(CLIENT_KEY);
-    if (/^[0-9a-f]{16}$/.test(stored ?? '')) return stored;
+    if (isClientId(stored)) return stored;
     const fresh = randomHex(16);
     globalThis.localStorage?.setItem(CLIENT_KEY, fresh);
     return fresh;

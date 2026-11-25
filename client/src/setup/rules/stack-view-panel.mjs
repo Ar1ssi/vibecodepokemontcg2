@@ -6,19 +6,13 @@
 
 import { isPokemonToolCard } from '../../../../shared/engine/rules/ability-executors.mjs';
 import { attachedEnergyUnits } from './attack-ui-model.mjs';
+import { el } from './overlay-chrome.mjs';
 import {
   buildAbilityOption,
   buildAttackOption,
   buildWeakResistBar,
   typeIcon,
 } from './attack-options.mjs';
-
-const el = (tag, className, text) => {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = String(text);
-  return node;
-};
 
 // NameHPRegion: the name left, "remaining/<b>max</b>" and the type icons right, the HP bar beneath.
 const nameHpRegion = (model) => {

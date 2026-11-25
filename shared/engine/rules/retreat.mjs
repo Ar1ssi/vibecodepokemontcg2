@@ -3,6 +3,7 @@
 
 import { rulesState, getStadium } from './rules-state.mjs';
 import { canPayAttackCost } from './attack-engine.mjs';
+import { pendingCantRetreat } from './attack-pending-effects.mjs';
 import {
   parseRetreatCostModifier,
   applyRetreatCostModifier,
@@ -72,6 +73,9 @@ export function canRetreat(
   }
   if (rulesState.flags[player]?.retreatedThisTurn) {
     return { allowed: false, reason: 'You already retreated this turn.' };
+  }
+  if (pendingCantRetreat(rulesState, player)) {
+    return { allowed: false, reason: "The Active Pokémon can't retreat during this turn (attack effect)." };
   }
   const cards = Array.isArray(zoneCards) ? zoneCards : (zoneCards?.array || []);
   const costN = getEffectiveRetreatCost(activeCard, player, cards, benchCards);

@@ -8,6 +8,8 @@
 // cards are fetched once, misses remembered for an hour, a cool-down when the CDN pushes back,
 // and a bounded queue, so nobody can turn the server into a firehose at TCGdex.
 
+import { BodyTooLargeError, createFailureLog, createLimiter, readCapped } from './upstream-limits.mjs';
+
 export const CARD_ART_HOSTS = new Set(['assets.tcgdex.net']);
 
 // /<lang>/<series>/<set>/<card>/(high|low).<ext> and /<lang>/<series>/<set>/(logo|symbol).<ext>
@@ -43,31 +45,6 @@ export function parseCardArtUrl(raw) {
 const isPushBack = (status) => status === 403 || status === 429 || status === 503;
 
 /**
- * The response body as a Buffer, refused as soon as it passes `max` bytes (null), whether or not
- * the upstream declared a length.
- */
-async function readCapped(res, max) {
-  const reader = res.body?.getReader?.();
-  if (!reader) {
-    const body = Buffer.from(await res.arrayBuffer());
-    return body.length > max ? null : body;
-  }
-  const chunks = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > max) {
-      await reader.cancel().catch(() => {});
-      return null;
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks, total);
-}
-
-/**
  * @param {object} [options]
  * @param {typeof fetch} [options.fetchImpl]
  * @param {() => number} [options.now]
@@ -76,6 +53,7 @@ async function readCapped(res, max) {
  * @param {number} [options.concurrency] upstream requests in flight at once
  * @param {number} [options.maxWaiting] requests that may queue for a slot; more are turned away
  * @param {number} [options.timeoutMs]
+ * @param {(line: string) => void} [options.log] told once when the CDN starts failing or pushing back, and once when it recovers
  * @returns {{get(href: string): Promise<{status: number, type?: string, body?: Buffer}>,
  *   bytes(): number, size(): number}}
  */
@@ -87,12 +65,13 @@ export function createCardArtProxy({
   concurrency = 6,
   maxWaiting = MAX_WAITING,
   timeoutMs = UPSTREAM_TIMEOUT_MS,
+  log = () => {},
 } = {}) {
   const cache = new Map(); // href -> { type, body }
   const missing = new Map(); // href -> expiresAt (a 404 remembered)
   const inFlight = new Map(); // href -> Promise<result>
-  const waiting = [];
-  let active = 0;
+  const limiter = createLimiter(concurrency, { maxWaiting });
+  const outage = createFailureLog(log);
   let cachedBytes = 0;
   let cooldownUntil = 0;
 
@@ -119,17 +98,6 @@ export function createCardArtProxy({
     while (missing.size > 4096) missing.delete(missing.keys().next().value);
   }
 
-  async function withSlot(task) {
-    if (active >= concurrency) await new Promise((resolve) => waiting.push(resolve));
-    active += 1;
-    try {
-      return await task();
-    } finally {
-      active -= 1;
-      waiting.shift()?.();
-    }
-  }
-
   async function fetchUpstream(href) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -148,12 +116,11 @@ export function createCardArtProxy({
         .trim()
         .toLowerCase();
       if (!IMAGE_TYPES.has(type)) return { status: 502 };
-      const declared = Number(res.headers.get('content-length'));
-      if (Number.isFinite(declared) && declared > maxImageBytes) return { status: 502 };
       const body = await readCapped(res, maxImageBytes);
-      if (!body || body.length === 0) return { status: 502 };
+      if (body.length === 0) return { status: 502 };
       return { status: 200, type, body };
     } catch (error) {
+      if (!(error instanceof BodyTooLargeError)) outage.failed('fetch', `card art: upstream fetch failed (${error?.message ?? error})`);
       return { status: error?.name === 'AbortError' ? 504 : 502 };
     } finally {
       clearTimeout(timeout);
@@ -162,11 +129,17 @@ export function createCardArtProxy({
 
   async function load(href) {
     if (now() < cooldownUntil) return { status: 503 };
-    if (active >= concurrency && waiting.length >= maxWaiting) return { status: 503 };
-    const result = await withSlot(() => fetchUpstream(href));
-    if (result.status === 200) remember(href, { type: result.type, body: result.body });
-    else if (result.status === 404) rememberMissing(href);
-    else if (isPushBack(result.upstream)) cooldownUntil = now() + COOLDOWN_MS;
+    if (limiter.saturated()) return { status: 503 };
+    const result = await limiter.run(() => fetchUpstream(href));
+    if (result.status === 200) {
+      outage.recovered('card art: upstream answering again');
+      remember(href, { type: result.type, body: result.body });
+    } else if (result.status === 404) {
+      rememberMissing(href);
+    } else if (isPushBack(result.upstream)) {
+      cooldownUntil = now() + COOLDOWN_MS;
+      outage.failed(`status-${result.upstream}`, `card art: upstream answered ${result.upstream}; no upstream requests for ${COOLDOWN_MS / 1000} s`);
+    }
     return { status: result.status, type: result.type, body: result.body };
   }
 

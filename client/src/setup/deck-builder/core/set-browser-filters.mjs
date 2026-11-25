@@ -6,7 +6,8 @@
  * narrows each set first (`set.id=eq:<id>` plus the filters it understands)
  * and only the survivors are fetched in full and checked by applyCardFilters,
  * which stays the truth. Filters TCGdex cannot narrow are only checked on the
- * set the player opened, never on every set at once.
+ * set the player opened, never on every set at once: `scopeFilterSets` picks
+ * those sets, and `findSetFilterMatches` scans exactly the `setIds` it is given.
  *
  * Pure: the fetches are injected.
  */

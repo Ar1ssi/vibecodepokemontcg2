@@ -18,7 +18,7 @@
 // a lit tube riding just over its crystal (gpu-canvas `volume` on the stroke), so the fringe reads
 // as an edge of light standing off the crystal rather than an outline printed on it.
 import { rgbCss } from '../../fx-colors.mjs';
-import { withFxMod, withLiftZ } from './_mods.js';
+import { edgedBy, withFxMod, withLiftZ } from './_mods.js';
 import { parseHex, traceOutline } from './_shared.js';
 import { ice, icicleOutline } from './ice.js';
 import { UNITS } from './_units.js';
@@ -63,9 +63,7 @@ export const accentKeyFor = (seed) => ACCENT_KEYS[((Math.floor(Math.abs(seed)) %
 function stellarKit(palette) {
   const crystalTongue = ice.withPalette(palette).tongue;
   const edge = Object.freeze({ dissolve: Object.freeze({ edge: palette.hot, width: 0.1, gain: 1.6 }) });
-  /** `draw` with this kit's dissolve edge named for every fill it makes. */
-  const edged = (draw) => (ctx, ...args) =>
-    ctx && typeof ctx === 'object' ? withFxMod(ctx, edge, () => draw(ctx, ...args)) : draw(ctx, ...args);
+  const edged = edgedBy(edge);
 
   function glow(ctx, x, y, r, alpha) {
     if (!(r > 0) || !(alpha > 0)) return;

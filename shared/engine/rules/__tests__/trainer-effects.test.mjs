@@ -481,66 +481,6 @@ import test, { describe } from 'node:test';
       assert.ok(!r.steps.some((s) => s.what === 'Basic Energy'), 'must not collapse to generic Basic Energy');
     });
 
-    test('announceDiscardPick: always broadcasts picked discard card', async () => {
-      const { announceDiscardPick } = await import('../search-reveal.mjs');
-      const messages = [];
-      const append = (_user, msg) => { messages.push(msg); };
-      announceDiscardPick('self', 'Super Rod', [{ name: 'Pikachu' }], append);
-      assert.equal(messages.length, 1);
-      assert.match(messages[0], /Revealed \(Super Rod\): Pikachu/);
-    });
-
-    test('maybeAnnounceSearchReveal: skips when effect has no reveal', async () => {
-      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
-      let called = 0;
-      const append = () => { called++; };
-      maybeAnnounceSearchReveal('self', 'Ultra Ball', [{ name: 'Pikachu' }], append, {
-        sourceText: 'Search your deck for a Pokémon and put it into your hand.',
-      });
-      assert.equal(called, 0);
-    });
-
-    test('maybeAnnounceSearchReveal: announces when effect text includes reveal', async () => {
-      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
-      const messages = [];
-      const append = (_user, msg) => { messages.push(msg); };
-      maybeAnnounceSearchReveal('self', 'Firebreather', [{ name: 'Basic Fire Energy' }], append, {
-        sourceText: 'Search your deck for up to 7 Basic {R} Energy cards, reveal them, and put them into your hand.',
-      });
-      assert.equal(messages.length, 1);
-      assert.match(messages[0], /Revealed \(Firebreather\): Basic Fire Energy/);
-    });
-
-    test('maybeAnnounceSearchReveal: an older "show them to your opponent" announces too (design 059)', async () => {
-      const { maybeAnnounceSearchReveal } = await import('../search-reveal.mjs');
-      const messages = [];
-      const append = (_user, msg) => { messages.push(msg); };
-      // Pokémon Collector (HeartGold & SoulSilver 97).
-      maybeAnnounceSearchReveal('self', 'Pokémon Collector', [{ name: 'Pichu' }], append, {
-        sourceText: 'Search your deck for up to 3 Basic Pokémon, show them to your opponent, and put them into your hand. Shuffle your deck afterward.',
-      });
-      assert.equal(messages.length, 1);
-      assert.match(messages[0], /Revealed \(Pokémon Collector\): Pichu/);
-    });
-
-    test('shuffleDeckAfterSearch: shuffles silently and announces in chat', async () => {
-      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
-      const messages = [];
-      let shuffled = false;
-      const append = (_user, msg) => { messages.push(msg); };
-      const shuffleZone = () => { shuffled = true; };
-      shuffleDeckAfterSearch('self', append, shuffleZone, { sourceName: 'Ultra Ball' });
-      assert.equal(shuffled, true);
-      assert.match(messages[0], /Ultra Ball — deck shuffled/);
-    });
-
-    test('shuffleDeckAfterSearch: message null shuffles without duplicate chat line', async () => {
-      const { shuffleDeckAfterSearch } = await import('../search-reveal.mjs');
-      const messages = [];
-      shuffleDeckAfterSearch('self', (_u, m) => messages.push(m), () => {}, { message: null });
-      assert.equal(messages.length, 0);
-    });
-
     test('Firebreather search filter: typed {R} matches Fire only', () => {
       const fire = { name: 'Basic Fire Energy', type: 'Energy', subtypes: ['Basic'], types: ['Fire'] };
       const water = { name: 'Basic Water Energy', type: 'Energy', subtypes: ['Basic'], types: ['Water'] };

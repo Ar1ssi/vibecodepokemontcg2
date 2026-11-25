@@ -43,6 +43,10 @@ const noise = (dur, gain, filter, over = {}) =>
 const arpeggio = (freqs, { step = 0.07, dur = 0.16, gain = 0.2, wave = 'triangle', at = 0 } = {}) =>
   Object.freeze(freqs.map((freq, i) => tone(freq, dur, gain, { wave, delay: at + i * step })));
 
+/** A name -> voice list table with the lists frozen too (a shallow freeze would leave them mutable). */
+const voiceSets = (sets) =>
+  Object.freeze(Object.fromEntries(Object.entries(sets).map(([name, voices]) => [name, Object.freeze(voices)])));
+
 // Design 041: the evolution scene's synthesized score, the fallback when the
 // evolve-card sample is not ready (design 064). Design 066 replaced the picture
 // and left the sound alone: a twinkling intro over a swelling pad, a riser and a
@@ -76,7 +80,7 @@ const UNBOX_HIT_1 = arpeggio([523, 659, 784], { step: 0.07, dur: 0.22, gain: 0.1
 const UNBOX_HIT_2 = arpeggio([1047, 1319, 1568, 2093], { step: 0.07, dur: 0.24, gain: 0.12, wave: 'sine' });
 
 // ── Static palette: effects whose sound never varies with the plan ──────────
-const STATIC_VOICES = Object.freeze({
+const STATIC_VOICES = voiceSets({
   'attack-banner': [
     tone(220, 0.13, 0.16, { wave: 'sawtooth', freqTo: 440 }),
     tone(660, 0.22, 0.12, { wave: 'triangle', delay: 0.1 }),
@@ -174,7 +178,7 @@ const STATIC_VOICES = Object.freeze({
 // plan when the scene starts and the `damage` plan at contact, so a family voice is the body of
 // the move up to contact and never exceeds 0.6 s. The last tone of `burst` and `charge` and the
 // second tone of `ghost` are shortened from the first draft so every set ends by 0.6 s.
-export const FAMILY_VOICES = Object.freeze({
+export const FAMILY_VOICES = voiceSets({
   slash: [
     noise(0.14, 0.22, { type: 'bandpass', freq: 2600, q: 1.2 }),
     tone(1800, 0.1, 0.1, { wave: 'sine', freqTo: 900, delay: 0.04 }),
@@ -243,7 +247,7 @@ export const FAMILY_VOICES = Object.freeze({
 });
 
 // ── Per-condition status motifs ────────────────────────────────────────────
-const STATUS_VOICES = Object.freeze({
+const STATUS_VOICES = voiceSets({
   Poisoned: [tone(180, 0.28, 0.16, { wave: 'sine', freqTo: 120 })],
   Burned: [noise(0.34, 0.2, { type: 'bandpass', freq: 1700, q: 0.6 })],
   Asleep: [tone(392, 0.44, 0.14, { wave: 'sine', freqTo: 196 })],
