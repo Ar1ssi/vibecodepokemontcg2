@@ -211,7 +211,7 @@ function handCardsCostReason(player, beforeSteps) {
   if (discard && (player?.zones?.hand || []).length < discard.count) {
     return `You need ${discard.count} card(s) in your hand to discard.`;
   }
-  const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional);
+  const lostZone = beforeSteps.find((step) => step.type === 'atkLostZoneFromHand' && !step.optional && !step.anyNumber);
   if (lostZone && handCardsForLostZone(player, lostZone).length < (lostZone.count || 1)) {
     return `You need ${lostZone.what === 'pokemon' ? 'a Pokémon' : 'a card'} in your hand to put in the Lost Zone.`;
   }

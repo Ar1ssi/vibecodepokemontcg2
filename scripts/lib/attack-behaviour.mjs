@@ -3,6 +3,7 @@
 // observation (ok / partial / ran-no-effect / engine-error), tallies per family, and compares
 // every row with the committed baseline so an attack that stops working fails the gate instead
 // of drifting back in silently.
+import { createCard } from '../../shared/engine/cards.mjs';
 import { classifyAttackEffect } from '../../shared/engine/rules/attack-effects.mjs';
 import { parseAttackSteps } from '../../shared/engine/rules/attack-steps.mjs';
 import { parseAttackDamage } from '../../shared/engine/rules/damage-parser.mjs';
@@ -79,6 +80,7 @@ const MECH = [
     /(discard your hand|discard \d+ cards? from your hand|discard a card from your hand)/,
     /^own:hand->(discard|deck)$/,
   ],
+  ['heal-deferred', /^at the end of your next turn, heal \d+ damage/, /^own:deferred-heal$/],
   ['heal', /heal \d+ damage/, /^own:heal$/],
   [
     'status-opp',
@@ -182,12 +184,46 @@ const MEANINGFUL = new Set([
   'energyReturned',
 ]);
 
+// "Search your deck for a card. Shuffle your deck, then put that card on top of it." (Beldum
+// Magnetic Lift): the search ends on top of the deck, not in the hand.
+const SEARCH_TO_DECK_TOP =
+  /search your deck for [^.]*\.\s+shuffle your deck,? (?:then|and) put (?:that card|those cards|it|them) on top of (?:it|your deck)/;
+
+const DRAW_UNTIL = /draw cards until you have (\d+) cards in your hand/i;
+const STADIUM_IN_PLAY = /\bstadium(?: card)? in play\b/i;
+
+/**
+ * Board changes an attack's text needs to show an effect: a "draw cards until you have N cards"
+ * attack draws nothing on the rich board's stocked hand, and "Discard the Stadium in play" needs
+ * one in play. Undefined when the rich board already serves the text.
+ */
+export function attackBoardFor(text) {
+  const t = String(text || '');
+  const steps = [];
+  if (DRAW_UNTIL.test(t)) steps.push((state) => state.players.p1.zones.hand.splice(1));
+  if (STADIUM_IN_PLAY.test(t)) {
+    steps.push((state) => {
+      state.stadium = createCard({
+        instanceId: 99002,
+        name: 'Probe Stadium',
+        supertype: 'Trainer',
+        subtypes: ['Stadium'],
+        type: 'Stadium',
+        ownerId: 'p2',
+      });
+    });
+  }
+  return steps.length ? (state) => steps.forEach((step) => step(state)) : undefined;
+}
+
 /** Printed sentences whose mechanic has no matching state tag. */
 export function attackMismatches(text, tags) {
   const mismatches = [];
+  const searchesToTop = SEARCH_TO_DECK_TOP.test(normalizeAttackText(text));
   for (const sentence of normalizeAttackText(text).split(/(?<=\.)\s+/)) {
     for (const [mech, re, expect] of MECH) {
       if (!re.test(sentence)) continue;
+      if (mech === 'search-to-hand' && searchesToTop) break;
       if (!(tags || []).some((t) => expect.test(t)))
         mismatches.push({ mech, sentence, conditional: CONDITIONAL.test(sentence) });
       break;
@@ -266,7 +302,7 @@ export function classifyAttackRow(card, item, attackIndex, allAttacks, { seeds =
     return m;
   };
   const costPool = costPoolFor(allAttacks);
-  const run = runAttackRich(holder, attackIndex, { seeds, costPool });
+  const run = runAttackRich(holder, attackIndex, { seeds, costPool, mutate: attackBoardFor(item.text) });
   const replay = replayBonuses(holder, attackIndex, {
     text: item.text,
     printedBase: printedBase(item.damageText),

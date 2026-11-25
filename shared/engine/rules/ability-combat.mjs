@@ -329,6 +329,13 @@ function sourceConditionMet(text, holder, target, attacker, ctx) {
     if (symbols.length && !symbols.some((ty) => attackerTypes(target).includes(lower(ty)))) return false;
   }
   if (/don't have a rule box/.test(text) && isRuleBoxPokemon(target)) return false;
+  // Orthworm Earth Eater (custom set): the shield holds only while the attacker has that Energy.
+  const oppEnergyShield = text.match(
+    /if your opponent's active pok[eé]mon has any \{([a-z])\} energy attached, prevent all damage/
+  );
+  if (oppEnergyShield && !hasEnergyOfType(attacker, ctx.opponentSideCards, TYPE_LETTER[oppEnergyShield[1]])) {
+    return false;
+  }
   const attackerEnergy = text.match(
     /from your opponent's pok[eé]mon that have (\d+) or less energy attached/
   );

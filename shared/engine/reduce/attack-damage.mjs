@@ -43,8 +43,19 @@ import {
 } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
 
+// Groups: 1 "by attacks" (opponent's attacks only unless group 2 follows), 2 "(both yours and your
+// opponent's)". Iron Armor (custom set) prints neither: "prevent all damage done to it" stops the
+// Pokémon's own side's attacks too.
 const SELF_BENCH_SHIELD =
-  /as long as this pok[eé]mon is on your bench, prevent all damage done to this pok[eé]mon by attacks/;
+  /as long as this pok[eé]mon is on your bench, prevent all damage done to (?:this pok[eé]mon|it)( by attacks)?(\s*\(both yours and your opponent's\.?\))?/;
+
+const ENERGY_CONDITION_SHIELD =
+  /if your opponent's active pok[eé]mon has any \{[a-z]\} energy attached, prevent all damage done to this pok[eé]mon/;
+
+function benchSelfShieldStops(text, ownAttack) {
+  const match = SELF_BENCH_SHIELD.exec(text);
+  return Boolean(match) && (!ownAttack || !match[1] || Boolean(match[2]));
+}
 
 /**
  * Applies damage to one benched Pokémon: counters, event, and KO through handleKnockout
@@ -122,11 +133,28 @@ export function damageBenchedPokemon(
   // Plume Protection).
   const victimView = inPlayView(draft, victim);
   if (
-    !ownAttack &&
-    SELF_BENCH_SHIELD.test(cardAbilityText(victimView)) &&
+    benchSelfShieldStops(cardAbilityText(victimView), ownAttack) &&
     !isAbilitySuppressed(victimView, abilitySideContext(draft, victimPlayerId))
   ) {
     events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'bench-self-shield' });
+    return;
+  }
+
+  // Orthworm Earth Eater (custom set): the shield that holds while the attacker has {F} Energy
+  // attached covers the holder on the Bench too.
+  const striker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+  if (
+    !ownAttack &&
+    striker &&
+    ENERGY_CONDITION_SHIELD.test(cardAbilityText(victimView)) &&
+    abilityDamagePrevention(victimView, inPlayView(draft, striker) || striker, {
+      ...abilitySideContext(draft, victimPlayerId),
+      zone: 'bench',
+      isActive: false,
+      attackerIsActive: true,
+    }).preventAll
+  ) {
+    events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'ability' });
     return;
   }
 

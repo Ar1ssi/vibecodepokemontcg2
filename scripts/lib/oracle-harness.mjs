@@ -261,6 +261,7 @@ export function snapshot(state) {
       (state.players[pid]?.zones?.deck || []).map((c) => c.instanceId).join(',')
     ),
     winner: state.winner,
+    stadiumId: state.stadium?.instanceId ?? null,
     // Player-scoped effects no card carries, so a per-card diff alone cannot see them: play
     // locks ("can't play Item cards"), Iron Rule attack locks, Bench traps, forced-tails coins.
     playerLocks: ['p1', 'p2'].map((pid) => {
@@ -315,6 +316,7 @@ export function diffTags(before, after, events) {
     if (/knock|KO/i.test(e.type)) tags.add('ko');
     if (e.type === 'effectStepSkipped') tags.add(`skipped:${e.reason}`);
     if (e.type === 'abilityUsed') tags.add('ability-used');
+    if (e.type === 'deferredHealScheduled') tags.add(`${role(e.playerId)}:deferred-heal`);
     // A turn-scoped damage boost lives on the turn flags, not on any card.
     if (e.type === 'turnDamageBonus') tags.add(`${role(e.playerId)}:turn-bonus`);
   }
@@ -328,6 +330,7 @@ export function diffTags(before, after, events) {
       tags.add(`${role(pid)}:deck-reordered`);
     }
   });
+  if (before.stadiumId !== after.stadiumId) tags.add('stadium-changed');
   if (after.winner && !before.winner) tags.add('game-won');
   return tags;
 }
