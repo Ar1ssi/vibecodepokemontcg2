@@ -164,7 +164,7 @@ export function toolDiscardsAtEndOfOpponentTurn(card) {
  */
 export function toolDiscardsOnEvolution(card) {
   if (!card || isPokemon(card) || isEnergy(card)) return false;
-  return /if this card is attached to an evolution pok[eé]mon, discard this card/.test(normalizeText(cardTextOf(card)));
+  return /if this card is attached to an evolution pok[eé]mon, discard this card/.test(normalizeText(cardPrintedText(card)));
 }
 
 /**
