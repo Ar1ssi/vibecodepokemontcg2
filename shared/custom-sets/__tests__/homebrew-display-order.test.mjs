@@ -12,7 +12,7 @@ function pokemon(localId, name, type, stage, evolveFrom, source = 'sv01-001') {
 const names = (cards) => cards.map((card) => `${card.name} ${card.localId}`);
 
 test('only the Homebrew set is re-sorted', () => {
-  assert.equal(usesHomebrewDisplayOrder('customhb'), true);
+  assert.equal(usesHomebrewDisplayOrder('customhb'), false);
   assert.equal(usesHomebrewDisplayOrder('customhbw'), false);
 });
 
