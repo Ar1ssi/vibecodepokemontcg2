@@ -25,6 +25,7 @@ import { TIME_OUT_REASON } from './homebrew-clock.mjs';
 import { validateReferences, validateLegality } from './reduce/legality.mjs';
 import { attackCommand } from './reduce/attack.mjs';
 import {
+  markStadiumHpLossKnockouts,
   settlePromotionChoices, stampHealedPokemon, stampActivePromotions, settleKoEnergyMoves, settleToolEnergyBenchMoves,
   settleAttackerEnergyToHand,
   settleKoHandDiscards,
@@ -34,7 +35,7 @@ import {
   takePrizesByIndexCommand, promoteCommand,
 } from './reduce/knockout.mjs';
 import {
-  discardBenchedAttachedTrainers, setupCommand, takeTurnCommand, loadDeckCommand, cardStatsCommand,
+  discardBenchedAttachedTrainers, discardEvolutionHeldTools, setupCommand, takeTurnCommand, loadDeckCommand, cardStatsCommand,
   applyAbilitySleepLocks,
   applyAbilityStatusImmunity,
   trackEnergyDiscards,
@@ -470,7 +471,9 @@ export function applyCommand(state, command, rng = null) {
     trackEnergyDiscards(draft);
     applyStadiumStatusImmunity(draft, { events });
     discardBenchedAttachedTrainers(draft, { events });
+    discardEvolutionHeldTools(draft, { events });
   }
+  if (draft.rulesEnabled) markStadiumHpLossKnockouts(draft, { events });
   resolveDamageCounterKnockouts(draft, { events });
   // Knock Out effects (Energy moves) resolve before the replacement Active is promoted.
   settleKoEnergyMoves(draft, { events });

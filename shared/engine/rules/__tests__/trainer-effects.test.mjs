@@ -679,10 +679,11 @@ import test, { describe } from 'node:test';
       assert.ok(r.steps[0].detail.includes('damage reduction'));
     });
 
-    test("Acerola's Mischief: passive protect-from-ex", () => {
+    test("Acerola's Mischief: shields one Pokémon from Pokémon ex attacks", () => {
       const r = parseTrainerEffect('Choose 1 of your Pokémon in play. During your opponent’s next turn, prevent all damage from and effects of attacks done to that Pokémon by your opponent’s Pokémon ex.');
       assert.equal(r.recognizable, true);
-      assert.equal(r.steps[0].type, 'passive');
+      assert.equal(r.steps[0].type, 'shieldOwnPokemon');
+      assert.deepEqual(r.steps[0].attackerFilter, { any: ['ex'] });
     });
 
     test('Anthea & Concordia: passive bonus prize', () => {
@@ -972,13 +973,12 @@ import test, { describe } from 'node:test';
     });
 
     describe('near-miss audit fixes', () => {
-      test('Briar: singular "take 1 more Prize card" is passive', () => {
+      test('Briar: singular "take 1 more Prize card" arms the Tera KO bonus', () => {
         const r = parseTrainerEffect(
           "You can use this card only if your opponent has exactly 2 Prize cards remaining.\n\nDuring this turn, if your opponent's Active Pokémon is Knocked Out by damage from an attack used by your Tera Pokémon, take 1 more Prize card."
         );
         assert.equal(r.recognizable, true);
-        assert.equal(r.steps[0].type, 'passive');
-        assert.ok(r.steps[0].detail.includes('prize'));
+        assert.equal(r.steps[0].type, 'turnKoPrizeBonus');
       });
 
       test("Lisia's Appeal: Benched Basic Pokémon switchOpponent", () => {
@@ -1274,11 +1274,10 @@ import test, { describe } from 'node:test';
         assert.equal(r.steps[0].type, 'discardToolAndSpecialEnergy');
       });
 
-      test("Roxie's Performance: passive can't retreat", () => {
+      test("Roxie's Performance: locks the opponent's Poisoned Pokémon in place", () => {
         const r = parseTrainerEffect("During your opponent's next turn, their Poisoned Pokémon can't retreat. (This includes newly Poisoned Pokémon.)");
         assert.equal(r.recognizable, true);
-        assert.equal(r.steps[0].type, 'passive');
-        assert.ok(r.steps[0].detail.includes('Retreat restriction'));
+        assert.equal(r.steps[0].type, 'poisonedCannotRetreat');
       });
 
       test('Redeemable Ticket: reshufflePrizes', () => {

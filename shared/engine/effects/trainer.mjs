@@ -294,16 +294,6 @@ export function executeTrainer(draft, {
     player.flags.turnDamageBonuses = [...(player.flags.turnDamageBonuses || []), turnBonus];
   }
 
-  // Briar's clause only: other Trainers with a Prize passive (Lt. Surge's Strategy, Anthea &
-  // Concordia) parse to the same step kind but are not "Tera Pokémon take 1 more Prize card".
-  if (
-    parsed?.steps?.some((step) => step.type === 'passive') &&
-    /attack used by your tera pok[eé]mon, take 1 more prize/i.test(text)
-  ) {
-    if (!player.flags) player.flags = {};
-    player.flags.briarActive = true;
-  }
-
   if (!parsed || !parsed.steps || parsed.steps.length === 0) {
     // No steps or passive only: clean up to discard
     const bIdx = (player.zones.board || []).findIndex((c) => c.instanceId === card.instanceId);

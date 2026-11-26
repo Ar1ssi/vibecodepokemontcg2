@@ -11,6 +11,8 @@ import {
   hasRecognizedPassiveStadiumEffect,
   stadiumHasWhenPlayedEffect,
 } from '../../shared/engine/rules/stadium-effects.mjs';
+import { parseHpBonus } from '../../shared/engine/rules/ability-executors.mjs';
+import { parseToolCondition } from '../../shared/engine/rules/tool-conditions.mjs';
 
 // Parsed steps with no server handler of their own: `passive` is announced (Tool modifiers are
 // read by tool-combat / tool-conditions), `discardCost` is paid by the playTrainer case.
@@ -21,7 +23,8 @@ const STEP_UPGRADES = {
   searchDeck: new Set(['searchDeckSequence']),
   discardCost: new Set(['optionalDiscardCost']),
   // I224: WotC attach-Trainers (PlusPower, Defender, …) were passive-only before they attached.
-  passive: new Set(['attachLegacyTrainer']),
+  // Acerola's Mischief, Roxie's Performance and Briar were passive-only before their windows ran.
+  passive: new Set(['attachLegacyTrainer', 'shieldOwnPokemon', 'poisonedCannotRetreat', 'turnKoPrizeBonus']),
 };
 
 const PICK_STEPS = new Set(['searchDeck', 'recursion', 'shuffleFromDiscard']);
@@ -108,6 +111,28 @@ function flattenStepTypes(steps) {
 }
 
 /**
+ * A Stadium or Tool that parseTrainerEffect cannot read but the engine's own passive readers do:
+ * Stadiums run through stadium-effects.mjs (standing effect, read from the printed text), Tools
+ * through tool-conditions / ability-executors (a holder condition and an HP bonus). Without this a
+ * Stadium such as Dyna Tree Hill, or "If the Basic Pokémon this card is attached to … it has +50 HP",
+ * showed up as unrecognizable although the engine runs it.
+ */
+function enginePassiveRead(row) {
+  const subtype = String(row?.subtype || '');
+  const text = row?.text || '';
+  if (/stadium/i.test(subtype)) {
+    const card = { name: row?.name, text, effect: text, category: 'Trainer', trainerType: 'Stadium', subtypes: ['Stadium'] };
+    const family = classifyStadiumEffect(card);
+    return hasRecognizedPassiveStadiumEffect(card) || family === 'setup-once' || family === 'once-per-turn';
+  }
+  if (/tool/i.test(subtype)) {
+    const card = { name: row?.name, text, effect: text, category: 'Trainer', trainerType: 'Tool', subtypes: ['Pokémon Tool'] };
+    return parseHpBonus(card).bonus !== 0 && parseToolCondition(card) !== null;
+  }
+  return false;
+}
+
+/**
  * @param {{name: string, text: string, subtype?: string}} row A corpus row
  * @returns {{key: string, name: string, subtype: string, gaps: string[], serverMissing: string[],
  *   playCondition: string|null, steps: string[]}}
@@ -128,14 +153,18 @@ export function classifyTrainer(row) {
   const parsed = legacyAttachedTrainer({ type: 'Trainer', name: row?.name, text: row?.text })
     ? { recognizable: true, steps: [{ type: 'attachLegacyTrainer' }] }
     : parseTrainerEffect(row?.text || '');
-  const steps = flattenStepTypes(parsed.steps || []);
+  // A standing effect the engine reads from the card text has nothing to play and nothing missing.
+  const engineRead = !parsed.recognizable && enginePassiveRead(row);
+  const steps = flattenStepTypes(engineRead ? [{ type: 'passive' }] : parsed.steps || []);
   const gaps = [];
   if (/stadium/i.test(row?.subtype || '') && stadiumRecognized(row)) {
     return { key: trainerKey(row), name: row?.name || '', subtype: row?.subtype || '', gaps, serverMissing: [], playCondition: null, steps };
   }
-  if (!parsed.recognizable) gaps.push('unrecognizable');
-  else if (steps.length === 0) gaps.push('empty');
-  else if (steps.every((t) => t === 'passive')) gaps.push('passive-only');
+  if (!engineRead) {
+    if (!parsed.recognizable) gaps.push('unrecognizable');
+    else if (steps.length === 0) gaps.push('empty');
+    else if (steps.every((t) => t === 'passive')) gaps.push('passive-only');
+  }
   const serverMissing = [
     ...new Set(steps.filter((t) => !NON_EXECUTED_OK.has(t) && !isExecutableStepType(t))),
   ].sort();

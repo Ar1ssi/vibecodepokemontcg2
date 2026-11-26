@@ -1725,6 +1725,8 @@ function applyGoingSecondCount(steps, lower) {
 }
 
 function parseTrainerSteps(lower) {
+  const timed = parseTimedTrainerEffect(lower);
+  if (timed) return timed;
   const chosen = parseChooseModes(lower);
   if (chosen) return chosen;
   const optional = splitOptionalHandCost(lower);
@@ -1738,6 +1740,32 @@ function parseTrainerSteps(lower) {
     if (optional) applyOptionalHandCost(result.steps, optional);
   }
   return result;
+}
+
+// Attackers a "by your opponent's Pokémon …" shield may name: the `attackerFilter` an attack marker reads.
+const SHIELD_ATTACKERS = { 'pokémon ex': { any: ['ex'] } };
+
+// Supporters whose whole effect is a window on a later turn, after the "You can use this card only if …"
+// sentence (Acerola's Mischief, Roxie's Performance, Briar). Null when the text is anything else.
+function parseTimedTrainerEffect(lower) {
+  const text = lower.replace(/\s+/g, ' ').trim().replace(/^you can use this card only if [^.]*\.\s*/, '');
+  const shield = text.match(
+    /^choose 1 of your pokémon in play\. during your opponent's next turn, prevent all damage from and effects of attacks done to that pokémon by your opponent's (pokémon ex)\.$/
+  );
+  if (shield) {
+    return { steps: [{ type: 'shieldOwnPokemon', attackerFilter: SHIELD_ATTACKERS[shield[1]] }], recognizable: true };
+  }
+  if (/^during your opponent's next turn, their poisoned pokémon can't retreat\.(?: \(this includes newly poisoned pokémon\.\))?$/.test(text)) {
+    return { steps: [{ type: 'poisonedCannotRetreat' }], recognizable: true };
+  }
+  if (
+    /^during this turn, if your opponent's active pokémon is knocked out by damage from an attack used by your tera pokémon, take 1 more prize card\.$/.test(
+      text
+    )
+  ) {
+    return { steps: [{ type: 'turnKoPrizeBonus' }], recognizable: true };
+  }
+  return null;
 }
 
 // Peony, Larry's Skill: the whole hand is discarded before the search resolves.
@@ -4021,6 +4049,12 @@ function describeStepBody(step) {
       return "Until the end of your opponent's next turn, prevent all damage from attacks done to your Benched Pokémon.";
     case 'teamDamageReduction':
       return "During your opponent's next turn, your " + (step.pokemonType ? '{' + step.pokemonType.toUpperCase() + '} ' : '') + 'Pokémon take ' + step.amount + ' less damage from attacks' + (step.attackerKind ? ' from your opponent\'s rule-box Pokémon' : '') + '.';
+    case 'shieldOwnPokemon':
+      return "Choose 1 of your Pokémon in play: during your opponent's next turn, prevent all damage from and effects of attacks done to it by your opponent's Pokémon ex.";
+    case 'poisonedCannotRetreat':
+      return "During your opponent's next turn, their Poisoned Pokémon can't retreat.";
+    case 'turnKoPrizeBonus':
+      return "This turn, if your opponent's Active Pokémon is Knocked Out by damage from an attack used by your Tera Pokémon, take 1 more Prize card.";
     case 'turnAttackRider':
       return `This turn, an attack from a Pokémon with ${step.nameTag} in its name that damages the Defending Pokémon leaves it ${step.condition}.`;
     case 'freeEvolve':

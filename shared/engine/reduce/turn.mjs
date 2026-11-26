@@ -16,6 +16,7 @@ import {
 } from '../rules/legacy-attached-trainer.mjs';
 import {
   toolDiscardsAtEndOfTurn, toolDiscardsAtEndOfOpponentTurn, toolEndOfTurnActiveHeal, toolCheckupEffect,
+  toolDiscardsOnEvolution,
 } from '../rules/tool-attacks.mjs';
 import { stadiumCheckupCoinModifiers } from '../rules/stadium-triggers.mjs';
 import {
@@ -27,7 +28,7 @@ import { flipCoin } from '../rng.mjs';
 import { addAttackMarker, markerFromTurn, markerUntilTurn } from '../rules/attack-markers.mjs';
 import { isEvolutionCard } from '../rules/tool-combat.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
-import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
+import { stampCanEvolve, topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { cardEffectShielded, pokemonHasType } from '../effects/trainer-steps.mjs';
 import {
   runEndOfTurnSpecialEnergies, applySpecialEnergyStatusImmunity, discardEndOfTurnSpecialEnergies,
@@ -421,6 +422,25 @@ export function discardBenchedAttachedTrainers(draft, { events }) {
     for (const card of [...(player.zones?.bench || [])]) {
       if (card.attachedTo == null || legacyAttachedTrainer(card)?.discard !== 'whenBenched') continue;
       detachLegacyTrainer(player, 'bench', card, 'discard', events);
+    }
+  }
+}
+
+/** Bravery Charm: "If this card is attached to an Evolution Pokémon, discard this card." Read after every command. */
+export function discardEvolutionHeldTools(draft, { events }) {
+  if (stadiumBlocksToolEffects(draft.stadium?.card || draft.stadium)) return;
+  for (const player of Object.values(draft.players || {})) {
+    for (const zoneId of ['active', 'bench']) {
+      const zone = player.zones?.[zoneId] || [];
+      for (const root of zone.filter((c) => !c.attachedTo)) {
+        if (!isEvolutionCard(topPokemonCard(zone, root) || root)) continue;
+        for (const tool of zone.filter((c) => c.attachedTo === root.instanceId && toolDiscardsOnEvolution(c))) {
+          zone.splice(zone.indexOf(tool), 1);
+          tool.attachedTo = null;
+          const to = discardCardToPlayerZone(player, tool);
+          events.push({ type: 'cardMoved', instanceId: tool.instanceId, from: zoneId, to, playerId: player.playerId });
+        }
+      }
     }
   }
 }
@@ -1147,6 +1167,7 @@ export function cardStatsCommand({ draft, playerId, payload, events }) {
     }
     updated += 1;
   }
+  stampCanEvolve(player);
 
   events.push({ type: 'cardStatsApplied', playerId, count: updated });
 }

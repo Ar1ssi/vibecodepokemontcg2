@@ -49,7 +49,7 @@ import { trainerTargetCounts, ownedCards, topPokemonCard } from '../rules/evolve
 import { isNextStage, isSameNameVmaxEvolution, normalizeStage, pokemonNamesMatch } from '../rules/evolution.mjs';
 import { isBabyEvolution } from '../rules/baby-rule.mjs';
 import { formMismatchReason, formsAllowEvolution } from '../rules/pokemon-forms.mjs';
-import { listConditions } from '../rules/special-conditions.mjs';
+import { hasCondition, listConditions } from '../rules/special-conditions.mjs';
 import {
   activeAttackMarkers, inPlayView, energyProvisionContext, cardText, cardEffectiveHp, markerCount,
   isGameFrozen, abilitySideContext, effectiveOncePerGameKind, tiebreakActive, rootsIn,
@@ -1346,6 +1346,13 @@ export function validateLegality(state, command) {
       const active = player.zones?.active?.find((c) => !c.attachedTo);
       if (!active) {
         return { allowed: false, reason: 'No active Pokémon to retreat.' };
+      }
+      // Roxie's Performance: the opponent's Poisoned Pokémon can't retreat, newly Poisoned ones too.
+      if (
+        player.poisonedRetreatLockUntilTurn >= (state.turn?.number || 1) &&
+        hasCondition(active, 'Poisoned')
+      ) {
+        return { allowed: false, reason: "Roxie's Performance — a Poisoned Pokémon can't retreat." };
       }
       const retreatsThrough = toolRetreatIgnoresConditions(active, player.zones?.active || [], {
         blockTools: isStadiumToolNegation(state.stadium?.card || state.stadium),

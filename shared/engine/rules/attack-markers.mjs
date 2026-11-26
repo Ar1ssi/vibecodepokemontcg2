@@ -28,6 +28,18 @@ export function clearAttackMarkers(card) {
 }
 
 /**
+ * Retreating or switching ends an attack's timed effects on the Pokémon, but not a shield a
+ * Trainer put on it ("Choose 1 of your Pokémon in play. During your opponent's next turn, …"):
+ * those carry `persistent` and last their printed window wherever the Pokémon stands.
+ */
+export function clearMovementMarkers(card) {
+  if (!card?.attackMarkers) return;
+  const kept = card.attackMarkers.filter((marker) => marker.persistent);
+  if (kept.length > 0) card.attackMarkers = kept;
+  else delete card.attackMarkers;
+}
+
+/**
  * Markers still in force on an Active Pokémon. The caller checks the card is Active.
  * @param {object} card In-play root card
  * @param {{ turnNumber: number, zoneCards?: object[], sourceZoneCards?: object[] }} options
