@@ -116,10 +116,11 @@ test('HB 531/673/675/674: a Tool naming its holder grants its attack only to tha
   }
 });
 
-test('HB 677 Crystal Edge: "If this card is attached to White Kyurem, … do 50 more damage" only for White Kyurem', () => {
+test('HB 677 Crystal Edge: "If this card is attached to White Kyurem, … do N more damage" only for White Kyurem', () => {
+  const bonus = Number(hbCard('677').effect.match(/(\d+) more damage/)[1]);
   const white = mon('White Kyurem');
   const other = mon('Reshiram');
-  assert.equal(activeDamage(attack(game({ p1: [white, hbTrainer('677', white)], p2: [mon('Def')] }))), 110);
+  assert.equal(activeDamage(attack(game({ p1: [white, hbTrainer('677', white)], p2: [mon('Def')] }))), 60 + bonus);
   assert.equal(activeDamage(attack(game({ p1: [other, hbTrainer('677', other)], p2: [mon('Def')] }))), 60);
 });
 
