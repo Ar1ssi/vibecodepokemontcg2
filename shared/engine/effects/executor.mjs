@@ -18,7 +18,7 @@ import { BENCH_LIMIT } from './bench-limit.mjs';
 import { normalizeStage } from '../rules/evolution.mjs';
 import { topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { becomeFossilPokemon, isFossilItem } from '../rules/fossil.mjs';
-import { addCondition, clearConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
+import { addCondition, clearConditions, cureConditions, hasAnyCondition } from '../rules/special-conditions.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isExCard, isGxCard, isVCard } from '../rules/card-classify.mjs';
 import { cardEffectiveHp, inPlayView } from '../reduce/shared.mjs';
@@ -1813,8 +1813,7 @@ export function executeSteps(draft, {
             damage: card.damage,
             healed: oldDamage - card.damage,
           });
-          if (step.cure && hasAnyCondition(card)) {
-            clearConditions(card);
+          if (step.cure && hasAnyCondition(card) && cureConditions(card)) {
             events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null, conditions: [] });
           }
           return oldDamage - card.damage;

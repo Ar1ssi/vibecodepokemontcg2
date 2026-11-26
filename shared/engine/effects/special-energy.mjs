@@ -22,7 +22,7 @@ import {
   stadiumBlanksSpecialEnergy,
   getSpecialEnergyStatusImmunity,
 } from '../rules/special-energy-parse.mjs';
-import { clearConditions, hasCondition, removeCondition } from '../rules/special-conditions.mjs';
+import { clearConditions, cureConditions, hasCondition, removeCondition } from '../rules/special-conditions.mjs';
 import { evolvedView, topPokemonCard } from '../rules/evolved-pokemon.mjs';
 import { matchesSearch } from '../rules/search-match.mjs';
 import { isEnergy } from '../cards.mjs';
@@ -165,7 +165,7 @@ function applyPlan(draft, plan, ctx, selection = null) {
       break;
     case 'removeDamage':
       healCard(host, plan.count * 10, events);
-      if (plan.alsoCure) clearConditions(host);
+      if (plan.alsoCure) cureConditions(host);
       break;
     case 'addDamage': {
       const target =
@@ -201,7 +201,7 @@ function applyPlan(draft, plan, ctx, selection = null) {
     }
     case 'clearStatus':
       if (plan.conditions) for (const condition of plan.conditions) removeCondition(host, condition);
-      else clearConditions(host);
+      else cureConditions(host);
       break;
     case 'returnBasicEnergy': {
       const basic = zone.find(
@@ -687,7 +687,7 @@ export function applySpecialEnergyStatusImmunity(draft, { events = [] } = {}) {
     if (!attachedSpecialEnergies(zone, root).length) continue;
     for (const condition of getSpecialEnergyStatusImmunity(view, zone, draft.stadium)) {
       if (!hasCondition(root, condition)) continue;
-      removeCondition(root, condition);
+      removeCondition(root, condition, { force: true });
       events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId: pid, reason: 'specialEnergy' });
     }
   }

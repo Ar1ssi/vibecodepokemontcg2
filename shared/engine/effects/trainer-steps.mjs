@@ -19,6 +19,7 @@ import { normalizeStage } from '../rules/evolution.mjs';
 import {
   addCondition,
   clearConditions,
+  cureConditions,
   copyConditions,
   hasAnyCondition,
 } from '../rules/special-conditions.mjs';
@@ -1513,8 +1514,7 @@ function discardOwnAttachedEnergy(ctx) {
     if (step.cost && !step.selfOnly && host) {
       ctx.events.push({ type: 'ownEnergyCostPaid', playerId: player.playerId, hostInstanceId: host.instanceId });
     }
-    if (step.cure && host && hasAnyCondition(host)) {
-      clearConditions(host);
+    if (step.cure && host && hasAnyCondition(host) && cureConditions(host)) {
       ctx.events.push({
         type: 'specialConditionUpdated',
         instanceId: host.instanceId,
@@ -2442,8 +2442,7 @@ function clearStatus(ctx) {
   );
   if (targets.length === 0) return skip(ctx, 'no_target');
   for (const card of targets) {
-    if (!hasAnyCondition(card)) continue;
-    clearConditions(card);
+    if (!hasAnyCondition(card) || !cureConditions(card)) continue;
     ctx.events.push({
       type: 'specialConditionUpdated',
       instanceId: card.instanceId,
@@ -3736,7 +3735,7 @@ function recoverStatusAbility(ctx) {
   const active = activeOf(player);
   if (!active) return skip(ctx, 'no_active');
   if (!hasAnyCondition(active)) return skip(ctx, 'no_condition');
-  clearConditions(active);
+  if (!cureConditions(active)) return skip(ctx, 'status_locked');
   ctx.events.push({
     type: 'specialConditionUpdated',
     instanceId: active.instanceId,

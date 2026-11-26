@@ -153,7 +153,7 @@ function applyEnergyAttachTriggers(draft, { host, hostTop, energy, playerId, eve
   for (const { target, recover, heal, source } of effects) {
     if (recover) {
       for (const condition of listConditions(target)) {
-        removeCondition(target, condition);
+        if (!removeCondition(target, condition)) continue;
         events.push({ type: 'statusCleared', condition, instanceId: target.instanceId, playerId, source });
       }
     }

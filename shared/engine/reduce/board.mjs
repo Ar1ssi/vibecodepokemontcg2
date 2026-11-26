@@ -273,7 +273,7 @@ export function removeSpecialConditionCommand({ draft, payload, events }) {
   const cardRef = findCard(draft, payload.instanceId);
   if (cardRef) {
     // A named condition removes only that one; no name clears them all.
-    if (payload.condition) removeCondition(cardRef.card, payload.condition);
+    if (payload.condition) removeCondition(cardRef.card, payload.condition, { force: true });
     else clearConditions(cardRef.card);
     events.push(conditionsUpdatedEvent(cardRef.card, null));
   }

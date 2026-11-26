@@ -683,6 +683,19 @@ export const MARKER_TEMPLATES = [
       marker: { kind: m[1] === 'attack' ? 'cantAttack' : 'cantRetreat', ...(m[2] ? { whileSourceActive: true } : {}) },
     }),
   ],
+  // Darkrai GX Dead End GX (customhb-1046): "… can't retreat or recover from Special Conditions."
+  // The statusLock marker is read by special-conditions.mjs (every cure and Checkup recovery); like
+  // the retreat lock it ends when the Pokémon leaves the Active Spot or evolves.
+  [
+    /^your opponent's active pokémon can't (retreat or )?recover from special conditions$/,
+    (m) => ({
+      type: 'atkAddMarker',
+      target: 'opponentActive',
+      window: 'whileActive',
+      marker: { kind: 'statusLock' },
+      ...(m[1] ? { alsoMarkers: [{ kind: 'cantRetreat' }] } : {}),
+    }),
+  ],
 ];
 
 const WINDOW_TURNS = {

@@ -18,6 +18,7 @@ import { textRevealsPicks } from '../rules/reveal-picks.mjs';
 import {
   addCondition,
   clearConditions,
+  cureConditions,
   hasAnyCondition,
   hasCondition,
   listConditions,
@@ -1626,15 +1627,17 @@ function atkRecover(ctx) {
 
 // ── self care ───────────────────────────────────────────────────────────────
 
+// False when a statusLock (Dead End GX) keeps the conditions on the card.
 function clearConditionsWithEvent(ctx, card) {
-  clearConditions(card);
+  if (!cureConditions(card)) return false;
   ctx.events.push({ type: 'specialConditionUpdated', instanceId: card.instanceId, condition: null, conditions: [] });
+  return true;
 }
 
 function atkCureSelf(ctx) {
   const ref = attackerRef(ctx);
   if (!ref || !hasAnyCondition(ref.card)) return skip(ctx, 'no_special_condition');
-  clearConditionsWithEvent(ctx, ref.card);
+  if (!clearConditionsWithEvent(ctx, ref.card)) return skip(ctx, 'status_locked');
   return null;
 }
 
@@ -1645,7 +1648,8 @@ function atkCureOppConditions(ctx) {
   if (!defender) return skip(ctx, 'no_opponent_active');
   const present = step.conditions.filter((condition) => hasCondition(defender, condition));
   if (present.length === 0) return skip(ctx, 'no_special_condition');
-  for (const condition of present) removeCondition(defender, condition);
+  const removed = present.filter((condition) => removeCondition(defender, condition));
+  if (removed.length === 0) return skip(ctx, 'status_locked');
   ctx.events.push({
     type: 'specialConditionUpdated',
     instanceId: defender.instanceId,
@@ -3915,10 +3919,7 @@ function healPokemon(ctx, card, limit, { cure = false } = {}) {
     ctx.events.push({ type: 'damageUpdated', instanceId: card.instanceId, damage: card.damage, healed });
     changed = true;
   }
-  if (cure && hasAnyCondition(card)) {
-    clearConditionsWithEvent(ctx, card);
-    changed = true;
-  }
+  if (cure && hasAnyCondition(card) && clearConditionsWithEvent(ctx, card)) changed = true;
   return changed;
 }
 
