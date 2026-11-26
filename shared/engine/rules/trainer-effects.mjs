@@ -1000,8 +1000,9 @@ function parseSearchDeckKind(lower) {
     if (genericEnergy) {
       const gSym = genericEnergy[2];
       return {
+        // "a {L} Energy card" is any Energy card of that type; only a printed "Basic" narrows it.
         what: gSym
-          ? `Basic ${gSym.toUpperCase()} Energy`
+          ? `${/\bbasic\b/.test(lower) ? 'Basic ' : ''}${gSym.toUpperCase()} Energy`
           : /\bbasic\b/.test(lower)
             ? 'Basic Energy'
             : 'Energy',
