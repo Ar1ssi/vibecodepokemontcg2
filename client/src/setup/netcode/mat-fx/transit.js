@@ -113,9 +113,10 @@ export const transit = (plan) => {
 /**
  * A card that came out of a pile onto the board (a Basic put on the Bench from the deck): it flies
  * from the pile to where it now stands. `card` was hidden when its plan was queued and is shown
- * as it lands. Returns the flight's length in ms, 0 when it could not fly (the card just shows).
+ * as it lands; `onLanded` runs then, once the scene has let go of the flight. Returns the
+ * flight's length in ms, 0 when it could not fly (the card just shows; `onLanded` is not called).
  */
-export function flyFromPile(card, user, zoneId) {
+export function flyFromPile(card, user, zoneId, onLanded = null) {
   const pile = user ? pileOf(user, zoneId) : null;
   const to = rectForInstance(card.instanceId, getCardRegistry());
   if (!pile || !to || !meshCanFly(card.instanceId)) {
@@ -125,9 +126,10 @@ export function flyFromPile(card, user, zoneId) {
   hideForFlight(card);
   const turn = frameTurnOf(card.image) ?? pile.turn;
   const flight = planFlight({ ...rectFlightEnds(pile.rect, to, { fromTurn: pile.turn, toTurn: turn }), seed: seed() });
-  playMeshTrack({ instanceId: card.instanceId, rect: pile.rect, pose: (u) => flightPose(u, flight), duration: FLIGHT_MS }).then(() =>
-    showAfterFlight(card)
-  );
+  playMeshTrack({ instanceId: card.instanceId, rect: pile.rect, pose: (u) => flightPose(u, flight), duration: FLIGHT_MS }).then(() => {
+    showAfterFlight(card);
+    onLanded?.();
+  });
   return FLIGHT_MS;
 }
 

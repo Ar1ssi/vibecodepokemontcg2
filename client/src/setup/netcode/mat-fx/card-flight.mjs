@@ -154,3 +154,21 @@ export function flightDelays(count, stagger = FLIGHT_STAGGER_MS) {
   const n = Math.max(0, Math.min(MAX_FLIGHTS, Math.floor(Number(count) || 0)));
   return Array.from({ length: n }, (_, i) => i * stagger);
 }
+
+/**
+ * Runs `land` once, when the flight that brings a card in reports it has landed. The scene clears
+ * a flight on its next frame after the flight's time is up, and it refuses to drive a card still
+ * in flight, so a landing timed by the clock alone can lose its motion. `schedule(fn, backstopMs)`
+ * (setTimeout) lands the card anyway if the flight never reports.
+ * @returns {() => void} the hook to call when the flight lands
+ */
+export function landWhenFlown(land, backstopMs, schedule = setTimeout) {
+  let landed = false;
+  const once = () => {
+    if (landed) return;
+    landed = true;
+    land();
+  };
+  schedule(once, Math.max(0, Number(backstopMs) || 0));
+  return once;
+}

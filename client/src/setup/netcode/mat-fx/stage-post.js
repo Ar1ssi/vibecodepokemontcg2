@@ -16,6 +16,8 @@ void main() {
 }`;
 
 // Four bilinear taps a texel out (a 4×4 tent): the downsample, and the bright pass with it.
+// Brightness is the brightest channel, or with uLuma 1 the luminance: then a saturated colour
+// (a crimson cloud, matter) stays below the threshold and only light near white blooms.
 const BRIGHT = `
 precision mediump float;
 varying vec2 vUv;
@@ -23,10 +25,11 @@ uniform sampler2D uTex;
 uniform vec2 uTexel;
 uniform float uThreshold;
 uniform float uKnee;
+uniform float uLuma;
 void main() {
   vec4 c = 0.25 * (texture2D(uTex, vUv + uTexel * vec2(-1.0, -1.0)) + texture2D(uTex, vUv + uTexel * vec2(1.0, -1.0))
     + texture2D(uTex, vUv + uTexel * vec2(-1.0, 1.0)) + texture2D(uTex, vUv + uTexel * vec2(1.0, 1.0)));
-  float lum = max(c.r, max(c.g, c.b));
+  float lum = mix(max(c.r, max(c.g, c.b)), dot(c.rgb, vec3(0.2126, 0.7152, 0.0722)), uLuma);
   gl_FragColor = c * smoothstep(uThreshold, uThreshold + uKnee, lum);
 }`;
 
@@ -128,8 +131,8 @@ function target(gl, width, height) {
 
 /**
  * A post pass for frames of `width` × `height` device pixels, or null where WebGL is missing.
- * `render(source, { bloom, threshold, knee, fringe })` draws the 2D canvas `source` through it and
- * returns the WebGL canvas to copy onto the stage, or null once the context is gone.
+ * `render(source, { bloom, threshold, knee, fringe, luma })` draws the 2D canvas `source` through
+ * it and returns the WebGL canvas to copy onto the stage, or null once the context is gone.
  */
 export function createStagePost(width, height) {
   if (typeof document === 'undefined' || !(width > 0) || !(height > 0)) return null;
@@ -180,7 +183,7 @@ export function createStagePost(width, height) {
   };
 
   return {
-    render(source, { bloom = 0.9, threshold = 0.55, knee = 0.3, fringe = 0 } = {}) {
+    render(source, { bloom = 0.9, threshold = 0.55, knee = 0.3, fringe = 0, luma = 0 } = {}) {
       if (lost || gl.isContextLost()) return null;
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, scene);
@@ -193,6 +196,7 @@ export function createStagePost(width, height) {
           gl.uniform2f(u.uTexel, 1 / from.width, 1 / from.height);
           gl.uniform1f(u.uThreshold, i === 0 ? threshold : 0);
           gl.uniform1f(u.uKnee, i === 0 ? knee : 0.001);
+          gl.uniform1f(u.uLuma, luma);
         });
         blur(level);
         from = level.main;

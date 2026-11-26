@@ -8,9 +8,37 @@ import {
   flightPose,
   flightSrcOf,
   flightTrail,
+  landWhenFlown,
   planFlight,
   rectFlightEnds,
 } from '../card-flight.mjs';
+
+/** A setTimeout stand-in that keeps the scheduled timers, to fire them by hand. */
+const manualTimers = () => {
+  const timers = [];
+  return { timers, schedule: (fn, ms) => timers.push({ fn, ms }) };
+};
+
+test('landWhenFlown: lands once, when the flight reports, and the backstop does not land it again', () => {
+  const { timers, schedule } = manualTimers();
+  let landings = 0;
+  const flown = landWhenFlown(() => (landings += 1), 870, schedule);
+  assert.equal(landings, 0, 'not before the flight lands');
+  assert.equal(timers[0].ms, 870);
+  flown();
+  flown();
+  timers[0].fn();
+  assert.equal(landings, 1);
+});
+
+test('landWhenFlown: a flight that never reports still lands at the backstop', () => {
+  const { timers, schedule } = manualTimers();
+  let landings = 0;
+  landWhenFlown(() => (landings += 1), Number.NaN, schedule);
+  assert.equal(timers[0].ms, 0);
+  timers[0].fn();
+  assert.equal(landings, 1);
+});
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps;
 const card = { left: 100, top: 400, width: 100, height: 140 };

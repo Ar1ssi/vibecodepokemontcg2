@@ -86,3 +86,16 @@ test('signatureEntryKind: a Trainer named like a Mega is not a Pokémon entry', 
 test('a homebrew Tera stage card gets the Tera entry without the printed rule', () => {
   assert.equal(signatureEntryKind({ name: 'Dragonite ex', supertype: 'Pokémon', stage: 'TERAHB' }), 'tera');
 });
+
+// Pikachu VMAX, SWSH Promos SWSH286 (out/pkmn-pokemon-cards.json): "G-Max Thunder"; Mew VMAX,
+// 30th Celebration: "Max Miracle". Gigantamax and Dynamax VMAX alike get the Gigantamax entry.
+test('signatureEntryKind: every Pokémon VMAX is gmax, by subtype, name or stage', () => {
+  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Pikachu VMAX', subtypes: ['VMAX'] }), 'gmax');
+  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Mew VMAX', hp: 310 }), 'gmax');
+  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Snorlax', stage: 'VMAX', hp: 340 }), 'gmax');
+});
+
+test('signatureEntryKind: V and VSTAR are not gmax', () => {
+  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Pikachu V', subtypes: ['Basic', 'V'] }), null);
+  assert.equal(signatureEntryKind({ supertype: 'Pokémon', name: 'Arceus VSTAR', subtypes: ['VSTAR'] }), null);
+});

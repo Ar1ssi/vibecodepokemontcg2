@@ -1,6 +1,6 @@
-// Plays a signature entry (tera | mega) on a real card of the e2e board, on a frozen scene clock,
-// and screenshots it at stepped times, cropped round the card at 2× density. See SKILL.md here.
-// usage: node .claude/skills/fx-preview/capture-entry.mjs <tera|mega> [outDir] [stepMs] [durationMs]
+// Plays a signature entry (tera | mega | gmax) on a real card of the e2e board, on a frozen scene
+// clock, and screenshots it at stepped times, cropped round the card at 2× density. See SKILL.md here.
+// usage: node .claude/skills/fx-preview/capture-entry.mjs <tera|mega|gmax> [outDir] [stepMs] [durationMs]
 // env:   CARD_IMG  local file or URL of the card face (required)
 //        TYPE      energy type of the card, e.g. Fire (default Darkness)
 //        SIDE      self (default) | opp: whose Active Pokémon plays it
@@ -17,7 +17,12 @@ import { chromiumPath, launchOptions, openBoard } from './board-mode.mjs';
 
 const [kind = 'tera', outDir = `fx-${kind}-frames`, stepArg = '100', durArg = '2600'] = process.argv.slice(2);
 const { CARD_IMG, TYPE = 'Darkness', SIDE = 'self', TIMES = '', PAD = '1.7', BASE_URL = 'http://localhost:4000', GPU, SIO_JS } = process.env;
-if (kind !== 'tera' && kind !== 'mega') throw new Error(`kind must be tera or mega, got ${kind}`);
+const STARS = {
+  tera: { name: 'Tera ex', subtypes: ['Stage 2', 'ex', 'Tera'] },
+  mega: { name: 'Mega ex', subtypes: ['Stage 1', 'MEGA', 'ex'] },
+  gmax: { name: 'Gigantamax VMAX', subtypes: ['VMAX'] },
+};
+if (!(kind in STARS)) throw new Error(`kind must be ${Object.keys(STARS).join(', ')}, got ${kind}`);
 if (!CARD_IMG) throw new Error('set CARD_IMG to a card image file or URL');
 
 const launch = GPU === '1'
@@ -36,12 +41,11 @@ if (localImg) await page.route('**/__fx-card', (r) => r.fulfill({ path: path.res
 await openBoard(page, BASE_URL);
 
 const rect = await page.evaluate(
-  async ([kind, type, src, side]) => {
+  async ([kind, type, src, side, { name, subtypes }]) => {
     const { applyView, getCardRegistry } = await import('/src/setup/netcode/apply-view.js');
     const { rectForInstance } = await import('/src/setup/image-logic/mat-fx.mjs');
     const { getBoardScene } = await import('/src/setup/board3d/board3d.js');
-    const subtypes = kind === 'mega' ? ['Stage 1', 'MEGA', 'ex'] : ['Stage 2', 'ex', 'Tera'];
-    const star = (instanceId) => ({ instanceId, name: kind === 'mega' ? 'Mega ex' : 'Tera ex', src, supertype: 'Pokémon', subtypes, types: [type], rarity: 'Double Rare', hp: '310' });
+    const star = (instanceId) => ({ instanceId, name, src, supertype: 'Pokémon', subtypes, types: [type], rarity: 'Double Rare', hp: '310' });
     const plain = (instanceId) => ({ instanceId, name: 'Plain', src, supertype: 'Pokémon', subtypes: ['Stage 1'], types: ['Water'], rarity: 'Uncommon', hp: '90' });
     const mine = side !== 'opp';
     applyView(
@@ -73,7 +77,7 @@ const rect = await page.evaluate(
     const r = rectForInstance(id, getCardRegistry());
     return { played, left: r.left, top: r.top, width: r.width, height: r.height };
   },
-  [kind, TYPE, localImg ? '/__fx-card' : CARD_IMG, SIDE]
+  [kind, TYPE, localImg ? '/__fx-card' : CARD_IMG, SIDE, STARS[kind]]
 );
 if (rect.played === false) throw new Error('the entry did not play (no scene draws the card)');
 

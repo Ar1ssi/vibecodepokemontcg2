@@ -876,6 +876,20 @@ body.fx-off .fx-mega-field {
   opacity: 1;
 }
 
+/* Gigantamax entry — the Dynamax column, the crimson cloud ring and the red lightning are drawn on
+   one canvas stage (gmax-entry.mjs) over the card's own swell; its clock is its own animation. */
+.fx-gmax-entry {
+  overflow: visible;
+  z-index: 2470;
+}
+
+.fx-gmax-entry__stage {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  will-change: opacity;
+}
+
 /* ── Design 024 slice 2: attack choreography ──────────────────────────── */
 
 /* The attack banner sits on the same strip as the turn/ability banners but

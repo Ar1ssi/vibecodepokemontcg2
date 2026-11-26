@@ -38,22 +38,25 @@ Playwright is a devDependency. Install its browser once per machine:
 Both scripts need `CARD_IMG`: a local PNG/JPG of any card face, or a card image URL. Write
 output under `.agent/scratch/`, which is not committed.
 
-**Entry animations** (the Tera and Mega scenes: mat-fx/entry.js draws tera-crystal.mjs, mega-orb.mjs and
-mega-vortex.mjs on canvas stages through the stage-post.js bloom pass; the Mega hex field is DOM/CSS):
+**Entry animations** (the Tera, Mega and Gigantamax scenes: mat-fx/entry.js draws tera-crystal.mjs,
+mega-orb.mjs, mega-vortex.mjs and gmax-entry.mjs on canvas stages through the stage-post.js bloom pass;
+the Mega hex field is DOM/CSS; the Gigantamax card's swell is its own mesh, driven on the scene clock):
 
 ```powershell
 $env:CARD_IMG = "C:\path\to\card.png"; $env:TYPE = "Fire"
 node .claude/skills/fx-preview/capture-entry.mjs tera .agent/scratch/tera-fire 100 3000
 node .claude/skills/fx-preview/capture-entry.mjs mega .agent/scratch/mega 100 3200
+node .claude/skills/fx-preview/capture-entry.mjs gmax .agent/scratch/gmax 100 3200
 ```
 
-The script puts a real Tera / Mega card in the Active Spot, plays its entry on a frozen clock (the
+The script puts a real Tera / Mega / VMAX card in the Active Spot, plays its entry on a frozen clock (the
 scene's and the entry's own animations) and writes `t<ms>.png` every `stepMs` over `durationMs`,
 cropped round the card at 2× density (`PAD` card heights each side, default 1.7; the scenes reach ~3.5).
 `TIMES=0,400,1300,…` shoots chosen times instead, `SIDE=opp` the far seat, `GPU=1` runs on the
 machine's own GPU (seconds instead of minutes; judge final frames on SwiftShader too). Read a
 handful of them (the Read tool shows images), or tile them into one sheet with ffmpeg `tile`.
-The burst is at 2490 ms (Tera, the card shows at 2640) / 1600 ms (Mega, the vortex runs to ~3100).
+The burst is at 2490 ms (Tera, the card shows at 2640) / 1600 ms (Mega, the vortex runs to ~3100) /
+1472 ms (Gigantamax: giant from ~1600, back in its slot at 2944, clouds gone at 3200).
 
 **Persistent board looks** (Tera crystal skin, anything drawn from card state):
 
@@ -77,7 +80,7 @@ few frames a second: the 3D pages are slower, and frame-time probes (`rec-move`)
   `applyView(view, [], {})` with
   `{stateVersion, you:{playerId, zones:{active,bench,hand}}, them:{…}}`. Cards need
   `instanceId, name, src, supertype, subtypes, types, rarity, hp`. Subtypes drive the
-  effects: `'Tera'` gives the crystal skin and entry, `'MEGA'` gives the Mega entry. This is the
+  effects: `'Tera'` gives the crystal skin and entry, `'MEGA'` gives the Mega entry, `'VMAX'` the Gigantamax one. This is the
   same path a server view takes, so what renders is real.
 - **Board DOM** lives in the board mirror's open shadow roots
   (`document.getElementById('selfBoard').shadowRoot` holds `#active` and `#bench`);

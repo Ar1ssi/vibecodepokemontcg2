@@ -1,4 +1,4 @@
-// The scalar curves the Tera and Mega entry scenes (tera-entry.mjs, mega-entry.mjs) share.
+// The scalar curves the signature entry scenes share (gmax-entry.mjs).
 
 export const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
 /** `t` over [a, b] as 0 → 1, clamped. */

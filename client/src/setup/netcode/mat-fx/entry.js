@@ -4,8 +4,10 @@
 // it comes out wearing its crystal coat (tera-skin.js). A Mega Pokémon floods
 // the mat with a prismatic hex field, goes white-hot inside a 3D keystone orb
 // (mega-orb.mjs) whose cracked shell shatters into a vortex of orange and blue
-// energy ribbons (mega-vortex.mjs). Both canvas stages run through the stage's
-// post pass (stage-post.js: bloom and highlight roll-off). Played by `evolve`
+// energy ribbons (mega-vortex.mjs). A Pokémon VMAX Gigantamaxes: a magenta
+// column streams up behind it, the card itself swells to giant size and a ring
+// of crimson clouds circles it (gmax-entry.mjs). Every canvas stage runs through
+// the stage's post pass (stage-post.js: bloom and highlight roll-off). Played by `evolve`
 // (lifecycle.js) and by `enter` (a Pokémon put into play from hand, deck or
 // discard). Each returns the hold its scene needs, so what follows waits for
 // the reveal; the evolve sample's peak lands on the burst (`signatureBurstMs`).
@@ -23,8 +25,20 @@ import {
 } from '../../image-logic/mat-fx.mjs';
 import { HEX_TINT_CELLS, HEX_WHITE_CELLS, hexTile, svgDataUrl } from './entry-art.mjs';
 import { placeCentered, playCanvasStage } from './canvas-stage.js';
-import { playLanding } from './board-fx.js';
+import { playLanding, shownId, stageCard } from './board-fx.js';
+import { landWhenFlown } from './card-flight.mjs';
 import { signatureEntryKind } from './entry-kind.mjs';
+import {
+  GMAX_BURST_MS,
+  GMAX_ENTRY_MS,
+  GMAX_HOLD_MS,
+  GMAX_PALETTE,
+  GMAX_SETTLE_AT,
+  buildGmaxScene,
+  drawGmaxEntry,
+  gmaxCardPose,
+  gmaxPostPose,
+} from './gmax-entry.mjs';
 import { flyFromPile } from './transit.js';
 import { buildMegaShell, drawMegaOrb, megaOrbPose } from './mega-orb.mjs';
 import { drawMegaVortex } from './mega-vortex.mjs';
@@ -57,11 +71,13 @@ import {
 import { formTeraSkinAt } from './tera-skin.js';
 
 const BACKSTOP_PAD_MS = 400;
+// A flight that never reports its landing (the scene went away) lands the card this late anyway.
+const LANDING_BACKSTOP_MS = 250;
 const MEGA_EMBER_RGB = [255, 150, 60];
 const MEGA_SPARK_COLOURS = ['#ff8a2a', '#2ab8ff'];
 
-const HOLD_MS = Object.freeze({ tera: TERA_HOLD_MS, mega: MEGA_HOLD_MS });
-const BURST_MS = Object.freeze({ tera: TERA_BURST_MS, mega: MEGA_BURST_MS });
+const HOLD_MS = Object.freeze({ tera: TERA_HOLD_MS, mega: MEGA_HOLD_MS, gmax: GMAX_HOLD_MS });
+const BURST_MS = Object.freeze({ tera: TERA_BURST_MS, mega: MEGA_BURST_MS, gmax: GMAX_BURST_MS });
 
 /** When a signature entry's burst lands, ms from its start (its sound is aligned to it); null for no entry. */
 export const signatureBurstMs = (kind) => BURST_MS[kind] ?? null;
@@ -303,6 +319,82 @@ function playMegaEntry(rect) {
   playMegaCard(rect, run);
 }
 
+// The Gigantamax stage spans the column above the card and the cloud ring as it widens.
+const GMAX_STAGE = 8;
+const GMAX_DRIVE_MS = Math.round(GMAX_ENTRY_MS * GMAX_SETTLE_AT);
+
+/**
+ * The card mesh itself Gigantamaxes (gmaxCardPose): it crouches and strains, swells to giant
+ * size at the burst, lifted clear of its neighbours, and springs back into its slot, its edge
+ * burning magenta meanwhile. False where no 3D scene draws the card (the DOM board): the canvas
+ * then frames the card at its own size.
+ */
+function driveGmaxCard(instanceId) {
+  const scene = getBoardScene();
+  const id = shownId(instanceId);
+  const card = scene?.drive ? stageCard(scene, id) : null;
+  if (!card) return false;
+  scene.drive(
+    id,
+    (ms) => {
+      const pose = gmaxCardPose(ms / GMAX_ENTRY_MS);
+      return {
+        dx: pose.shake * card.h,
+        dy: 0,
+        dz: pose.lift * card.h,
+        yawDeg: pose.yawDeg,
+        scale: pose.scale,
+        scaleAlong: 1,
+        scaleAcross: 1,
+        laneAngleDeg: 0,
+      };
+    },
+    GMAX_DRIVE_MS
+  );
+  scene.cardFx?.(id, { at: (ms) => ({ rim: gmaxCardPose(ms / GMAX_ENTRY_MS).rim }), ms: GMAX_DRIVE_MS, rimRgb: GMAX_PALETTE.magenta });
+  return true;
+}
+
+/** A scratch 2D context the size of `ctx`'s canvas (drawGmaxEntry lays its clouds on from it). */
+const scratchLayerFor = (ctx) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = ctx.canvas.width;
+  canvas.height = ctx.canvas.height;
+  return canvas.getContext('2d');
+};
+
+/** The Gigantamax entry (gmax-entry.mjs): one canvas centred on the card, over the card's own swell. */
+function playGmaxEntry(rect, instanceId) {
+  const W = rect.width;
+  const H = rect.height;
+  const host = spawnOverlay({ rect, className: 'fx-overlay fx-gmax-entry' });
+  const scene = buildGmaxScene(randomSeed());
+  const grows = driveGmaxCard(instanceId);
+  const size = H * GMAX_STAGE;
+  let layer;
+  const done = playCanvasStage(host, {
+    className: 'fx-gmax-entry__stage',
+    cx: W / 2,
+    cy: H / 2,
+    size,
+    duration: GMAX_ENTRY_MS,
+    post: gmaxPostPose,
+    draw: (ctx, t) => {
+      layer ??= scratchLayerFor(ctx);
+      drawGmaxEntry(ctx, t, {
+        cx: size / 2,
+        cy: size / 2,
+        unit: H,
+        card: { width: W, height: H },
+        scene,
+        grows,
+        layer,
+      });
+    },
+  });
+  removeWhen(host, [done], GMAX_ENTRY_MS + BACKSTOP_PAD_MS);
+}
+
 /**
  * Play the signature entry for `kind` over the card `instanceId`; `card` (the entering card) picks
  * a Tera crystal's type colour. `rect` is the card's on-screen box (default: its own).
@@ -312,12 +404,13 @@ function playMegaEntry(rect) {
 export function playSignatureEntry(kind, instanceId, card, rect = rectForInstance(instanceId, getCardRegistry())) {
   if (!rect || !(kind in HOLD_MS)) return false;
   if (kind === 'tera') playTeraEntry(rect, instanceId, card);
+  else if (kind === 'gmax') playGmaxEntry(rect, instanceId);
   else playMegaEntry(rect);
   return HOLD_MS[kind];
 }
 
 /**
- * `enter` effect: a Pokémon was put into play. A Mega or Tera plays its signature entry; any other
+ * `enter` effect: a Pokémon was put into play. A Mega, Tera or VMAX plays its signature entry; any other
  * lands on its slot (design 089: the card settles, a ring in its type colour rolls out from under
  * it). One that came out of the deck or the discard pile flies in from that pile first
  * (`plan.held`: the card, hidden since the plan was queued).
@@ -326,15 +419,18 @@ export const enter = (plan) => {
   clearTimeout(plan.backstop);
   const card = getCardRegistry().get(plan.instanceId)?.card;
   const held = Array.isArray(plan.held) ? plan.held[0] : null;
-  const flightMs = held ? flyFromPile(held, plan.user, plan.from) : 0;
   const kind = signatureEntryKind(card);
   const land = () => {
     const hold = kind ? playSignatureEntry(kind, plan.instanceId, card) : false;
     if (hold === false) playLanding(plan.instanceId, card);
     return hold;
   };
+  // The landing (the Gigantamax swell, the settle) drives the card's mesh: it waits for the flight
+  // to let go of it. Set before the flight can land, as its landing is reported asynchronously.
+  let flown = null;
+  const flightMs = held ? flyFromPile(held, plan.user, plan.from, () => flown?.()) : 0;
   if (flightMs > 0) {
-    setTimeout(land, flightMs);
+    flown = landWhenFlown(land, flightMs + LANDING_BACKSTOP_MS);
     return kind ? flightMs + HOLD_MS[kind] : flightMs * 0.8;
   }
   const hold = land();
