@@ -264,8 +264,12 @@ const DISCOUNT_CONDITIONS = [
     const opp = rootsIn(ctx.opponentSideCards);
     const wantVmax = /vmax/.test(c);
     const wantGxEx = /pok[eé]mon-gx or pok[eé]mon-ex/.test(c);
-    if (!wantVmax && !wantGxEx) return undefined;
-    return opp.some((p) => (wantVmax && isVmaxCard(p)) || (wantGxEx && (isGxCard(p) || isExCard(p))));
+    // Lycanroc Boiling Blood (customcheck): "If your opponent has any Pokémon ex in play".
+    const wantEx = /pok[eé]mon ex\b/.test(c);
+    if (!wantVmax && !wantGxEx && !wantEx) return undefined;
+    return opp.some(
+      (p) => (wantVmax && isVmaxCard(p)) || (wantGxEx && (isGxCard(p) || isExCard(p))) || (wantEx && isExCard(p))
+    );
   },
   (c, ctx) => {
     if (!/you have more prize cards remaining than your opponent/.test(c)) return undefined;
