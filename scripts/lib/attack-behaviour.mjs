@@ -184,6 +184,7 @@ const MEANINGFUL = new Set([
   'prizeHandSwapped',
   'prizesTaken',
   'knockOutMarked',
+  'deferredDamageScheduled',
   'pokemonDevolved',
   'pokemonEvolved',
   'cardsMovedToDeckBottom',
@@ -218,6 +219,30 @@ export function attackBoardFor(text) {
         type: 'Stadium',
         ownerId: 'p2',
       });
+    });
+  }
+  // Ho-Oh-GX Eternal Flame GX: "Put 3 in any combination of Fire Pokémon-GX or Fire Pokémon-EX from
+  // your discard pile onto your Bench" needs rule-box Pokémon of every type in the discard pile.
+  if (/pok[ée]mon-(?:gx|ex)[^.]*from your discard pile (?:onto|on) your bench/i.test(t)) {
+    steps.push((state) =>
+      state.players.p1.zones.discard.push(
+        mon('Probe Discard GX', { subtypes: ['Basic', 'GX'] }),
+        mon('Probe Discard EX', { subtypes: ['Basic', 'EX'] }),
+        mon('Probe Discard GX 2', { subtypes: ['Basic', 'GX'] })
+      )
+    );
+  }
+  // "50 damage for each Prize card your opponent has taken" (Pheromosa GX Beauty GX) deals 0 until
+  // some Prize cards are gone.
+  if (/prize cards? your opponent has taken/i.test(t)) steps.push((state) => state.players.p2.zones.prizes.splice(0, 2));
+  if (/prize cards? you have taken/i.test(t)) steps.push((state) => state.players.p1.zones.prizes.splice(0, 2));
+  // "…to each of your opponent's Pokémon-GX and Pokémon-EX" (Necrozma-GX Black Ray GX, Hoopa-GX
+  // Devilish Hands GX) has no target on a board without a rule-box Pokémon.
+  if (/your opponent[’']s pok[ée]mon-(?:gx|ex)\b/i.test(t)) {
+    steps.push((state) => {
+      const bench = state.players.p2.zones.bench.filter((c) => c.attachedTo == null);
+      if (bench[1]) bench[1].subtypes = [...(bench[1].subtypes || []), 'GX'];
+      if (bench[2]) bench[2].subtypes = [...(bench[2].subtypes || []), 'EX'];
     });
   }
   return steps.length ? (state) => steps.forEach((step) => step(state)) : undefined;

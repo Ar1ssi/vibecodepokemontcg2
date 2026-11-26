@@ -231,6 +231,12 @@ const TEMPLATES = [
     /^at the end of your opponent's next turn, (?:(?:their|your opponent's) active pokémon takes|this attack does) (\d+) damage(?: to their active pokémon)?$/,
     (m) => ({ type: 'atkDeferredActiveDamage', amount: Number(m[1]) }),
   ],
+  // Yveltal-GX Doom Count GX (customhb-1051): whichever Pokémon is Active at the end of the attacker's
+  // next turn is Knocked Out (turn.mjs applyDeferredActiveDamage).
+  [
+    /^at the end of your next turn, your opponent's active pokémon is knocked out$/,
+    () => ({ type: 'atkDeferredActiveDamage', knockOut: true, turns: 2 }),
+  ],
   // Jirachi Wish (custom set): the heal waits for the end of the attacker's next turn
   // (turn.mjs applyDeferredActiveHeal); damage-parser.mjs leaves it out of the immediate heal.
   [

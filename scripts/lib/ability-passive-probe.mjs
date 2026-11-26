@@ -17,6 +17,7 @@ import {
   abilityPreventsCardEffectsOnPlayer,
   abilityHandDiscardProtector,
   abilityWeaknessOverride,
+  abilityLostZoneKnockouts,
   abilityHpBonus,
   abilityPrizeModify,
   abilityRetreatCost,
@@ -285,6 +286,10 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       const ctx = at(p1, root);
       const card = viewOf(p1.sideCards, root);
       ask(`damageBonus:${card.name}`, () => abilityDamageBonus(card, p2Active, ctx));
+      // Scizor GX Danger Perception: "If this Pokémon's remaining HP is 70 or less, …" needs a nearly KO'd holder.
+      ask(`damageBonusLowHp:${card.name}`, () => abilityDamageBonus({ ...card, damage: Math.max(0, (card.hp || 0) - 10) }, p2Active, ctx));
+      // Tyranitar GX Lost Out: the holder's Knock Outs go to the Lost Zone.
+      ask(`lostZoneKnockouts:${card.name}`, () => abilityLostZoneKnockouts(card, ctx));
       ask(`damageReduction:${card.name}`, () => abilityDamageReduction(card, p2Active, ctx));
       // Bastiodon Primal Fortress (customcheck-003): "…from your opponent's Pokémon ex" needs an ex attacker.
       const exAttacker = { ...p2Active, name: 'Probe Pokémon ex', subtypes: ['Basic', 'ex'] };
@@ -301,6 +306,10 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       }
       ask(`handDiscardProtector:${card.name}`, () => abilityHandDiscardProtector(card, ctx));
       ask(`weakness:${card.name}`, () => abilityWeaknessOverride(card, ctx));
+      // Jirachi GX Psychic Zone: "Don't apply Psychic Weakness …" needs a defender with that Weakness.
+      ask(`weaknessPsychic:${card.name}`, () =>
+        abilityWeaknessOverride({ ...card, weakness: { type: 'Psychic', value: '×2' }, weaknesses: [{ type: 'Psychic', value: '×2' }] }, ctx)
+      );
       ask(`hp:${card.name}`, () => abilityHpBonus(card, ctx));
       ask(`prize:${card.name}`, () => abilityPrizeModify(card, ctx));
       ask(`retreat:${card.name}`, () => abilityRetreatCost(card, ctx));

@@ -3836,16 +3836,17 @@ function atkFreezeBoth(ctx) {
 
 // Giratina ex Shadow Force (customhb): "At the end of your opponent's next turn, their Active
 // Pokémon takes 150 damage." Lives on the opponent, not a card: whichever Pokémon is Active then
-// takes it (turn.mjs resolveDeferredKnockouts).
+// takes it (turn.mjs applyDeferredActiveDamage). Yveltal-GX Doom Count GX: the same, a Knock Out two turns on.
 function atkDeferredActiveDamage(ctx) {
   const { opponent, player } = ctx;
   if (!opponent) return skip(ctx, 'no_opponent');
-  const atTurn = (ctx.draft.turn?.number || 1) + 1;
+  const atTurn = (ctx.draft.turn?.number || 1) + (ctx.step.turns || 1);
+  const knockOut = ctx.step.knockOut === true;
   opponent.deferredActiveDamage = [
     ...(opponent.deferredActiveDamage || []),
-    { atTurn, amount: ctx.step.amount, sourceAttack: attackName(ctx), sourcePlayerId: player.playerId },
+    { atTurn, amount: ctx.step.amount || 0, sourceAttack: attackName(ctx), sourcePlayerId: player.playerId, ...(knockOut ? { knockOut } : {}) },
   ];
-  ctx.events.push({ type: 'deferredDamageScheduled', playerId: opponent.playerId, atTurn, amount: ctx.step.amount });
+  ctx.events.push({ type: 'deferredDamageScheduled', playerId: opponent.playerId, atTurn, amount: ctx.step.amount || 0, ...(knockOut ? { knockOut } : {}) });
   return null;
 }
 

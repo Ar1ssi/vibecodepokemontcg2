@@ -1137,6 +1137,17 @@ export function abilityWeaknessOverride(defender, ctx = {}) {
         if (weak && weak === lower(TYPE_LETTER[typedNone[1]])) return { none: true };
       }
 
+      // Jirachi GX Psychic Zone (customhb-1070): "Don't apply Psychic Weakness when Pokémon (both
+      // yours and your opponent's) take damage from attacks." Unscoped, so it reads from either side.
+      const typedSkip = t.match(
+        /don't apply (?:\{([a-z])\}|([a-z]+)) weakness when pok[eé]mon \(both yours and your opponent's\) take damage from attacks/
+      );
+      if (typedSkip) {
+        const skipped = lower(typedSkip[1] ? TYPE_LETTER[typedSkip[1]] : typedSkip[2]);
+        const weak = lower(defender.weakness?.type || defender.weaknesses?.[0]?.type);
+        if (weak && weak === skipped) return { none: true };
+      }
+
       if (
         holderSide === 'defender' &&
         /your pok[eé]mon in play have no weakness/.test(t)
