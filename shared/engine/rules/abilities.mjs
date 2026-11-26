@@ -682,7 +682,10 @@ function parseWinCondition(lower) {
   return null;
 }
 
-export const PLAY_LOCK_CLAUSE = /can'?t play [^.]*from (?:his or her|their) hand/;
+const DISCARD_BENCH_MOVE_ENERGY =
+  /you may discard (?:1|a|one) of your benched pok[eé]mon and move all energy(?: cards?)? attached to that pok[eé]mon to this pok[eé]mon/;
+
+export const PLAY_LOCK_CLAUSE =/can'?t play [^.]*from (?:his or her|their) hand/;
 // "each play" is the corpus typo for "each player"; it must not match the
 // substring inside "each player's hand" (Chandelure TWM's draw text parsed as
 // a play lock that would have blocked every card in hand).
@@ -1044,7 +1047,16 @@ export function parseAbility(text = '') {
     lower.includes('move from your bench to become your active pokémon');
 
   // ── 6. Move energy between Pokémon ──────────────────────────────────────
+  // Omastar Primordial Sacrifice: the Benched Pokémon is discarded, and its Energy moves on.
+  const discardBenchMovesEnergy = DISCARD_BENCH_MOVE_ENERGY.test(lower);
+  if (discardBenchMovesEnergy) {
+    steps.push({
+      type: 'discardBenchMoveEnergyAbility',
+      guidance: 'Once during your turn: discard 1 of your Benched Pokémon and move all Energy attached to it to this Pokémon.',
+    });
+  }
   if (
+    !discardBenchMovesEnergy &&
     !hasPromotionTrigger &&
     !lower.includes('knocked out') &&
     !OPPONENT_ENERGY_TO_SELF.test(lower) &&
@@ -2006,7 +2018,7 @@ export function parseAbility(text = '') {
     hasWord(lower, 'move') &&
     lower.includes('energy') &&
     !OPPONENT_ENERGY_TO_SELF.test(lower) &&
-    !steps.some((s) => s.type === 'moveEnergyAbility')
+    !steps.some((s) => s.type === 'moveEnergyAbility' || s.type === 'discardBenchMoveEnergyAbility')
   ) {
     if (/from your opponent's active pok[eé]mon to/.test(lower)) {
       steps.push({

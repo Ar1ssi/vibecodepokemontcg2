@@ -169,6 +169,12 @@ export function planAbilitySteps(steps = [], { mode = 'auto' } = {}) {
           action: mode === 'auto' ? 'announce' : 'attach-tool-from-discard',
         });
         break;
+      case 'discardBenchMoveEnergyAbility':
+        planned.push({
+          ...base,
+          action: mode === 'auto' ? 'announce' : 'discard-bench-move-energy',
+        });
+        break;
       case 'turnDamageBonusAbility':
         planned.push({
           ...base,
