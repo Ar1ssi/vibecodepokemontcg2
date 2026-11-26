@@ -58,6 +58,8 @@ import { hashString, moveFor, speciesFor } from './moves/move-select.mjs';
 import { SPECS } from './moves/specs/index.mjs';
 import { signatureFor, slugFor, withSignatureSpec } from './moves/signature/signature-select.mjs';
 import { SIGNATURE_SPECS } from './moves/signature/specs/index.mjs';
+import { maxMoveFor, withMaxSpec } from './moves/max/max-select.mjs';
+import { MAX_SPECS } from './moves/max/specs/index.mjs';
 import { attackSoundFields } from './moves/attack-sound.mjs';
 import { burstParticles } from './particles.mjs';
 import { createStrikeBook, hitDelayFor, hitDelaysOf, knockoutHoldMs, layoutHits, recoilVector } from './multi-hit.mjs';
@@ -420,12 +422,30 @@ const pickSignature = (plan, card) => {
 };
 
 /**
+ * Design 092: the Max or G-Max Move a VMAX's Dynamax attack ("Max …", "G-Max …") plays, with its
+ * spec; null for any other attack, or while that move's spec has not shipped. Pure.
+ */
+const pickMax = (plan, card) => {
+  if (!card) return null;
+  const pick = maxMoveFor(card, {
+    attackName: plan.attackName,
+    slug: slugFor(card),
+    species: speciesFor(card),
+    seed: hashString(`${plan.attackerId ?? ''}|${plan.attackName ?? ''}|type`),
+  });
+  return withMaxSpec(pick, MAX_SPECS);
+};
+
+/** The tier-S scene an attack plays, if any: a VMAX's Max Move first, then a signature. Pure. */
+const pickSpecial = (plan, card) => pickMax(plan, card) ?? pickSignature(plan, card);
+
+/**
  * What the attack's sound needs (design 064 Addendum A): sound family, tier, contact time and the
- * attacker's type, from the same signature / move picks `attack()` makes.
+ * attacker's type, from the same Max / signature / move picks `attack()` makes.
  */
 export const attackSoundFor = (plan) => {
   const card = combatCard(plan.attackerId, getCardRegistry());
-  const signatureSpec = pickSignature(plan, card)?.spec ?? null;
+  const signatureSpec = pickSpecial(plan, card)?.spec ?? null;
   const zeroDamage = isZeroDamage(plan);
   const pick = signatureSpec || zeroDamage ? null : pickMove(plan, card);
   return attackSoundFields({ signatureSpec, zeroDamage, pick, card });
@@ -567,8 +587,9 @@ export const attack = (plan) => {
           branches: hits.branches,
         })
       : null;
-  // Design 065: a signature plays before the zero-damage check (a status move by name still plays).
-  const sig = to ? pickSignature(plan, card) : null;
+  // Design 065: a signature plays before the zero-damage check (a status move by name still plays);
+  // design 092: a VMAX's Max or G-Max Move before either.
+  const sig = to ? pickSpecial(plan, card) : null;
   if (sig) {
     const impactType = readyImpactType(card, sig.spec.vgType);
     const played = playScene(sceneSpecFor(sig.spec, impactType, defenderHit), impactType);
@@ -616,7 +637,7 @@ export const attackBanner = (plan) => {
   const attacker = combatCard(plan.attackerId, registry);
   const attackerName = attacker?.name;
   // Design 068: the banner leads the hit by its hold; start loading the impact it will play.
-  if (attacker) prepareImpact(impactTypeFor(attacker, pickSignature(plan, attacker)?.spec.vgType ?? pickMove(plan, attacker)?.vgType ?? null));
+  if (attacker) prepareImpact(impactTypeFor(attacker, pickSpecial(plan, attacker)?.spec.vgType ?? pickMove(plan, attacker)?.vgType ?? null));
   const text = attackBannerText(plan.attackName, attackerName);
   if (!text) return 0;
   // Design 089: a GX attack and a VSTAR Power attack say so, and flare on the attacker.

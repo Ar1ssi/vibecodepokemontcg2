@@ -3,7 +3,8 @@
 // · settle, each a PNG cropped to the two cards at 2× pixel density. SwiftShader draws about one
 // frame a second, so a real-time recording holds too few states to judge; freezing the WAAPI scene
 // clock and seeking it is the only way to see a chosen beat here.
-// env: MOVE (spec id; default hydro-pump), SIGNATURE (signature spec id; overrides MOVE),
+// env: MOVE (spec id; default hydro-pump), SIGNATURE (signature spec id; overrides MOVE), MAX (Max /
+//      G-Max spec id, design 092; overrides both), GPU=1 (the machine's own GPU: seconds, not minutes),
 //      SIDE (self | opp: who attacks; opp = the far seat), SEED, IMPACT=1 (TCG Live impact at contact,
 //      slow), BASE_URL (default http://localhost:4100), OUT (default .agent/scratch/vfx-frames/<move>[-opp]),
 //      CHROMIUM / CHROMIUM_PATH, CARD_IMG / CARD_DIR (card art when images.pokemontcg.io is blocked),
@@ -11,14 +12,18 @@
 // Pair with rec/seven-sheet.sh to label, tile and stack the frames under a reference row.
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { launchOptions, openBoard } from '../board-mode.mjs';
+import { chromiumPath, launchOptions, openBoard } from '../board-mode.mjs';
 
-const { MOVE = 'hydro-pump', SIGNATURE, BASE_URL = 'http://localhost:4100', SEED = '7', IMPACT, SIDE = 'self', SIO_JS } = process.env;
-const MOVE_ID = SIGNATURE || MOVE;
-const OUT = process.env.OUT || `.agent/scratch/vfx-frames/${SIGNATURE ? `signature-${SIGNATURE}` : MOVE}${SIDE === 'opp' ? '-opp' : ''}`;
+const { MOVE = 'hydro-pump', SIGNATURE, MAX, GPU, BASE_URL = 'http://localhost:4100', SEED = '7', IMPACT, SIDE = 'self', SIO_JS } = process.env;
+const MOVE_ID = MAX || SIGNATURE || MOVE;
+const KIND = MAX ? 'max' : SIGNATURE ? 'sig' : 'move';
+const OUT = process.env.OUT || `.agent/scratch/vfx-frames/${MAX ? `max-${MAX}` : SIGNATURE ? `signature-${SIGNATURE}` : MOVE}${SIDE === 'opp' ? '-opp' : ''}`;
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch(launchOptions());
+const launch = GPU === '1'
+  ? { ...(chromiumPath() ? { executablePath: chromiumPath() } : {}), args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] }
+  : launchOptions();
+const browser = await chromium.launch(launch);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
@@ -61,13 +66,14 @@ const bottom = Math.min(800, Math.max(info.attacker.top + info.attacker.height, 
 const clip = { x: Math.round(left), y: Math.round(top), width: Math.round(right - left), height: Math.round(bottom - top) };
 
 const spec = await page.evaluate(
-  async ([id, signature]) => {
+  async ([id, kind]) => {
     const { SPECS } = await import('/src/setup/netcode/mat-fx/moves/specs/index.mjs');
     const { SIGNATURE_SPECS } = await import('/src/setup/netcode/mat-fx/moves/signature/specs/index.mjs');
-    const s = signature ? SIGNATURE_SPECS[id] : SPECS[id];
+    const { MAX_SPECS } = await import('/src/setup/netcode/mat-fx/moves/max/specs/index.mjs');
+    const s = (kind === 'max' ? MAX_SPECS : kind === 'sig' ? SIGNATURE_SPECS : SPECS)[id];
     return s ? { contactMs: s.contactMs, durationMs: s.durationMs } : null;
   },
-  [MOVE_ID, Boolean(SIGNATURE)]
+  [MOVE_ID, KIND]
 );
 if (!spec) {
   console.log('no spec for', MOVE_ID);
@@ -96,16 +102,17 @@ await page.evaluate(() => {
 await page.screenshot({ path: `${OUT}/${beats[0][0]}.png`, clip });
 
 const played = await page.evaluate(
-  async ([id, signature, seed, withImpact]) => {
+  async ([id, kind, seed, withImpact]) => {
     const { playMoveInScene } = await import('/src/setup/netcode/mat-fx/moves/scene-move-player.js');
     const { SPECS } = await import('/src/setup/netcode/mat-fx/moves/specs/index.mjs');
     const { SIGNATURE_SPECS } = await import('/src/setup/netcode/mat-fx/moves/signature/specs/index.mjs');
+    const { MAX_SPECS } = await import('/src/setup/netcode/mat-fx/moves/max/specs/index.mjs');
     const select = await import('/src/setup/netcode/mat-fx/impact/impact-select.mjs');
     const stage = await import('/src/setup/netcode/mat-fx/impact/impact-stage.js');
     const p = window.__sevenFrames;
     p.clock.currentTime = p.start;
     p.scene.render();
-    const full = signature ? SIGNATURE_SPECS[id] : SPECS[id];
+    const full = (kind === 'max' ? MAX_SPECS : kind === 'sig' ? SIGNATURE_SPECS : SPECS)[id];
     // As the game plays it: the TCG Live impact of the type at contact (IMPACT=1), and the spec
     // without the contact dressing that impact replaces.
     const type = select.impactTypeFor(null, full.vgType);
@@ -116,7 +123,7 @@ const played = await page.evaluate(
     const spec = select.withoutImpactBeats(full);
     return Boolean(playMoveInScene({ scene: p.scene, spec, attackerId: p.attackerId, defenderId: p.defenderId, seed: Number(seed) }));
   },
-  [MOVE_ID, Boolean(SIGNATURE), SEED, Boolean(IMPACT)]
+  [MOVE_ID, KIND, SEED, Boolean(IMPACT)]
 );
 if (!played) {
   console.log('FAILED to play', MOVE_ID);
