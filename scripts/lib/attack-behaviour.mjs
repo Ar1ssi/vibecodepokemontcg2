@@ -6,7 +6,7 @@
 import { createCard } from '../../shared/engine/cards.mjs';
 import { classifyAttackEffect } from '../../shared/engine/rules/attack-effects.mjs';
 import { parseAttackSteps } from '../../shared/engine/rules/attack-steps.mjs';
-import { parseAttackDamage } from '../../shared/engine/rules/damage-parser.mjs';
+import { parseAttackDamage, parsePrizeOnKo } from '../../shared/engine/rules/damage-parser.mjs';
 import { parseAttackCondition } from '../../shared/engine/rules/attack-conditions.mjs';
 import { mon, DEFAULT_SEEDS, printedBase } from './oracle-harness.mjs';
 import { runAttackRich } from './attack-harness.mjs';
@@ -44,6 +44,10 @@ export function attackKey(name, text) {
   return `${normalizeAttackText(name) || '(unnamed)'}#${hash.toString(36)}`;
 }
 
+// "Discard the top N cards of your deck. If any of those cards are Energy cards, attach them …".
+const MILL_ATTACHES = /discard the top (?:\d+ cards?|card) of your deck\. if [^.]*\battach (?:it|them)\b/;
+const MILL_ATTACHED = /^own:deck->(?:discard|attached)$/;
+
 // Sentence mechanics with the state tag that proves each one ran (S279 probe's cross-check).
 const MECH = [
   ['switch-self', /switch this pokémon with 1 of your benched/, /^own:active-changed$/],
@@ -52,6 +56,8 @@ const MECH = [
     /(switch (in|out)[^.]*your opponent's|your opponent switches|switch[^.]*your opponent's benched pokémon with)/,
     /^opp:active-changed$/,
   ],
+  // Blacephalon-GX Burst-GX: the discarded Prize card is the Energy that gets attached.
+  ['attach-from-prize', /^if it's an energy card, attach it to/, /^own:prizes->(attached|discard)$/],
   [
     'attach-from-deck',
     // "take 1 {G} Energy card attached to 1 of your Pokémon and attach it to …" (Energy Trans) moves
@@ -125,7 +131,8 @@ const MECH = [
   ['opp-shuffle-hand', /your opponent shuffles (his or her|their) hand/, /^opp:hand->deck$/],
   ['discard-opp-tool', /discard (a|all|\d+)? ?pokémon tools?[^.]*your opponent/, /^opp:attached->(discard|gone)$/],
   ['devolve', /devolve/, /^opp:(attached|active|bench)->(hand|deck)$/],
-  ['mill-self', /discard the top (\d+ cards?|card) of your deck/, /^own:deck->discard$/],
+  // Guzzlord-GX Eat Sloppily: the milled Energy is attached, so it never rests in the discard pile.
+  ['mill-self', /discard the top (\d+ cards?|card) of your deck/, /^own:deck->discard$/, MILL_ATTACHES],
   ['mill-opp', /discard the top (\d+ cards?|card) of your opponent's deck/, /^opp:deck->discard$/],
   ['lost-zone', /(put|send)[^.]*(in|into) the lost zone/, /->lostZone$/],
   // Locks leave no zone change: the snapshot's per-card locks/markers and per-player play locks
@@ -177,6 +184,7 @@ const MEANINGFUL = new Set([
   'prizeHandSwapped',
   'prizesTaken',
   'knockOutMarked',
+  'deferredDamageScheduled',
   'pokemonDevolved',
   'pokemonEvolved',
   'cardsMovedToDeckBottom',
@@ -213,19 +221,49 @@ export function attackBoardFor(text) {
       });
     });
   }
+  // Ho-Oh-GX Eternal Flame GX: "Put 3 in any combination of Fire Pokémon-GX or Fire Pokémon-EX from
+  // your discard pile onto your Bench" needs rule-box Pokémon of every type in the discard pile.
+  if (/pok[ée]mon-(?:gx|ex)[^.]*from your discard pile (?:onto|on) your bench/i.test(t)) {
+    steps.push((state) =>
+      state.players.p1.zones.discard.push(
+        mon('Probe Discard GX', { subtypes: ['Basic', 'GX'] }),
+        mon('Probe Discard EX', { subtypes: ['Basic', 'EX'] }),
+        mon('Probe Discard GX 2', { subtypes: ['Basic', 'GX'] })
+      )
+    );
+  }
+  // "50 damage for each Prize card your opponent has taken" (Pheromosa GX Beauty GX) deals 0 until
+  // some Prize cards are gone.
+  if (/prize cards? your opponent has taken/i.test(t)) steps.push((state) => state.players.p2.zones.prizes.splice(0, 2));
+  if (/prize cards? you have taken/i.test(t)) steps.push((state) => state.players.p1.zones.prizes.splice(0, 2));
+  // "…to each of your opponent's Pokémon-GX and Pokémon-EX" (Necrozma-GX Black Ray GX, Hoopa-GX
+  // Devilish Hands GX) has no target on a board without a rule-box Pokémon.
+  if (/your opponent[’']s pok[ée]mon-(?:gx|ex)\b/i.test(t)) {
+    steps.push((state) => {
+      const bench = state.players.p2.zones.bench.filter((c) => c.attachedTo == null);
+      if (bench[1]) bench[1].subtypes = [...(bench[1].subtypes || []), 'GX'];
+      if (bench[2]) bench[2].subtypes = [...(bench[2].subtypes || []), 'EX'];
+    });
+  }
   return steps.length ? (state) => steps.forEach((step) => step(state)) : undefined;
 }
 
 /** Printed sentences whose mechanic has no matching state tag. */
 export function attackMismatches(text, tags) {
   const mismatches = [];
-  const searchesToTop = SEARCH_TO_DECK_TOP.test(normalizeAttackText(text));
+  const whole = normalizeAttackText(text);
+  const searchesToTop = SEARCH_TO_DECK_TOP.test(whole);
+  // "…, take N more Prize cards" on a Knock Out is paid by handleKnockout (parsePrizeOnKo) after the
+  // attack, so a run that knocks nothing out cannot show it.
+  const paysPrizeOnKo = parsePrizeOnKo(text) != null;
   // Hand-typed "Acitve" (customcheck-004 Rock Tomb) hid its lock from the sentence checks below.
-  for (const sentence of normalizeAttackText(text).replace(/\bacitve\b/g, 'active').split(/(?<=\.)\s+/)) {
-    for (const [mech, re, expect] of MECH) {
+  for (const sentence of whole.replace(/\bacitve\b/g, 'active').split(/(?<=\.)\s+/)) {
+    for (const [mech, re, expect, alsoWhen] of MECH) {
       if (!re.test(sentence)) continue;
       if (mech === 'search-to-hand' && searchesToTop) break;
-      if (!(tags || []).some((t) => expect.test(t)))
+      if (mech === 'take-prize' && paysPrizeOnKo) break;
+      const wanted = alsoWhen && alsoWhen.test(whole) ? MILL_ATTACHED : expect;
+      if (!(tags || []).some((t) => wanted.test(t)))
         mismatches.push({ mech, sentence, conditional: CONDITIONAL.test(sentence) });
       break;
     }

@@ -342,6 +342,17 @@ function counterCount(unit, ctx) {
   if (/^prize cards? you have taken$/.test(unit) && typeof ctx.ownPrizes === 'number') {
     return { count: prizesTakenFor(ctx.ownPrizes, ctx.ownDeckFormat), label: 'Prize cards you have taken' };
   }
+  // Kartana-GX Cut Down (sm4-70, customhb-1034): "for each 10 more maximum HP your opponent's
+  // Active Pokémon has than this Pokémon" — whole steps of N by which the Defending Pokémon's HP
+  // exceeds the attacker's (never negative).
+  if ((m = /^(\d+) more maximum hp your opponent's active pokémon has than this pokémon$/.exec(unit))) {
+    const step = Number(m[1]);
+    if (!(step > 0) || !Number.isFinite(ctx.attackerHp) || !Number.isFinite(ctx.defenderMaxHp)) return null;
+    return {
+      count: Math.max(0, Math.floor((ctx.defenderMaxHp - ctx.attackerHp) / step)),
+      label: `${step} more maximum HP than this Pokémon`,
+    };
+  }
   // Azelf LV.X Deep Balance.
   if (/^energy attached to all of your opponent's pokémon$/.test(unit) && typeof ctx.opponentAllEnergyCount === 'number') {
     return { count: ctx.opponentAllEnergyCount, label: "Energy on your opponent's Pokémon" };

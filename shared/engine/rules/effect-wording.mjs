@@ -29,6 +29,9 @@ const REWRITES = [
   // "Switch out your opponent's Active Pokémon with 1 of their Benched Pokémon" is the gust
   // "Switch your opponent's Active Pokémon with 1 of their Benched Pokémon".
   [/\bswitch out (your opponent's active pok[ée]mon with)\b/gi, 'switch $1'],
+  // Dusk Mane Necrozma-GX Meteor Tempest (customhb): "Put 2 Energy attached to this Pokémon into the
+  // Lost Zone" is the printed "… in the Lost Zone".
+  [/\binto the lost zone\b/gi, 'in the Lost Zone'],
   // "Then switch this Pokémon …" → "Then, switch this Pokémon …". Only before "switch": older
   // printings read "Then discard …" without the comma, and their parsers match it that way.
   [/(^|[.)] )then (?=switch )/gi, '$1Then, '],

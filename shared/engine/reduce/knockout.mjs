@@ -757,7 +757,13 @@ export function stampActivePromotions(prev, next) {
       if (!moved) continue;
       delete moved.movedToActiveTurn;
       // "As long as this Pokémon remains in the Active Spot" effects end when it leaves.
-      if (moved.attackMarkers) moved.attackMarkers = moved.attackMarkers.filter((m) => !m.whileActive);
+      if (moved.attackMarkers) moved.attackMarkers = moved.attackMarkers.filter((m) => !m.whileActive && m.kind !== 'statusLock');
+    }
+    // A statusLock (Dead End GX) also ends when the Pokémon evolves: its top card is no longer the one it marked.
+    for (const root of nextActive) {
+      if (root.attachedTo || !root.attackMarkers?.some((m) => m.kind === 'statusLock')) continue;
+      const topId = topPokemonCard(nextActive, root)?.instanceId ?? root.instanceId;
+      root.attackMarkers = root.attackMarkers.filter((m) => m.kind !== 'statusLock' || m.topId == null || m.topId === topId);
     }
   }
 }

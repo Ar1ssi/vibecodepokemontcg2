@@ -7,7 +7,7 @@
 
 import {
   addCondition,
-  clearConditions,
+  cureConditions,
   hasAnyCondition,
   hasCondition,
   listConditions,
@@ -49,8 +49,7 @@ export function applyStadiumTriggerEffect(draft, effect, { host, hostPlayerId, e
       source: effect.source,
     });
   }
-  if ((effect.kind === 'cure' || effect.cure) && hasAnyCondition(host)) {
-    clearConditions(host);
+  if ((effect.kind === 'cure' || effect.cure) && hasAnyCondition(host) && cureConditions(host)) {
     events.push({
       type: 'specialConditionUpdated',
       instanceId: host.instanceId,

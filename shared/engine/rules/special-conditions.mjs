@@ -72,9 +72,23 @@ export function addCondition(card, condition) {
   return true;
 }
 
-/** Removes one condition, leaving every other condition in place. */
-export function removeCondition(card, condition) {
+/**
+ * Darkrai GX Dead End GX: "can't … recover from Special Conditions" is a `statusLock` attack marker
+ * (attack-markers.mjs) on the root card. It ends when the Pokémon leaves the Active Spot or evolves
+ * (reduce/knockout.mjs stampActivePromotions drops it).
+ */
+export function hasStatusLock(card) {
+  return Boolean(card) && (card.attackMarkers || []).some((marker) => marker.kind === 'statusLock');
+}
+
+/**
+ * Removes one condition, leaving every other condition in place. A `statusLock` Pokémon recovers
+ * from nothing (Checkup flips, Trainers, Abilities, attacks) unless `force` — the sweeps for
+ * immunity and the manual board edit, which are not recoveries.
+ */
+export function removeCondition(card, condition, { force = false } = {}) {
   if (!card) return false;
+  if (!force && hasStatusLock(card)) return false;
   normalizeLegacyMarker(card);
   if (isMarker(condition)) {
     delete card[MARKER_KEYS[condition]];
@@ -104,6 +118,17 @@ export function clearConditions(card) {
   card.specialCondition = null;
   for (const key of Object.values(MARKER_KEYS)) delete card[key];
   delete card.poisonCounters;
+}
+
+/**
+ * Cures every condition: a Trainer, Ability, attack or Special Energy that removes Special
+ * Conditions. Unlike `clearConditions` (the Bench, a Knockout, an evolution), a `statusLock`
+ * Pokémon keeps them. Returns whether the conditions were removed.
+ */
+export function cureConditions(card) {
+  if (!card || hasStatusLock(card)) return false;
+  clearConditions(card);
+  return true;
 }
 
 /** Makes `to` carry exactly the conditions `from` has. */

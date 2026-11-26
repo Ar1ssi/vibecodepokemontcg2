@@ -57,7 +57,7 @@ export function applyAbilitySleepLocks(draft, { events }) {
     const active = (draft.players[playerId]?.zones?.active || []).find((c) => !c.attachedTo);
     if (!active || !hasCondition(active, 'Asleep')) continue;
     if (!abilitySleepLock(sideContextFor(draft, playerId))) continue;
-    removeCondition(active, 'Asleep');
+    removeCondition(active, 'Asleep', { force: true });
     events.push({ type: 'statusCleared', condition: 'Asleep', instanceId: active.instanceId, playerId, reason: 'ability' });
   }
 }
@@ -87,7 +87,7 @@ export function applyAbilityStatusImmunity(draft, { events }) {
         }
         if (!hasAnyCondition(root) || !abilityTeamStatusImmunity(inPlayView(draft, root), ctx)) continue;
         for (const condition of listConditions(root)) {
-          removeCondition(root, condition);
+          removeCondition(root, condition, { force: true });
           events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId, reason: 'ability' });
         }
       }
@@ -114,7 +114,7 @@ export function applyStadiumStatusImmunity(draft, { events }) {
           !stadiumTypeStatusImmunity(stadium, inPlayView(draft, root))
         ) continue;
         for (const condition of listConditions(root)) {
-          removeCondition(root, condition);
+          removeCondition(root, condition, { force: true });
           events.push({ type: 'statusCleared', condition, instanceId: root.instanceId, playerId, reason: 'stadium' });
         }
       }
@@ -253,6 +253,17 @@ function applyDeferredActiveDamage(draft, pid, { events }) {
   else delete player.deferredActiveDamage;
   const active = player.zones?.active?.find((c) => !c.attachedTo);
   if (!active || due.length === 0) return false;
+  const doomed = due.find((entry) => entry.knockOut);
+  if (doomed) {
+    events.push({ type: 'deferredKnockOut', instanceId: active.instanceId, playerId: pid, sourceAttack: doomed.sourceAttack });
+    handleKnockout(draft, {
+      victimPlayerId: pid,
+      attackerPlayerId: doomed.sourcePlayerId ?? Object.keys(draft.players).find((id) => id !== pid),
+      victim: active,
+      events,
+    });
+    return true;
+  }
   const amount = due.reduce((sum, entry) => sum + (entry.amount || 0), 0);
   active.damage = (active.damage || 0) + amount;
   events.push({ type: 'damageUpdated', instanceId: active.instanceId, damage: active.damage, source: due[0].sourceAttack });
@@ -652,8 +663,9 @@ export function resolveCheckup(
       events.push({ type: 'coinFlipped', playerId: pid, face, source: condition, instanceId: active.instanceId });
       return face;
     };
+    // A statusLock Pokémon (Dead End GX) recovers from nothing: the flip happens, the condition stays.
     const cleared = (condition) => {
-      removeCondition(active, condition);
+      if (!removeCondition(active, condition)) return;
       events.push({
         type: 'statusCleared',
         condition,
