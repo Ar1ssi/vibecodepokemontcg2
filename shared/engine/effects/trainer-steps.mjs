@@ -48,7 +48,7 @@ import {
   sideContextFor,
 } from '../rules/ability-combat.mjs';
 import { TYPE_LETTER, holderSwitchOutLocked } from '../rules/tool-combat.mjs';
-import { attachedTools, toolCapacity } from '../rules/ability-executors.mjs';
+import { attachedTools, isPokemonToolCard, toolCapacity } from '../rules/ability-executors.mjs';
 import {
   attachTargetAllowed,
   energyRemovalGuarded,
@@ -4576,6 +4576,31 @@ export function moveToolToOpponent(ctx) {
 }
 
 /**
+ * Excadrill Excavation: you may attach a Pokémon Tool from your discard pile to this Pokémon.
+ * Skipped (not used up) when the discard pile holds no Tool or this Pokémon has no room for one;
+ * declining the pick (an empty selection) attaches nothing.
+ */
+function attachToolFromDiscardAbility(ctx) {
+  const { player } = ctx;
+  const self = sourceRoot(ctx);
+  if (!self) return skip(ctx, 'source_not_found');
+  const tools = (player.zones.discard || []).filter(isPokemonToolCard);
+  if (tools.length === 0) return skip(ctx, 'no_tool_in_discard');
+  if (!hasToolRoom(player, self)) return skip(ctx, 'no_tool_room');
+  if (ctx.selection) {
+    const [picked] = pickById(tools, ctx.selection);
+    if (picked) attachTo(player, picked, self, ctx.events);
+    return null;
+  }
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Ability')}: You may attach a Pokémon Tool from your discard pile to ${self.name}`,
+    options: tools,
+    min: 0,
+    max: 1,
+  });
+}
+
+/**
  * Homebrew Doduo Two Minds: look at the bottom 2 cards of your deck; you may move 1 of them to the
  * top. Declining (an empty selection) leaves the deck as it was.
  */
@@ -6438,6 +6463,7 @@ export const EXTRA_STEP_HANDLERS = {
   selfAttachEnergyAbility,
   selfAttachToolAbility,
   moveToolToOpponentAbility: moveToolToOpponent,
+  attachToolFromDiscardAbility,
   bottomCardToTopAbility,
   fossilItem,
   searchOrRecover,
