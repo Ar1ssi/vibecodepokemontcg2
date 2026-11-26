@@ -672,11 +672,10 @@ import test, { describe } from 'node:test';
       assert.equal(r.steps[0].type, 'passive');
     });
 
-    test('Iron Defender: passive damage reduction', () => {
+    test('Iron Defender: team damage reduction for {M} Pokémon', () => {
       const r = parseTrainerEffect('During your opponent’s next turn, all of your { M } Pokémon take 30 less damage from attacks from your opponent’s Pokémon.');
       assert.equal(r.recognizable, true);
-      assert.equal(r.steps[0].type, 'passive');
-      assert.ok(r.steps[0].detail.includes('damage reduction'));
+      assert.deepEqual(r.steps, [{ type: 'teamDamageReduction', amount: 30, pokemonType: 'm' }]);
     });
 
     test("Acerola's Mischief: shields one Pokémon from Pokémon ex attacks", () => {
