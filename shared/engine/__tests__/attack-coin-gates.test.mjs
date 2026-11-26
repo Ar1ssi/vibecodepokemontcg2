@@ -520,6 +520,19 @@ test('attack: Dangerous Evolution evolves the attacker from the deck on heads', 
   assert.ok(zone(tails.res, 'p1', 'deck').some((c) => c.name === 'Beedrill'));
 });
 
+test('attack: Frozen Awakening (Glaceon V evs-040, pkmncards corpus) evolves the attacker, not the hand', () => {
+  const text =
+    'Search your deck for a card that evolves from this Pokémon and put it onto this Pokémon to evolve it. Then, shuffle your deck.';
+  assert.deepEqual(parseAttackSteps(text, { selfName: 'Eevee' }).after, [{ type: 'searchEvolve', ontoSource: true }]);
+  const setup = ({ p1 }) => p1.zones.deck.push(mon('Glaceon V', { stage: 'Basic', evolvesFrom: 'Eevee' }));
+  const b = board(text, { name: 'Eevee', setup, seed: 1 });
+  const res = attack(b);
+  const glaceon = res.state.pendingChoice.options.find((c) => c.name === 'Glaceon V');
+  const res2 = choose(res, [glaceon.instanceId], b.rng);
+  assert.ok(zone(res2, 'p1', 'active').some((c) => c.name === 'Glaceon V' && c.attachedTo === b.attacker.instanceId));
+  assert.equal(zone(res2, 'p1', 'hand').length, 0, 'no card goes to the hand');
+});
+
 // ── slice 4: Knock Outs and chosen Special Conditions ───────────────────────
 
 const SPHENE =
