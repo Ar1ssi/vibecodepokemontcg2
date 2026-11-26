@@ -1553,6 +1553,20 @@ export function abilityKoConfusesAttacker(card, ctx = {}) {
 }
 
 /**
+ * Glimmora Shattering Crystal: "When this Pokémon is Knocked Out, flip a coin. If heads, your
+ * opponent can't take any Prize cards for it." 'coin' when the victim's owner flips for it,
+ * 'always' for the unflipped wording, null when not printed or suppressed. Any zone counts.
+ */
+export function abilityKoDeniesPrizes(card, ctx = {}) {
+  if (!isPokemon(card)) return null;
+  const m = cardAbilityText(card).match(
+    /when this pok[eé]mon is knocked out, (flip a coin\. if heads, )?your opponent can'?t take any prize cards? for it/
+  );
+  if (!m || isAbilitySuppressed(card, ctx)) return null;
+  return m[1] ? 'coin' : 'always';
+}
+
+/**
  * Honedge Final Hour (sm6-46): "If this Pokémon is your Active Pokémon and is Knocked Out by damage
  * from an opponent's attack, put 3 damage counters on 1 of your opponent's Pokémon." The count, or
  * 0; the caller checks the Active Spot and the attack.
@@ -2304,13 +2318,19 @@ export function abilitySleepLock(ctx = {}) {
 
 /**
  * How many Benched Pokémon the side in `ctx` may have: 5, or fewer while an opposing Ability
- * caps it (Sudowoodo Roadblock, sm2-66: "Your opponent can't have more than 4 Benched Pokémon").
+ * caps it (Sudowoodo Roadblock, sm2-66: "Your opponent can't have more than 4 Benched Pokémon";
+ * Glimmora ex Dust Field: the same cap "as long as this Pokémon is in the Active Spot").
  */
 export function abilityBenchLimit(ctx = {}) {
   let limit = 5;
+  const holderCtx = opponentHolderCtx(ctx);
   for (const holder of dedupe(opponentInPlay(ctx))) {
-    const m = cardAbilityText(holder).match(/your opponent can't have more than (\d+) benched pok[eé]mon/);
-    if (m && !isAbilitySuppressed(holder, opponentHolderCtx(ctx))) limit = Math.min(limit, Number(m[1]));
+    const text = cardAbilityText(holder);
+    const m = text.match(/your opponent can't have more than (\d+) benched pok[eé]mon/);
+    if (!m) continue;
+    const activeOnly = /as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon)/.test(text);
+    if (activeOnly && holderZone(holder, holderCtx) !== 'active') continue;
+    if (!isAbilitySuppressed(holder, holderCtx)) limit = Math.min(limit, Number(m[1]));
   }
   return limit;
 }

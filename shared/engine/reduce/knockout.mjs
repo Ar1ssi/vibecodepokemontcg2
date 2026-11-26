@@ -19,6 +19,7 @@ import { parseToolCondition, toolConditionMet } from '../rules/tool-conditions.m
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
 import {
   abilityPrizeModify, abilityPrizeToBench, abilityPrizesToLostZone, abilityKoDiscardsOpponentHand, abilityKoConfusesAttacker, abilityKoCountersOnOpponent,
+  abilityKoDeniesPrizes,
 } from '../rules/ability-combat.mjs';
 import { inPlayEntries, parseOnKoAbilities } from '../rules/ability-triggers.mjs';
 import { createPendingChoice, attachToRoot } from '../effects/executor.mjs';
@@ -41,6 +42,11 @@ import { trainerEffectText } from './trainer.mjs';
 import { parseTrainerEffect } from '../rules/trainer-effects.mjs';
 import { executeTrainer } from '../effects/trainer.mjs';
 import { BENCH_LIMIT } from '../effects/trainer-steps.mjs';
+
+// The command's rng, for Knock Outs resolved by callers that do not carry `activeRng` (Poison at
+// Checkup, recoil, evolve-in-place): bound by reduce.mjs for the draft it clones, never stored on it.
+const draftRngs = new WeakMap();
+export const bindDraftRng = (draft, rng) => draftRngs.set(draft, rng);
 
 const TOOL_KO_TARGET_KINDS = { holder: 'holder', bench: 'bench', hand: 'hand' };
 
@@ -454,6 +460,17 @@ export function handleKnockout(
   prizeCount += markerBonus;
   // Poipole Knockout Reviver: "your opponent can't take any Prize cards for it".
   if (activeAttackMarkers(draft, victimPlayerId, victim).some((marker) => marker.kind === 'noPrizesOnKo')) prizeCount = 0;
+  // Glimmora Shattering Crystal: the victim's owner flips; heads pays no Prize cards for it.
+  const prizeDenial = prizeCount > 0 ? abilityKoDeniesPrizes(victimView, abilitySideContext(draft, victimPlayerId)) : null;
+  if (prizeDenial) {
+    let denied = true;
+    if (prizeDenial === 'coin') {
+      const face = flipCoin(activeRng || draftRngs.get(draft) || null);
+      events.push({ type: 'coinFlipped', playerId: victimPlayerId, face, source: victimView.name });
+      denied = face === 'heads';
+    }
+    if (denied) prizeCount = 0;
+  }
 
   if (attacker) {
     if (!attacker.flags) attacker.flags = {};

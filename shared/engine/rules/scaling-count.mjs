@@ -226,6 +226,22 @@ function attachedCount(unit, ctx) {
     const spent = m[1] ? list(ctx.attackCost).length : 0;
     return { count: Math.max(0, basic - spent), label: 'basic Energy attached' };
   }
+  // Single Strike Urshifu Wicked Blow: "for each additional {D} Energy attached" counts the type
+  // beyond the attack's own cost symbols of that type.
+  if (
+    (m = /^additional (?:\{([a-z])\} )?energy(?: cards?)? attached to this pokémon$/.exec(unit)) &&
+    Array.isArray(ctx.attackerEnergyUnits)
+  ) {
+    const type = LETTER_TYPES[m[1]];
+    const attached = ctx.attackerEnergyUnits.filter(
+      (u) => !type || lower(u).split('|').some((part) => sameType(part, type))
+    ).length;
+    const paid = list(ctx.attackCost).filter((symbol) => {
+      const raw = lower(symbol).replace(/[{}]/g, '').trim();
+      return !type || sameType(LETTER_TYPES[raw] || raw, type);
+    }).length;
+    return { count: Math.max(0, attached - paid), label: `additional ${type ? `${type} ` : ''}Energy attached` };
+  }
   if ((m = /^(?:\{([a-z])\} )?energy attached to this pokémon$/.exec(unit)) && Array.isArray(ctx.attackerEnergyUnits)) {
     const type = LETTER_TYPES[m[1]];
     const units = ctx.attackerEnergyUnits.filter(
