@@ -1830,11 +1830,39 @@ function parseWotcTrainerSteps(lower) {
   return null;
 }
 
+// Fantina (swsh11-157), Jasmine's Gaze, Iron Defender: "During your opponent's next turn, all of your
+// [{M}] Pokémon take N less damage from attacks [from your opponent's Pokémon ex] (after applying
+// Weakness and Resistance)." Read by reduce/shared.mjs teamDamageReductionMarkers.
+const TEAM_DAMAGE_REDUCTION =
+  /(?:^|\.\s+)during your opponent's next turn, all of your (?:\{([a-z])\} )?pokémon take (\d+) less damage from attacks(?: from your opponent's (pokémon ex|pokémon-ex|pokémon v|pokémon vmax|pokémon-gx|pokémon))?/;
+const TEAM_REDUCTION_ATTACKER_KINDS = {
+  'pokémon ex': 'ex',
+  'pokémon-ex': 'EX',
+  'pokémon v': 'v',
+  'pokémon vmax': 'vmax',
+  'pokémon-gx': 'gx',
+};
+
+function parseTeamDamageReduction(lower) {
+  const m = TEAM_DAMAGE_REDUCTION.exec(lower);
+  if (!m) return null;
+  const attackerKind = TEAM_REDUCTION_ATTACKER_KINDS[m[3]];
+  return {
+    type: 'teamDamageReduction',
+    amount: Number(m[2]),
+    ...(m[1] ? { pokemonType: m[1] } : {}),
+    ...(attackerKind ? { attackerKind } : {}),
+  };
+}
+
 function parseTrainerStepsInner(lower) {
   const steps = [];
 
   const wotc = parseWotcTrainerSteps(lower);
   if (wotc) return { steps: wotc, recognizable: true };
+
+  const teamReduction = parseTeamDamageReduction(lower);
+  if (teamReduction) return { steps: [teamReduction], recognizable: true };
 
   // Pokémon Communication (Team Up 152, Black & White Trainer Kit 24, HeartGold & SoulSilver 98)
   // and Pokémon Trader (via legacy-trainer-wording): the Pokémon from hand goes into the deck
@@ -3991,6 +4019,8 @@ function describeStepBody(step) {
       return "All Pokémon Powers stop working until the end of your opponent's next turn.";
     case 'benchAttackShield':
       return "Until the end of your opponent's next turn, prevent all damage from attacks done to your Benched Pokémon.";
+    case 'teamDamageReduction':
+      return "During your opponent's next turn, your " + (step.pokemonType ? '{' + step.pokemonType.toUpperCase() + '} ' : '') + 'Pokémon take ' + step.amount + ' less damage from attacks' + (step.attackerKind ? ' from your opponent\'s rule-box Pokémon' : '') + '.';
     case 'turnAttackRider':
       return `This turn, an attack from a Pokémon with ${step.nameTag} in its name that damages the Defending Pokémon leaves it ${step.condition}.`;
     case 'freeEvolve':

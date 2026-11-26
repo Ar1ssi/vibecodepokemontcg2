@@ -1509,6 +1509,25 @@ function recoverWhat(kind) {
 // Clauses printed across sentences. Each match is replaced by a placeholder sentence so its
 // position in the printed order is kept.
 const BLOCKS = [
+  // Alcremie ex Bakery Bunker (customhb): the attacker's Bench takes no attack damage for the
+  // window (player-level, effects/attack-steps.mjs atkBenchShield) and the attacker takes N less.
+  // The printed "During your next turn" is read as the opponent's next turn: attacks only land then.
+  [
+    /during (?:your opponent's|your) next turn, (?:your benched pokémon can't take damage|prevent all damage done to your benched pokémon by attacks)(?:, and this pokémon takes (\d+) less damage(?: from attacks)?)?\./g,
+    (m) => [
+      { type: 'atkBenchShield' },
+      ...(m[1]
+        ? [
+            {
+              type: 'atkAddMarker',
+              target: 'self',
+              window: 'opponentNextTurn',
+              marker: { kind: 'incomingReduce', amount: Number(m[1]), afterWR: true, filter: null },
+            },
+          ]
+        : []),
+    ],
+  ],
   // Brock's Mankey [Gym Heroes 68] Fidget: "Shuffle your deck." as the whole effect. Anchored on
   // the whole text: the same sentence after a deck search is that search's own shuffle.
   [/^shuffle your deck\.$/g, () => ({ type: 'atkShuffleOwnDeck' })],
@@ -1738,7 +1757,7 @@ const BLOCKS = [
   ],
   [
     // Drakloak Recon Directive: "Put the other card on the bottom of your deck."
-    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards in the lost zone|put the other cards? on the bottom of your deck)\./g,
+    /look at the top (\d+) cards of your deck(?:, choose (\d+) of them,)? and put (\d+|it) (?:of them )?into your hand\. (shuffle the other cards back into your deck|put the other cards? in the lost zone|put the other cards? on the bottom of your deck)\./g,
     (m) => ({
       type: 'atkLookTopTake',
       look: Number(m[1]),

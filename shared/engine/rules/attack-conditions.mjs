@@ -149,6 +149,8 @@ export function kindsOf(phrase) {
   const noun = / (pokémon)$/.exec(parts[parts.length - 1])?.[1];
   const kinds = parts
     .map((part, i) => (noun && i < parts.length - 1 && /^(?:an? )?\{[a-z]\}$/.test(part.trim()) ? `${part} ${noun}` : part))
+    // "a Pokémon ex or VMAX": a later part may be the bare suffix, sharing the leading "Pokémon".
+    .map((part, i) => (i > 0 && /^(?:an? )?(?:ex|gx|v|vmax|vstar)$/.test(part.trim()) ? `pokémon ${part.trim().replace(/^an? /, '')}` : part))
     .map(kindOf);
   return kinds.length > 0 && kinds.every(Boolean) ? kinds : null;
 }

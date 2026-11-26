@@ -6218,6 +6218,27 @@ function benchAttackShield(ctx) {
   return null;
 }
 
+// Fantina / Jasmine's Gaze / Iron Defender: the window the reducer reads for every Pokémon of the
+// player's, the Bench and the ones that come into play meanwhile (reduce/shared.mjs
+// teamDamageReductionMarkers, attack-damage.mjs damageBenchedPokemon).
+function teamDamageReduction(ctx) {
+  const { player, step } = ctx;
+  const turn = turnNumberOf(ctx);
+  const live = (player.teamDamageReductions || []).filter((r) => r.untilTurn >= turn);
+  player.teamDamageReductions = [
+    ...live,
+    {
+      amount: step.amount,
+      untilTurn: turn + 1,
+      pokemonType: step.pokemonType || null,
+      attackerKind: step.attackerKind || null,
+      source: sourceName(ctx, 'Trainer'),
+    },
+  ];
+  ctx.events.push({ type: 'teamDamageReduction', playerId: player.playerId, amount: step.amount, untilTurn: turn + 1 });
+  return null;
+}
+
 // Koga gym2-19: the reducer applies the condition after this turn's attack damages the Defending
 // Pokémon (flags are cleared when the turn passes).
 function turnAttackRider(ctx) {
@@ -6477,6 +6498,7 @@ export const EXTRA_STEP_HANDLERS = {
   moveAllEnergy,
   powersOff,
   benchAttackShield,
+  teamDamageReduction,
   turnAttackRider,
   freeEvolve,
   energyAttachPlan,

@@ -55,6 +55,7 @@ export function activeAttackMarkers(draft, playerId, card) {
     }),
     ...restOfGameMarkers(draft, playerId, card),
     ...usedAttackVulnerability(draft, card),
+    ...teamDamageReductionMarkers(draft, playerId, card),
     // I224: PlusPower / Defender / Magnifier attached to it, read as the same marker kinds.
     ...attachedTrainerMarkers(active, card),
     // Head Ringer / Jamming Net: its Tools tax its own attacks (Jamming Tower switches them off).
@@ -77,6 +78,27 @@ function usedAttackVulnerability(draft, card) {
     const count = uses[attack.name] || 0;
     return per && count > 0 ? [{ kind: 'incomingBonus', amount: Number(per) * count, afterWR: true }] : [];
   });
+}
+
+/**
+ * Trainer windows "During your opponent's next turn, all of your Pokémon take N less damage"
+ * (Fantina, Jasmine's Gaze, Iron Defender) still open on `card`, as incomingReduce markers.
+ * They live on the player, so Pokémon that come into play during the window carry them too.
+ */
+export function teamDamageReductionMarkers(draft, playerId, card) {
+  const windows = draft.players[playerId]?.teamDamageReductions || [];
+  const turn = draft.turn?.number || 1;
+  const live = windows.filter((w) => w.untilTurn >= turn);
+  if (live.length === 0 || !card) return [];
+  const view = inPlayView(draft, card);
+  return live
+    .filter((w) => !w.pokemonType || pokemonHasType(view, w.pokemonType))
+    .map((w) => ({
+      kind: 'incomingReduce',
+      amount: w.amount,
+      afterWR: true,
+      filter: w.attackerKind ? { any: [w.attackerKind] } : null,
+    }));
 }
 
 // "For the rest of this game, …" (design 036 E) read as the marker kinds the damage path knows:

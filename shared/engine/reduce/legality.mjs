@@ -634,6 +634,7 @@ export function attackCostPayable(state, playerId, active, attack) {
     zone: holderRef?.zoneId === 'bench' ? 'bench' : 'active',
     isActive: holderRef?.zoneId !== 'bench',
     opponentHandCount: (opponent?.zones?.hand || []).length,
+    ownLostZoneCount: (state.players?.[playerId]?.zones?.lostZone || []).length,
   });
   if (abilityCost.ignoreAll) {
     effectiveCost = [];

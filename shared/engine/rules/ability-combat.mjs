@@ -249,6 +249,9 @@ function inPlayConditionMet(text, target, ctx) {
   if (/if (?:this pok[eé]mon|it) has full hp/.test(text)) {
     if ((target?.damage || 0) > 0) return false;
   }
+  // Cramorant Lost Provisions: a Lost Zone count the caller supplies; no count fails closed.
+  const lostZoneNeed = text.match(/if you have (\d+) or more cards in the lost zone/);
+  if (lostZoneNeed && !(Number(ctx.ownLostZoneCount) >= Number(lostZoneNeed[1]))) return false;
   const energyCondition =
     anyEnergy ||
     teamEnergy ||
@@ -1403,7 +1406,7 @@ export function abilityAttackCostDiscount(attacker, ctx = {}) {
     if (!t) continue;
     if (isAbilitySuppressed(holder, ctx)) continue;
     const all = t.match(
-      /ignore all energy in the costs? of attacks used by this pok[eé]mon/
+      /ignore all energy in (?:the costs? of attacks used by this pok[eé]mon|this pok[eé]mon's attack costs?)/
     );
     const colorless = t.match(
       /ignore all \{c\} energy in the costs? of attacks used by this pok[eé]mon/
@@ -1498,12 +1501,17 @@ export function abilityIgnoresAttackerBoosts(defender, ctx = {}) {
  */
 export function abilityFlipPreventsAttackDamage(card, ctx = {}) {
   if (!isPokemon(card)) return false;
-  return (
-    /if any damage is done to this pok[eé]mon by attacks, flip a coin\. if heads, prevent that damage/.test(
-      cardAbilityText(card)
-    ) && !isAbilitySuppressed(card, ctx)
-  );
+  const text = cardAbilityText(card);
+  const gated = text.match(ENERGY_GATED_FLIP_PREVENT);
+  const flips =
+    /if any damage is done to this pok[eé]mon by attacks, flip a coin\. if heads, prevent that damage/.test(text) ||
+    (gated && TYPE_LETTER[gated[1]] && hasEnergyOfType(card, ctx.sideCards || [], TYPE_LETTER[gated[1]]));
+  return Boolean(flips) && !isAbilitySuppressed(card, ctx);
 }
+
+// Fezandipiti Adrena-Pheromone: the same flip, gated on a {X} Energy attached to the holder.
+const ENERGY_GATED_FLIP_PREVENT =
+  /if this pok[eé]mon has any \{([a-z])\} energy attached and is damaged by an attack, flip a coin\. if heads, prevent that damage/;
 
 /**
  * Amoonguss Disarming Spore: cards the opponent discards from hand when this Pokémon is Knocked
@@ -2513,6 +2521,20 @@ export function abilityPrizeToBench(card) {
   if (/flip a coin\. if heads, take 1 more prize card/.test(t)) return { extraPrize: 'coin' };
   if (/and take 1 more prize card/.test(t)) return { extraPrize: 'always' };
   return { extraPrize: null };
+}
+
+/**
+ * Barbaracle Lost Block: "Your opponent puts any Prize cards they would take in the Lost Zone
+ * instead of into their hand." True when the holder carries that wording and is not suppressed;
+ * the caller passes the holder's side context and applies it to the opponent's Prize takes.
+ */
+export function abilityPrizesToLostZone(card, ctx = {}) {
+  if (!isPokemon(card)) return false;
+  return (
+    /your opponent puts any prize cards they would take in the lost zone instead of into their hand/.test(
+      cardAbilityText(card)
+    ) && !isAbilitySuppressed(card, ctx)
+  );
 }
 
 // --- status / evolve / summon / attack permissions -----------------------

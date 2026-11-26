@@ -38,7 +38,7 @@ import {
 import { isGxCard, isUltraBeastCard } from '../rules/card-classify.mjs';
 import {
   discardCardFromPlayerZone, activeAttackMarkers, inPlayView, cardEffectiveHp, abilitySideContext,
-  rootsIn,
+  rootsIn, teamDamageReductionMarkers,
   onlyPokemonInPlay,
 } from './shared.mjs';
 import { handleKnockout } from './knockout.mjs';
@@ -115,6 +115,22 @@ export function damageBenchedPokemon(
       dealt = Math.max(0, dealt - stadiumCut);
       if (dealt === 0) {
         events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'stadium' });
+        return;
+      }
+    }
+  }
+
+  // Fantina / Jasmine's Gaze: "all of your Pokémon take N less damage" reaches the Bench too.
+  if (!ownAttack && !countersPlaced) {
+    const striker = (draft.players[attackerPlayerId]?.zones?.active || []).find((c) => !c.attachedTo);
+    const strikerView = striker ? inPlayView(draft, striker) : null;
+    const teamCut = teamDamageReductionMarkers(draft, victimPlayerId, victim)
+      .filter((marker) => attackerMatchesFilter(marker.filter, strikerView))
+      .reduce((sum, marker) => sum + marker.amount, 0);
+    if (teamCut > 0) {
+      dealt = Math.max(0, dealt - teamCut);
+      if (dealt === 0) {
+        events.push({ type: 'damagePrevented', instanceId: victim.instanceId, attackName, reason: 'trainer-team-reduction' });
         return;
       }
     }

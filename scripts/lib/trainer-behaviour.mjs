@@ -6,6 +6,11 @@
 import { parseTrainerEffect } from '../../shared/engine/rules/trainer-effects.mjs';
 import { isExecutableStepType } from '../../shared/engine/effects/executor.mjs';
 import { legacyAttachedTrainer } from '../../shared/engine/rules/legacy-attached-trainer.mjs';
+import {
+  classifyStadiumEffect,
+  hasRecognizedPassiveStadiumEffect,
+  stadiumHasWhenPlayedEffect,
+} from '../../shared/engine/rules/stadium-effects.mjs';
 
 // Parsed steps with no server handler of their own: `passive` is announced (Tool modifiers are
 // read by tool-combat / tool-conditions), `discardCost` is paid by the playTrainer case.
@@ -107,6 +112,17 @@ function flattenStepTypes(steps) {
  * @returns {{key: string, name: string, subtype: string, gaps: string[], serverMissing: string[],
  *   playCondition: string|null, steps: string[]}}
  */
+// A Stadium is read by stadium-effects.mjs, not by the Trainer step parser (Lost City, Dyna Tree
+// Hill): its text is recognized there, or not at all.
+function stadiumRecognized(row) {
+  const card = { name: row?.name, subtypes: ['Stadium'], text: row?.text };
+  return (
+    hasRecognizedPassiveStadiumEffect(card) ||
+    stadiumHasWhenPlayedEffect(card) ||
+    classifyStadiumEffect(card) === 'once-per-turn'
+  );
+}
+
 export function classifyTrainer(row) {
   // executeTrainer plays a WotC attach-Trainer as one attachLegacyTrainer step (I224).
   const parsed = legacyAttachedTrainer({ type: 'Trainer', name: row?.name, text: row?.text })
@@ -114,6 +130,9 @@ export function classifyTrainer(row) {
     : parseTrainerEffect(row?.text || '');
   const steps = flattenStepTypes(parsed.steps || []);
   const gaps = [];
+  if (/stadium/i.test(row?.subtype || '') && stadiumRecognized(row)) {
+    return { key: trainerKey(row), name: row?.name || '', subtype: row?.subtype || '', gaps, serverMissing: [], playCondition: null, steps };
+  }
   if (!parsed.recognizable) gaps.push('unrecognizable');
   else if (steps.length === 0) gaps.push('empty');
   else if (steps.every((t) => t === 'passive')) gaps.push('passive-only');

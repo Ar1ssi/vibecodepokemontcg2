@@ -352,6 +352,24 @@ export function parseOnEnergyAttachAbilities(host, energy, ctx = {}) {
   return out;
 }
 
+const ATTACH_BENCH_SEARCH =
+  /(?:^|\.\s)when(?:ever)? you attach an? (basic )?(?:\{([a-z])\} )?(basic )?energy card from your hand to this pokémon(?: during your turn)?, you may search your deck for ([a-z0-9 .'é-]+?) and put (?:it|that pokémon) onto your bench\.(?:\s|$)/;
+
+/**
+ * Goomy Water Down: "Whenever you attach a {W} Energy card from your hand to this Pokémon, you may
+ * search your deck for Goomy and put it onto your Bench." Returns `{ name, source }` (the printed
+ * name of the card to fetch) when `energy` attached to `host` meets the printed Energy kind, else null.
+ */
+export function parseAttachBenchSearch(host, energy, ctx = {}) {
+  if (!host || !energy || !holderCanTrigger(host, ctx)) return null;
+  const text = cardAbilityText(host).replace(/’/g, "'");
+  const m = text.match(ATTACH_BENCH_SEARCH);
+  if (!m) return null;
+  if (m[2] && TYPE_LETTER[m[2]] !== lower(resolveAttachedEnergyType(energy))) return null;
+  if ((m[1] || m[3]) && !isBasicEnergy(energy)) return null;
+  return { name: m[4].trim(), source: host.name };
+}
+
 // The printed α marker identifies the trait (D72); marker-less wording is a real Ability
 // and is not this trait. `effect` is TCGdex's field name for `text`.
 function firstNamedAbility(card) {
