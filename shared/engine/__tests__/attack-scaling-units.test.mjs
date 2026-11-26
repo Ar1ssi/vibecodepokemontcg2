@@ -340,3 +340,19 @@ test('reducer: an attack records the damage it did on the defender for a later C
   const defender = res.state.players.p2.zones.active.find((c) => !c.attachedTo);
   assert.deepEqual(defender.attackDamageTaken, { turn: 5, amount: 70 });
 });
+
+test('Melmetal VMAX G-Max Juggernaut (user scan; corpus PGO row is 160+/60/120): extra {M} beyond the cost only, added part capped at 100', () => {
+  const text =
+    "This attack does 20 more damage for each extra {M} Energy attached to this Pokémon (in addition to this attack's cost). You can't add more than 100 damage in this way.";
+  const cost = ['{M}', '{M}', '{M}'];
+  const at = (n) =>
+    dealt('Melmetal VMAX', '130+', text, {
+      attackCost: cost,
+      attackerEnergyUnits: Array(n).fill('metal'),
+    });
+  assert.equal(at(3), 130);
+  assert.equal(at(4), 150);
+  assert.equal(at(7), 210);
+  assert.equal(at(8), 230);
+  assert.equal(at(12), 230);
+});

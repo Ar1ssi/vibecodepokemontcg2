@@ -227,9 +227,10 @@ function attachedCount(unit, ctx) {
     return { count: Math.max(0, basic - spent), label: 'basic Energy attached' };
   }
   // Single Strike Urshifu Wicked Blow: "for each additional {D} Energy attached" counts the type
-  // beyond the attack's own cost symbols of that type.
+  // beyond the attack's own cost symbols of that type. Melmetal VMAX G-Max Juggernaut (PGO)
+  // prints "extra {M} Energy … (in addition to this attack's cost)" — same count.
   if (
-    (m = /^additional (?:\{([a-z])\} )?energy(?: cards?)? attached to this pokémon$/.exec(unit)) &&
+    (m = /^(?:additional|extra) (?:\{([a-z])\} )?energy(?: cards?)? attached to this pokémon$/.exec(unit)) &&
     Array.isArray(ctx.attackerEnergyUnits)
   ) {
     const type = LETTER_TYPES[m[1]];
@@ -240,7 +241,7 @@ function attachedCount(unit, ctx) {
       const raw = lower(symbol).replace(/[{}]/g, '').trim();
       return !type || sameType(LETTER_TYPES[raw] || raw, type);
     }).length;
-    return { count: Math.max(0, attached - paid), label: `additional ${type ? `${type} ` : ''}Energy attached` };
+    return { count: Math.max(0, attached - paid), label: `extra ${type ? `${type} ` : ''}Energy attached` };
   }
   if ((m = /^(?:\{([a-z])\} )?energy attached to this pokémon$/.exec(unit)) && Array.isArray(ctx.attackerEnergyUnits)) {
     const type = LETTER_TYPES[m[1]];
