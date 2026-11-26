@@ -284,3 +284,13 @@ import test from 'node:test';
       assert.equal(isExCard(printed), false);
       assert.equal(prizesForKO(printed), 3);
     });
+
+    test('homebrew GX (custom id) counts as ex and stays GX at 2 Prizes; a printed GX is not ex', () => {
+      const homebrew = card({ name: 'Charizard-GX', id: 'customhb-471', subtypes: ['GX'] });
+      const printed = card({ name: 'Charizard-GX', id: 'sm3-20', subtypes: ['GX'] });
+      assert.equal(isExCard(homebrew), true);
+      assert.equal(isGxCard(homebrew), true);
+      assert.equal(prizesForKO(homebrew), 2);
+      assert.equal(isExCard(printed), false);
+      assert.equal(prizesForKO(printed), 2);
+    });

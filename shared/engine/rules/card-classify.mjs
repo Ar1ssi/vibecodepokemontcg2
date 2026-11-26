@@ -64,9 +64,14 @@ export function isHomebrewVmaxCard(card = {}) {
   return isVmaxCard(card) && isHomebrewCard(card);
 }
 
+// Homebrew GX is built as an ex too: it counts as ex (and stays GX, 2 Prizes).
+export function isHomebrewGxCard(card = {}) {
+  return isGxCard(card) && isHomebrewCard(card);
+}
+
 export function isExCard(card = {}) {
   if (hasSubtype(card, 'ex')) return true;
-  if (isHomebrewVmaxCard(card)) return true;
+  if (isHomebrewVmaxCard(card) || isHomebrewGxCard(card)) return true;
   return /(?:^|[\s-])ex$/i.test(nameOf(card));
 }
 
