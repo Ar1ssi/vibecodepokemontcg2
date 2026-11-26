@@ -6,8 +6,9 @@
 # Pruned, folded or shortened lines, verbatim: .agent/archive/DECISIONS-pruned-2026-11-13.md, DECISIONS-pruned-2026-10-15.md (grep the D-number).
 # Full pre-2026-09-24 wording of every line: .agent/archive/DECISIONS-full-2026-09-24.md (grep it).
 # ID collisions from parallel sessions: D43, D44, D86, D117–D120, D214 each exist twice — cite as `D119[rules]`. Designs 074 and 088 name two each: cite by file name.
-#   Next id = highest D number in this file and the archives + 1 (next: D261).
+#   Next id = highest D number in this file and the archives + 1 (next: D262).
 
+- D261 2026-11-27 [mat-fx] A VMAX's "Max …" attack plays its species type's Max Move, a "G-Max …" one its species' G-Max Move (design 092), before signatures; tier S, so queue, sound and family rules hold.
 - D260 2026-11-27 [mat-fx] Every Pokémon VMAX plays the Gigantamax entry (gmax-entry.mjs): a D259 canvas stage plus the card mesh's own swell (scene.drive); its crimson clouds bloom by luminance (stage-post `luma`).
 - D259 2026-11-23 [mat-fx] Mega/Tera entries are designs 035–037's canvas scenes again (user), through stage-post.js (bloom, roll-off, fringe), holding to the reveal; Tera skin stays tera-coat.mjs. (Supersedes D250)
 - D258 2026-11-20 [netcode] 090-homebrew-clock: the homebrew chess clock is room-level (never engine state, so replay/undo stay deterministic); 0:00 ends the game through a server-only `timeOut` command.
