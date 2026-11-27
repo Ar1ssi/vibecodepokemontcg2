@@ -1926,9 +1926,9 @@ const BLOCKS = [
     /if there are any \{([a-z])\} energy cards in your discard pile, flip a coin\. if heads, attach 1 of them to this pokémon\./g,
     (m) => ({ type: 'atkAttach', source: 'discard', count: 1, energyType: m[1].toUpperCase(), target: 'self', gate: 'heads' }),
   ],
-  // Kakuna Dangerous Evolution: evolves the attacker from the deck.
+  // Kakuna Dangerous Evolution, Glaceon V Frozen Awakening (evs-040), Magikarp Waterfall Evolution (cin-17): evolves the attacker from the deck.
   [
-    /search your deck for an evolution card that evolves from this pokémon and put it onto this pokémon\. shuffle your deck afterward\./g,
+    /search your deck for (?:an evolution|a) card that evolves from this pokémon and put it onto this pokémon(?: to evolve it)?\. (?:then, )?shuffle your deck(?: afterward)?\./g,
     () => ({ type: 'searchEvolve', ontoSource: true }),
   ],
   // Technical Machine TS-1 Evoluter (Legends Awakened 136): evolves any of your Pokémon.

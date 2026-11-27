@@ -5,7 +5,8 @@
 // Eevee's evolutions are listed under their own type, and the Hisuian Zorua lines each under theirs rather than with their family. Trainers and Energy keep
 // the set.json order.
 
-export const HOMEBREW_DISPLAY_ORDER_SET_IDS = Object.freeze(['customhb']);
+// Empty: customhb lists in its set.json order (cardback's export sorts by each card's own type), so this re-sort applies to no set.
+export const HOMEBREW_DISPLAY_ORDER_SET_IDS = Object.freeze([]);
 
 const TYPE_ORDER = ['Colorless', 'Darkness', 'Dragon', 'Fairy', 'Fighting', 'Fire', 'Grass', 'Lightning', 'Metal', 'Psychic', 'Water'];
 const STAGE_RANK = { Basic: 0, Stage1: 1, Stage2: 2 };
