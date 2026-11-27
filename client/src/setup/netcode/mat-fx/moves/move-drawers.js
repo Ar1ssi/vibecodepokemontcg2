@@ -845,6 +845,8 @@ const shade = (ctx, lane, s, info) => {
     ctx.fill();
     ctx.restore();
   }
+  // design 092 ground-rock-steel
+  if (p.kind === 'bubble') bubbleLights(ctx, x, y, pose.rx, palette, pose.alpha);
   if (p.kind === 'giant' && p.eyes) {
     ctx.fillStyle = rgbCss(GIANT_EYES, pose.alpha);
     for (const side of [-1, 1]) {
@@ -918,6 +920,37 @@ const grip = (ctx, lane, s, info) => {
 };
 
 // ---- design 092 ground-rock-steel -------------------------------------------------------
+
+/** How far a bubble's light and shade crescents are thrown off its centre, × its radius. */
+const BUBBLE_CRESCENT = 0.11;
+
+/**
+ * The light on a 'bubble' shade, lit from the upper left as the board is: a lit crescent along its
+ * upper-left rim, its lower-right rim in shade and a specular arc inside the lit side, so a sphere
+ * of energy reads as a ball rather than a disc. Each crescent is the circle less itself thrown
+ * toward the far side, so it tapers to nothing at both ends.
+ */
+const bubbleLights = (ctx, x, y, r, palette, alpha) => {
+  if (!(r > 0) || !(alpha > 0)) return;
+  const deg = (d) => (d * Math.PI) / 180;
+  const s = BUBBLE_CRESCENT * r;
+  const crescent = (rgb, a, from, to, sx, sy) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, deg(from), deg(to));
+    ctx.arc(x + sx, y + sy, r, deg(to), deg(from), true);
+    ctx.closePath();
+    ctx.fillStyle = rgbCss(rgb, a);
+    ctx.fill();
+  };
+  crescent(palette.hot, 0.5 * alpha, 135, 315, s, s);
+  crescent(palette.deep, 0.32 * alpha, -45, 135, -s, -s);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgbCss(palette.core, 0.85 * alpha);
+  ctx.lineWidth = Math.max(1, r * 0.055);
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.72, deg(200), deg(245));
+  ctx.stroke();
+};
 
 /** Where a monolith stands: its foot `back` h up the screen from its card's centre. */
 export const monolithBase = (lane, p) => {

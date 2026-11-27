@@ -347,8 +347,9 @@ function rockKit(palette) {
     palette,
     // The vignette's tint: a slate-black kept local to a card.
     shade: Object.freeze([22, 24, 30]),
-    // Stone dust: the recipe's "smoke = dust", greyed to the stone.
-    smoke: Object.freeze([150, 146, 138]),
+    // Stone dust: the recipe's "smoke = dust", greyed to the stone; design 092 ground-rock-steel: a
+    // beat tint's `dust` colours it.
+    smoke: palette.dust ?? Object.freeze([150, 146, 138]),
     particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
     glow: haloOf(palette),
     body: rockBody,

@@ -296,7 +296,8 @@ const BASE_DRAWER_PARAMS = {
   },
   shade: {
     ...ANCHORED('defender'),
-    kind: ['enum', ['disc', 'dome', 'giant', 'sphere'], 'disc'],
+    // design 092 ground-rock-steel: 'bubble', a sphere lit from the upper left (move-drawers.js).
+    kind: ['enum', ['disc', 'dome', 'giant', 'sphere', 'bubble'], 'disc'],
     r: ['num', 0.3, 2, 0.9],
     fill: ['enum', ['deep', 'body', 'hot', 'core'], 'deep'],
     fillAlpha: ['num', 0, 1, 1],

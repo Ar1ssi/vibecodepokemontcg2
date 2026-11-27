@@ -26,6 +26,10 @@ const SAND = tint('#4D380A', '#A27033', '#D8B070', '#F2E2B8');
 const CHROME = tint('#2A2433', '#8E8A99', '#D9D8E0', '#FFFFFF');
 const JADE = tint('#1E3A36', '#4F857B', '#8FD0C6', '#E0FFF8');
 const MOLTEN = tint('#962165', '#D0567E', '#FFB870', '#FFE8C8');
+// Dust colours (the `dust` tint key, design 092 ground-rock-steel): Sandblast's golden sand,
+// Quake's olive dust, sampled from their clips.
+const SAND_DUST = Object.freeze({ ...SAND, dust: '#C08A40' });
+const OLIVE_DUST = Object.freeze({ dust: '#8C7448' });
 
 const spec = (over) => Object.freeze({ tier: 'S', pad: 1.9, grain: 0.1, ...over });
 
@@ -79,22 +83,22 @@ export const maxQuake = spec({
   defender: { motion: 'sink', params: { heat: 0.35 } },
   tint: DYNAMAX,
   beats: [
-    { at: 0, until: 420, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.0 } },
+    { at: 0, until: 420, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.0, tint: OLIVE_DUST } },
     { at: 60, until: 460, layer: 'front', drawer: 'shards', params: { target: 'attacker', count: 8, arc: 150, distance: 0.7, spin: 300 } },
     // The dust wave rolls down the lane onto the struck card.
-    dust(200, 700, 'attacker', 0.05),
-    dust(330, 830, 'attacker', 0.45),
-    dust(460, 960, 'defender', -0.3),
+    dust(200, 700, 'attacker', 0.05, { tint: OLIVE_DUST }),
+    dust(330, 830, 'attacker', 0.45, { tint: OLIVE_DUST }),
+    dust(460, 960, 'defender', -0.3, { tint: OLIVE_DUST }),
     { at: 680, until: 2000, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.42 } },
     // Dynamax energy gathers under it; the shock dome swells round it as the earth heaves.
     { at: 680, until: 1120, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 5, alpha: 0.6, r0: 0.7, r1: 1.0, tint: DYNAMAX } },
-    { at: 980, until: 1750, layer: 'front', drawer: 'shade', params: { kind: 'sphere', r: 1.0, fill: 'body', fillAlpha: 0.16, rimAlpha: 1, swirl: 40, tint: DYNAMAX } },
+    { at: 980, until: 1750, layer: 'front', drawer: 'shade', params: { kind: 'bubble', r: 1.0, fill: 'body', fillAlpha: 0.16, rimAlpha: 1, swirl: 40, tint: DYNAMAX } },
     { at: 1000, until: 1700, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 3, alpha: 0.7, r0: 0.9, r1: 1.25, tint: DYNAMAX } },
     flash(1050, SPARK_GOLD),
     { at: 1050, until: 1650, layer: 'back', drawer: 'pillar', params: { height: 1.6, w: 0.6 } },
     { at: 1050, until: 1900, layer: 'back', drawer: 'terrain', params: { kind: 'crack', radius: 1.0 } },
     { at: 1050, until: 1600, layer: 'front', drawer: 'terrain', params: { kind: 'quake', amp: 0.05 } },
-    dust(1300, 2300, 'defender', 0, { count: 6, radius: 0.32, alpha: 0.45 }),
+    dust(1300, 2300, 'defender', 0, { count: 6, radius: 0.32, alpha: 0.45, tint: OLIVE_DUST }),
   ],
   particles: [burst({ at: 80, count: 10, distance: 0.7, spread: 160 })],
 });
@@ -116,20 +120,20 @@ export const gMaxSandblast = spec({
   defender: { motion: 'sink', params: { heat: 0.3 } },
   tint: SAND,
   beats: [
-    { at: 0, until: 500, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.1 } },
-    dust(40, 700, 'attacker', 0, { count: 5, radius: 0.3, alpha: 0.5 }),
-    dust(300, 800, 'attacker', 0.45),
-    dust(430, 930, 'defender', -0.3),
+    { at: 0, until: 500, layer: 'back', drawer: 'terrain', params: { target: 'attacker', kind: 'dust', radius: 1.1, tint: SAND_DUST } },
+    dust(40, 700, 'attacker', 0, { count: 5, radius: 0.3, alpha: 0.5, tint: SAND_DUST }),
+    dust(300, 800, 'attacker', 0.45, { tint: SAND_DUST }),
+    dust(430, 930, 'defender', -0.3, { tint: SAND_DUST }),
     { at: 680, until: 2300, layer: 'back', drawer: 'vignette', params: { maxAlpha: 0.38 } },
     { at: 700, until: 1100, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 4, alpha: 0.5, r0: 0.7, r1: 1.0, tint: DYNAMAX } },
     // The sand tornado: rocks whirl up round the card inside a rising column of sand.
     { at: 820, until: 2000, layer: 'front', drawer: 'spiral', params: { turns: 2.5, r0: 0.3, r1: 0.95, rpm: 150, tongues: 10, tint: SAND } },
-    dust(860, 2200, 'defender', 0, { count: 8, radius: 0.34, drift: 0.5, alpha: 0.5 }),
+    dust(860, 2200, 'defender', 0, { count: 8, radius: 0.34, drift: 0.5, alpha: 0.5, tint: SAND_DUST }),
     flash(1050, SAND),
     { at: 1050, until: 1550, layer: 'front', drawer: 'terrain', params: { kind: 'quake', amp: 0.04 } },
     // It settles into a whirlpool of sand round the card.
-    { at: 1450, until: 2500, layer: 'back', drawer: 'terrain', params: { kind: 'wave', radius: 1.2, tint: SAND } },
-    { at: 1450, until: 2500, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.2 } },
+    { at: 1450, until: 2500, layer: 'back', drawer: 'terrain', params: { kind: 'wave', radius: 1.2, tint: SAND_DUST } },
+    { at: 1450, until: 2500, layer: 'back', drawer: 'terrain', params: { kind: 'dust', radius: 1.2, tint: SAND_DUST } },
   ],
   particles: [burst({ at: 60, count: 12, distance: 0.8, spread: 220 })],
 });
@@ -298,7 +302,7 @@ export const gMaxMeltdown = spec({
   tint: MOLTEN,
   beats: spikeFrame(1050, CHROME, [
     // The molten sphere swells round the struck card before the spikes break through it.
-    { at: 600, until: 1400, layer: 'front', drawer: 'shade', params: { kind: 'sphere', r: 0.85, fill: 'hot', fillAlpha: 0.32, rimAlpha: 1, swirl: 60, tint: MOLTEN } },
+    { at: 600, until: 1400, layer: 'front', drawer: 'shade', params: { kind: 'bubble', r: 0.85, fill: 'hot', fillAlpha: 0.32, rimAlpha: 1, swirl: 60, tint: MOLTEN } },
     { at: 650, until: 1500, layer: 'back', drawer: 'aura', params: { target: 'defender', hz: 2, alpha: 0.7, r0: 0.8, r1: 1.1, tint: MOLTEN } },
   ]),
   particles: [STEEL_SPARKS],
