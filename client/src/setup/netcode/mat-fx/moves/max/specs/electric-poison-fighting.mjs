@@ -270,7 +270,9 @@ export const maxKnuckle = fistSpec({ id: 'max-knuckle', name: 'Max Knuckle', fis
 // dark brown-red with a molten orange rim; a gold burst of shards and rock slabs, a gold crater,
 // tan dust rolling off it.
 // Sampled: fist #921701 / #6B0E09 / #481630, rim #BA6C02 / #BA6104, dust #B08B63 / #BBB86C.
-const CHI_FIST = Object.freeze({ deep: '#2A0C06', body: '#6E2A12', hot: '#F09030', core: '#FFD8A0' });
+// A core darker than its hot makes it a dark fist (_units.js isDarkFistPalette): lit by red-brown,
+// the orange only on its molten rim.
+const CHI_FIST = Object.freeze({ deep: '#22080A', body: '#5E1A0E', hot: '#F08A2A', core: '#A0402A' });
 const CHI_BLAST = Object.freeze({ deep: '#8A4A16', body: '#E0A030', hot: '#FFE48A', core: '#FFF8DC' });
 
 export const gMaxChiStrike = fistSpec({ id: 'g-max-chi-strike', name: 'G-Max Chi Strike', fist: CHI_FIST, blast: CHI_BLAST });
@@ -279,7 +281,8 @@ export const gMaxChiStrike = fistSpec({ id: 'g-max-chi-strike', name: 'G-Max Chi
 
 // G-Max One Blow (Coup Final G-Max): Urshifu gathers crimson energy in its fist and punches; a
 // spiky gold-orange impact star bursts at the fist and a comet streaks across the field onto the
-// target; a translucent crimson dome closes over it, slashes flashing inside; crimson fog.
+// target; a translucent crimson dome (a glass shell: bright rim, gloss, thin haze) closes over it, slashes
+// flashing inside.
 // Sampled: star #FDFF09 / #F5B607 / #E57004, dome #CD0004 / #D4001E / #8B0001, magenta #D90081.
 const URSHIFU_RED = Object.freeze({ deep: '#5A0008', body: '#D0101E', hot: '#FF4A8A', core: '#FFC8D0' });
 const DOME_RED = Object.freeze({ deep: '#69000A', body: '#D4001E', hot: '#FF3A6E', core: '#FFC8D0' });
@@ -313,7 +316,7 @@ export const gMaxOneBlow = Object.freeze({
     { at: 760, until: 1130, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.14, r1: 0.2, tongues: 4, ease: 'in', tint: STAR_GOLD } },
     flash(1100, STAR_GOLD),
     { at: 1080, until: 1400, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.0, spin: 300, tint: URSHIFU_RED } },
-    { at: 1120, until: 2300, layer: 'back', drawer: 'shade', params: { kind: 'dome', r: 1.1, fill: 'body', fillAlpha: 0.14, rimAlpha: 1, swirl: 90, tint: DOME_RED } },
+    { at: 1120, until: 2300, layer: 'front', drawer: 'darkDome', params: { r: 0.8, grow: 0.12, arcs: 0.12, ink: 0.3, end: 'fade', tint: DOME_RED } },
     { at: 1250, until: 1900, layer: 'top', drawer: 'slashArc', params: { count: 3, sweep: 110, radius: 0.75, gapDeg: 35, angle: 35, thick: 0.16, tint: URSHIFU_RED } },
   ],
   particles: [sparks(1100, 10), motes(1400, 6, { spread: 160 })],
