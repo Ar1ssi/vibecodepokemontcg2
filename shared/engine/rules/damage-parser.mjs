@@ -476,6 +476,8 @@ export function parseAttackDamage(
   } else if (
     text &&
     discardEnergyScaling(attack?.text) &&
+    // customhb Dragapult ex Phantom Dive: the discard count scales the counters, not the damage.
+    !discardScalesCounters(attack?.text) &&
     // Electivire Discharge: the discard sets the coin count; the heads scale the damage.
     // (timesAsForEach has already rewritten "times the number of heads" to "for each heads").
     !/damage (?:times the number of|for each) heads/.test(text)
@@ -2108,6 +2110,16 @@ function discardEnergyGroups(text) {
     basicOnly: Boolean(all[1]),
     all: true,
   };
+}
+
+/**
+ * "You may discard any amount of Energy from this Pokémon. For each Energy card discarded in
+ * this way, put 2 damage counters on …" — the count multiplies the counters placed
+ * (attack-effect.mjs), and the printed damage stays flat.
+ */
+export function discardScalesCounters(attackText) {
+  const t = String(attackText || '').replace(/[‘’]/g, "'");
+  return /for each (?:basic )?(?:\{[A-Z]\} )?(?:energy )?(?:cards? )?(?:you )?discard(?:ed)?\b[^.,]*,\s*(?:put|place) \d+ damage counters?/i.test(t);
 }
 
 export function discardEnergyScaling(attackText) {

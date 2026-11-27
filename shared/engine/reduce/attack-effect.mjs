@@ -12,7 +12,7 @@ import { computeAttackDamage } from '../rules/attack-engine.mjs';
 import {
   drawCount, parseAttackDamage, allBenchDamage, eachPokemonDamage, ownBenchDamage,
   computedCounterClause, targetClauseGate, parseAttackSearchClause, parsePrizeOnKo,
-  prizeFilterMatches, discardEnergyScaling, deckMillScaling, deckRevealScaling,
+  prizeFilterMatches, discardEnergyScaling, discardScalesCounters, deckMillScaling, deckRevealScaling,
   attachDiscardToBenchSpread, returnEnergyBonusClause,
 } from '../rules/damage-parser.mjs';
 import { optionalCostBonusClause } from '../rules/optional-cost-bonus.mjs';
@@ -1469,6 +1469,17 @@ export function resolveAttackEffectPhase(draft, ctx) {
       // Bronzong BREAK Metal Rain: one 30-damage pick per Energy card the discard paid.
       if (attackTarget?.remainingFromDiscard) {
         attackTarget = energyDiscarded > 0 ? { ...attackTarget, remaining: energyDiscarded } : null;
+      }
+      // customhb Dragapult ex Phantom Dive: "For each Energy card discarded in this way, put 2
+      // damage counters on …" — none discarded, none placed.
+      if (attackTarget?.kind === 'counters' && discardScaling && discardScalesCounters(attack.text)) {
+        const discarded = energyDiscarded || 0;
+        attackTarget =
+          discarded === 0
+            ? null
+            : attackTarget.distributable
+              ? { ...attackTarget, remaining: attackTarget.remaining * discarded }
+              : { ...attackTarget, amount: attackTarget.amount * discarded };
       }
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
