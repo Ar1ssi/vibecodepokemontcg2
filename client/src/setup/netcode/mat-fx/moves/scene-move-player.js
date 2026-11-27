@@ -34,6 +34,8 @@ const isSourceOver = (beat) =>
   beat.drawer === 'vignette' ||
   beat.drawer === 'smoke' ||
   beat.drawer === 'shade' ||
+  // design 092 ground-rock-steel: a slab of stone is matter.
+  beat.drawer === 'monolith' ||
   (beat.drawer === 'terrain' && beat.params.kind === 'crack');
 
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });

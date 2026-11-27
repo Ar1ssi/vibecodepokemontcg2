@@ -57,6 +57,8 @@ import {
   vignettePose,
   volleyPose,
 } from './move-poses.mjs';
+// design 092 ground-rock-steel
+import { monolithPose } from './max/ground-rock-steel-poses.mjs';
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
@@ -907,6 +909,65 @@ const grip = (ctx, lane, s, info) => {
   }
 };
 
+// ---- design 092 ground-rock-steel -------------------------------------------------------
+
+/** Where a monolith stands: its foot `back` h up the screen from its card's centre. */
+export const monolithBase = (lane, p) => {
+  const c = centreOf(lane, p.target);
+  return { x: c.x, y: c.y - (Number(p.back) || 0) * lane.h };
+};
+
+/**
+ * The monolith's outline about its foot (0, 0), rising up the screen: a slab with a flat-ish top,
+ * one shoulder chipped, a little wider at the foot. `w`, `tall` px.
+ */
+export const monolithOutline = (w, tall) => [
+  [-0.5 * w, 0],
+  [-0.47 * w, -0.62 * tall],
+  [-0.34 * w, -0.95 * tall],
+  [0.08 * w, -tall],
+  [0.4 * w, -0.86 * tall],
+  [0.47 * w, -0.4 * tall],
+  [0.5 * w, 0],
+];
+
+/**
+ * The canvas monolith (the earth kit draws it as a real stone on the board): a slab lit on its
+ * left face, its right face in shadow and a darker outline, falling onto its foot, with a shadow
+ * on the cloth that tightens and darkens as it nears.
+ */
+const monolith = (ctx, lane, s, info) => {
+  const pose = monolithPose(s, lane.h, poseParams(info));
+  if (!(pose.alpha > 0)) return;
+  const { palette } = info.material;
+  const base = monolithBase(lane, info.params);
+  const spread = 1 + 0.6 * (1 - pose.shadow);
+  ctx.fillStyle = rgbCss(palette.deep, 0.4 * pose.shadow * pose.alpha);
+  ctx.beginPath();
+  ctx.ellipse(base.x, base.y, pose.w * 0.6 * spread, pose.w * 0.22 * spread, 0, 0, TAU);
+  ctx.fill();
+  const visible = Math.max(0, pose.tall - pose.sink) * pose.scale;
+  if (!(visible > 0)) return;
+  ctx.save();
+  ctx.translate(base.x, base.y - pose.height);
+  ctx.rotate((pose.lean * Math.PI) / 180);
+  const w = pose.w * pose.scale;
+  const points = monolithOutline(w, visible);
+  const lit = ctx.createLinearGradient(-0.5 * w, -visible, 0.5 * w, 0);
+  lit.addColorStop(0, rgbCss(palette.hot, pose.alpha));
+  lit.addColorStop(0.45, rgbCss(palette.body, pose.alpha));
+  lit.addColorStop(1, rgbCss(palette.deep, pose.alpha));
+  ctx.fillStyle = lit;
+  ctx.beginPath();
+  points.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = rgbCss(palette.deep, pose.alpha);
+  ctx.lineWidth = Math.max(1, lane.h * 0.015);
+  ctx.stroke();
+  ctx.restore();
+};
+
 /** `draw` with its whole beat burning away from `fromOf(params)` of its progress. */
 const burning = (draw, fromOf) => (ctx, lane, s, info) =>
   burnOut(ctx, dissolveTail(s, fromOf(info.params)), () => draw(ctx, lane, s, info));
@@ -968,6 +1029,8 @@ const IMPLEMENTATIONS = {
   // the shafts (light) fade whole.
   hoopCoil: elementable('hoopCoil', hoopCoil),
   skyColumn: elementable('skyColumn', skyColumn),
+  // design 092 ground-rock-steel: the slab stands on its foot and falls out of the air onto it.
+  monolith: lifted(elementable('monolith', monolith), (lane, p) => standOn(monolithBase(lane, p))),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
