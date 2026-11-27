@@ -1027,6 +1027,8 @@ export function parseAttackEnergyDiscard(attack) {
   // "You may discard … If you do, <effect>" (Hydreigon Dark Destruction) is an optional step whose
   // cost gates the effect (attack-steps.mjs).
   if (/^you may discard\b/.test(sentence) && /\bif you do, (?!this attack does)/.test(t)) return null;
+  // "… from this Pokémon and your opponent's Active Pokémon" is atkDiscardBothActiveEnergy's.
+  if (/\bthis pok[ée]mon and your opponent's active pok[ée]mon\b/.test(sentence)) return null;
 
   // "Discard all Energy from this Pokémon" / "Discard all Energy attached to this Pokémon"
   if (/discard all energy (?:attached to|from) this pok[ée]mon/i.test(sentence)) {
