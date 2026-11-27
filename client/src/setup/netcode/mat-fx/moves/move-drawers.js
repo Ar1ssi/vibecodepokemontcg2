@@ -56,6 +56,8 @@ import {
   vignettePose,
   volleyPose,
 } from './move-poses.mjs';
+// design 092 grass-bug-flying
+import { prop, tornado, vine } from './max/max-drawers-gbf.js';
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
@@ -963,6 +965,11 @@ const IMPLEMENTATIONS = {
   chain: elementable('chain', chain),
   // The glove comes down out of the air.
   grip: lifted(elementable('grip', grip), fromSky),
+  // design 092 grass-bug-flying: each lifts itself (props stand off their feet, the vines and the
+  // tube travel at chest height).
+  prop: elementable('prop', prop),
+  vine: elementable('vine', vine),
+  tornado: elementable('tornado', tornado),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */

@@ -34,7 +34,10 @@ const isSourceOver = (beat) =>
   beat.drawer === 'vignette' ||
   beat.drawer === 'smoke' ||
   beat.drawer === 'shade' ||
-  (beat.drawer === 'terrain' && beat.params.kind === 'crack');
+  (beat.drawer === 'terrain' && beat.params.kind === 'crack') ||
+  // design 092 grass-bug-flying: matter (apples, roots, plants, vines) covers what is under it.
+  beat.drawer === 'prop' ||
+  beat.drawer === 'vine';
 
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
 

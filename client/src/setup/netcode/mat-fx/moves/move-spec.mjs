@@ -65,7 +65,11 @@ const ANCHORED = (fallback = 'defender') => ({
   dy: ['num', -2, 2, 0],
 });
 /** Design 065 § New pieces C: the bodies a travelling / orbiting drawer can draw (materials/_units.js). */
-export const UNIT_NAMES = Object.freeze(['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+export const UNIT_NAMES = Object.freeze([
+  'body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel',
+  // design 092 grass-bug-flying
+  'butterfly',
+]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 
 const BASE_DRAWER_PARAMS = {
@@ -290,6 +294,32 @@ const BASE_DRAWER_PARAMS = {
   grip: {
     size: ['num', 0.5, 2, 1.2],
   },
+  // design 092 grass-bug-flying: giant apples / roots / plants rising round the defender, Venusaur's
+  // lashing vines, the horizontal tornado tube (moves/max/max-props.mjs, max-drawers-gbf.js).
+  prop: {
+    ...ANCHORED('defender'),
+    kind: ['enum', ['apple', 'root', 'mushroom', 'dome'], 'apple'],
+    count: ['int', 1, 6, 3],
+    size: ['num', 0.2, 1.4, 0.6],
+    spread: ['num', 0.4, 1.6, 0.85],
+    arc: ['pair', -360, 540, [150, 390]],
+    grow: ['num', 0.05, 0.6, 0.22],
+    stagger: ['num', 0, 0.2, 0.06],
+    sink: ['num', 0.05, 0.6, 0.24],
+    tilt: ['num', 0, 40, 0],
+    grass: ['enum', [false, true], false],
+  },
+  vine: {
+    whipAt: ['num', 0.2, 0.7, 0.45],
+    retract: ['num', 0.1, 0.5, 0.3],
+  },
+  tornado: {
+    w: ['num', 0.2, 1.2, 0.55],
+    rpm: ['num', 30, 600, 300],
+    rings: ['int', 3, 14, 9],
+    growIn: ['num', 0.1, 0.6, 0.35],
+    retract: ['num', 0.1, 0.5, 0.3],
+  },
 };
 
 /**
@@ -349,6 +379,13 @@ export function tonguesAt(drawer, params) {
       return p.count * p.tongues;
     case 'bolt':
       return p.count * (1 + p.branches);
+    // design 092 grass-bug-flying
+    case 'prop':
+      return p.count;
+    case 'vine':
+      return 2;
+    case 'tornado':
+      return p.rings;
     default:
       return 0;
   }
