@@ -18,3 +18,8 @@ test('every Max / G-Max spec is valid, tier S, keyed by its id, and matches its 
 test('the registry is frozen', () => {
   assert.ok(Object.isFrozen(MAX_SPECS));
 });
+
+test('every Max and G-Max Move of the catalogue has shipped its spec', () => {
+  const missing = Object.keys(MAX_MOVES).filter((id) => !Object.hasOwn(MAX_SPECS, id));
+  assert.deepEqual(missing, []);
+});
