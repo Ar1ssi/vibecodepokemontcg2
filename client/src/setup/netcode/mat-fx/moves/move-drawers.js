@@ -66,7 +66,7 @@ import { monolithPose } from './max/ground-rock-steel-poses.mjs';
 import { prop, tornado, vine } from './max/max-drawers-gbf.js';
 // design 092 water-ice
 import { alphaOf, dissolveOf, elementsLive, emit, rgb01, stageAngle, stageLen, stageOf } from './elements/_emit.js';
-import { auroraVeilPose, surgeStonesPose } from './max/water-ice-poses.mjs';
+import { auroraVeilPose, chiCrescentPose, splashCrownPose, surgeStonesPose } from './max/water-ice-poses.mjs';
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
@@ -1066,37 +1066,79 @@ const canvasStone = (ctx, palette, x, y, stone, seed) => {
   ctx.fill();
 };
 
+/** Ice's hard corner glints (the crystal kit's sparkle): white, the one place ice passes 1.0. */
+const ICE_GLINT_TEXTURE = 'T_VFX_Star_Bright_2x2.webp';
+const ICE_GLINT = Object.freeze([1.8, 1.9, 2.0]);
+
 /**
- * Stones (Stonesurge) or frosted boulders (Resonance, `from` 'sky', with gloss and smooth) as real
- * tumbling 3-D stones on the GL layer, each standing on its own ground point round the target, so
- * what flies above it rises off the cloth and what stands throws its shadow at its foot.
+ * An ice stone's dressing on the GL layer: a refracting skin round the faceted body (ice is
+ * translucent: it bends the board behind it) and hard white glints at two corners that catch the
+ * light in turn. Ice never glows from inside, so there is no halo.
+ */
+const frostSkin = (ctx, palette, at, size, alpha, frost, seed, time) => {
+  // Tight to the body: a looser skin read as a soap bubble round a stone.
+  emit(ctx, 'waterDrop', {
+    at,
+    radius: size * 1.02,
+    alpha: alpha * 0.6 * frost,
+    seed,
+    dissolve: dissolveOf(ctx),
+    palette: { deep: rgb01(palette.deep), body: rgb01(palette.body), hot: rgb01(palette.hot) },
+  });
+  for (let k = 0; k < 2; k += 1) {
+    const flicker = Math.sin(time * 7 + seed * 2.3 + k * 2.6) > 0.1 ? 1 : 0.25;
+    const corner = k === 0 ? [-0.55, -0.6] : [0.5, 0.35];
+    emit(ctx, 'sprite', {
+      texture: ICE_GLINT_TEXTURE,
+      at: { x: at.x + corner[0] * size, y: at.y + corner[1] * size, z: at.z + size * 0.6 },
+      size: size * (k === 0 ? 1.25 : 0.75),
+      rotation: seed * 40,
+      frame: Math.floor(seed * 7) + k,
+      colour: ICE_GLINT,
+      alpha: alpha * frost * flicker,
+    });
+  }
+};
+
+/**
+ * Stones (Stonesurge) or ice boulders (Resonance, `from` 'sky', `frost` 1) as real tumbling 3-D
+ * stones on the GL layer, each standing on its own ground point round the target, so what flies
+ * above it rises off the cloth and what stands throws its shadow at its foot. Frost makes a stone
+ * ice: a translucent faceted body with a pale Fresnel rim, a refracting skin and corner glints.
  */
 const surgeStones = (ctx, lane, s, info) => {
   const p = info.params;
   const c = centreOf(lane, p.target);
   const { palette } = info.material;
+  const frost = p.frost ?? 0;
   surgeStonesPose(s, lane.h, info.seed, p).forEach((stone, index) => {
     if (!(stone.alpha > 0) || !(stone.size > 0)) return;
     ctx.fxLift = standOn({ x: c.x + stone.gx, y: c.y + stone.gy });
     const x = c.x + stone.x;
     const y = c.y + stone.y;
     const seed = info.seed + index * 1.37;
+    const at = elementsLive(ctx) ? stageOf(ctx, x, y) : null;
+    const size = at ? stageLen(ctx, stone.size) : 0;
+    const alpha = at ? alphaOf(ctx, stone.alpha) : 0;
     const drawn =
-      elementsLive(ctx) &&
+      Boolean(at) &&
       emit(ctx, 'debris', {
-        at: stageOf(ctx, x, y),
-        size: stageLen(ctx, stone.size),
+        at,
+        size,
         stretch: stone.stretch,
         headingDeg: stageAngle(ctx, stone.headingDeg),
         spin: stone.spin,
-        alpha: alphaOf(ctx, stone.alpha),
+        // Ice is translucent: its body lets a little of the board through.
+        alpha: alpha * (1 - 0.25 * frost),
         seed,
         colour: rgb01(palette.body, 1),
-        light: rgb01(palette.hot, 1.1),
+        light: rgb01(palette.hot, 1.1 + 0.4 * frost),
+        // The spec's own gloss: a fully glossy stone reflects the sky and reads as chrome, not ice.
         gloss: p.gloss,
-        smooth: p.smooth,
+        smooth: p.smooth * (1 - 0.7 * frost),
         dissolve: dissolveOf(ctx),
       });
+    if (drawn && frost > 0) frostSkin(ctx, palette, at, size, alpha, frost, seed, info.time ?? 0);
     if (!drawn) canvasStone(ctx, palette, x, y, stone, seed);
   });
 };
@@ -1144,6 +1186,126 @@ const auroraVeil = (ctx, lane, s, info) => {
         ctx.lineTo(footX + sway(v) + half, footY - v * curtain.height);
       }
       ctx.closePath();
+      ctx.fill();
+    }
+  }
+};
+
+// The water kit's crown flipbook (four frames from a chunky mass to scattered drops), its splash
+// lying along each frame's width from the left: turned to a plume's heading, the mass leaves its base.
+const CROWN_TEXTURE = 'TEX_VFX_Splash_Water_1x4.webp';
+/** A crown frame is four times as wide as it is tall; its splash starts this far in from the left. */
+const CROWN_FRAME_ASPECT = 0.25;
+const CROWN_BASE = 0.06;
+/** The light comes from the upper left: the lit sheet sits that way of the water sheet (card heights). */
+const CROWN_LIGHT = Object.freeze([-0.04, -0.06]);
+
+/** Light-blue foam, never white: `palette.hot` softened toward a pale tint. */
+const foamOf = (palette) => rgb01(palette.hot, 1).map((v) => 0.55 * v + 0.38);
+
+/**
+ * The geyser crown erupting out of the struck card: plumes of the water kit's crown flipbook, 2-3
+ * card heights tall, rising off the card's near edge and stood per the beat lifts, each a darker
+ * water sheet with a lit light-blue sheet over it toward the light (matter: it covers, never
+ * adds), stepping from a chunky mass to scattered drops; real water drops are thrown off its top
+ * and fall. It fades cleanly. On a 2D context each plume is the material's own stream.
+ */
+const splashCrown = (ctx, lane, s, info) => {
+  const p = info.params;
+  const c = centreOf(lane, p.target);
+  const base = { x: c.x, y: c.y + 0.5 * lane.h };
+  const pose = splashCrownPose(s, lane.h, info.seed, p);
+  const { palette } = info.material;
+  ctx.fxLift = standOn(base);
+  const live = elementsLive(ctx);
+  const water = rgb01(palette.body, 0.85);
+  const foam = foamOf(palette);
+  for (const plume of pose.plumes) {
+    if (!(plume.alpha > 0) || !(plume.rise > 1)) continue;
+    if (!live) {
+      drawTongueAt(ctx, info, base.x, base.y, plume.headingDeg, plume.rise, plume.width * 0.5, plume.index * 2.3, { alpha: plume.alpha });
+      continue;
+    }
+    const a = (plume.headingDeg * Math.PI) / 180;
+    // The quad is the whole frame: its splash runs from CROWN_BASE of its length to the far end.
+    const length = plume.rise / (1 - CROWN_BASE);
+    const mid = length * (0.5 - CROWN_BASE);
+    const centre = { x: base.x + Math.cos(a) * mid, y: base.y + Math.sin(a) * mid };
+    const size = stageLen(ctx, length);
+    // The frame's own aspect, widened so the plume is `width` across (the splash fills half a frame).
+    const aspect = Math.max(CROWN_FRAME_ASPECT, (plume.width / length) * 2);
+    const rotation = stageAngle(ctx, plume.headingDeg);
+    const sheet = (dx, dy, colour, alpha) =>
+      emit(ctx, 'sprite', {
+        texture: CROWN_TEXTURE,
+        at: stageOf(ctx, centre.x + dx * lane.h, centre.y + dy * lane.h),
+        size,
+        aspect,
+        rotation,
+        frame: plume.frame,
+        colour,
+        alpha: alphaOf(ctx, alpha),
+        blend: 'over',
+      });
+    sheet(0.02, 0.03, water, plume.alpha * 0.8);
+    sheet(CROWN_LIGHT[0], CROWN_LIGHT[1], foam, plume.alpha * 0.85);
+  }
+  for (const drop of pose.drops) {
+    if (!(drop.alpha > 0)) continue;
+    if (!live) {
+      info.material.body(ctx, base.x + drop.x, base.y + drop.y, drop.r, drop.alpha, 0.6);
+      continue;
+    }
+    emit(ctx, 'waterDrop', {
+      at: stageOf(ctx, base.x + drop.x, base.y + drop.y),
+      radius: stageLen(ctx, drop.r),
+      alpha: alphaOf(ctx, drop.alpha),
+      seed: info.seed + drop.r,
+      palette: { deep: rgb01(palette.deep), body: rgb01(palette.body), hot: rgb01(palette.hot) },
+    });
+  }
+};
+
+/** A crescent's light passes, widest first: [palette key, thickness factor, alpha, shift toward the outer edge]. */
+const CRESCENT_PASSES = Object.freeze([
+  ['deep', 1.9, 0.22, 0],
+  ['body', 1, 0.62, 0.1],
+  ['hot', 0.55, 0.8, 0.45],
+  ['core', 0.16, 0.9, 0.85],
+]);
+
+/** One crescent band through `points` at `scale` of its thickness, shifted `out` of it toward its outer edge. */
+const traceCrescent = (ctx, cx, cy, points, scale, out) => {
+  ctx.beginPath();
+  points.forEach((pt, k) => {
+    const r = pt.half * (out + scale);
+    const x = cx + pt.x + pt.nx * r;
+    const y = cy + pt.y + pt.ny * r;
+    if (k === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  for (let k = points.length - 1; k >= 0; k -= 1) {
+    const pt = points[k];
+    const r = pt.half * (out - scale);
+    ctx.lineTo(cx + pt.x + pt.nx * r, cy + pt.y + pt.ny * r);
+  }
+  ctx.closePath();
+};
+
+/**
+ * Rapid Flow's crescent blades: lit bands of light sweeping round the struck card, each nested
+ * passes from a dark wide glow to a hot edge and a thin core along its outer (leading) side, so
+ * the blade has a lit edge and a shadowed inner side. They fade cleanly: no burn.
+ */
+const chiCrescent = (ctx, lane, s, info) => {
+  const c = centreOf(lane, info.params.target);
+  ctx.fxLift = burstLift(c);
+  const { palette } = info.material;
+  for (const blade of chiCrescentPose(s, lane.h, info.params)) {
+    if (!(blade.alpha > 0) || blade.points.length < 2) continue;
+    for (const [key, scale, alpha, out] of CRESCENT_PASSES) {
+      ctx.fillStyle = rgbCss(palette[key] ?? palette.hot, alpha * blade.alpha);
+      traceCrescent(ctx, c.x, c.y, blade.points, scale, out);
       ctx.fill();
     }
   }
@@ -1221,9 +1383,12 @@ const IMPLEMENTATIONS = {
   tornado: elementable('tornado', tornado),
   // design 092 electric-poison-fighting: the storm cloud hangs over the target (it lifts itself).
   stormCloud: elementable('stormCloud', stormCloud),
-  // design 092 water-ice: each stone and curtain stands on its own ground point (they lift per item).
+  // design 092 water-ice: each stone and curtain stands on its own ground point (they lift per item);
+  // the crown and the crescents set their own lifts and fade cleanly (no burn).
   surgeStones,
   auroraVeil,
+  splashCrown,
+  chiCrescent,
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
