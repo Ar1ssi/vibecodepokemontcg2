@@ -23,9 +23,35 @@ test('in a game the impact keeps each move\'s own matter: coins, berries and the
   assert.ok(kept('g-max-gold-rush').particles.some((burst) => burst.kind === 'coin'), 'coins thrown');
   assert.ok(kept('g-max-gold-rush').beats.some((beat) => beat.params?.unit === 'coin' && beat.at > 1100), 'coins rain');
   assert.ok(kept('g-max-replenish').particles.some((burst) => burst.kind === 'berry'), 'berries');
+  // The contact bursts of coins and berries ignite before contact, so the impact strip keeps them.
+  const burstOf = (id, unit) => kept(id).beats.find((beat) => beat.drawer === 'shards' && beat.params?.unit === unit);
+  assert.ok(burstOf('g-max-gold-rush', 'coin')?.at < 1100, 'coin burst at contact');
+  assert.ok(burstOf('g-max-replenish', 'berry')?.at < 1100, 'berry burst at contact');
   for (const id of ['max-flare', 'g-max-wildfire', 'g-max-centiferno', 'g-max-fireball']) {
     const after = kept(id).beats.filter((beat) => beat.until > 1100 + 300);
     assert.ok(after.some((beat) => beat.drawer === 'starFlare' || beat.drawer === 'pillar'), `${id} erupts`);
+  }
+});
+
+test('the fireball flies as an unstretched lit ball about a card height across, with a comet tail', () => {
+  const flown = FIRE_NORMAL_MAX_SPECS['g-max-fireball'].beats.filter((beat) => beat.drawer === 'projectile');
+  const ball = flown.find((beat) => beat.params.flare !== undefined && beat.params.flare !== 'none');
+  const tail = flown.find((beat) => beat !== ball);
+  assert.ok(ball && tail, 'a ball and a tail');
+  // The fire kit draws a body 1.7× its canvas radius (elements/fire.js FIRE_SCALE.body).
+  const diameter = 2 * ball.params.size * ball.params.flareCore * 1.7;
+  assert.ok(diameter >= 0.6, `ball ${diameter.toFixed(2)} card heights across`);
+  assert.equal(tail.at, ball.at);
+  assert.equal(tail.until, ball.until);
+});
+
+test('the strike crescents sweep wide round the target', () => {
+  const crescents = FIRE_NORMAL_MAX_SPECS['max-strike'].beats.filter((beat) => beat.drawer === 'slashArc');
+  assert.equal(crescents.length, 2);
+  for (const { params } of crescents) {
+    // The blade is the chord of the swept 55 % of the arc: about two card heights at this radius.
+    const chord = 2 * params.radius * Math.sin(((0.55 * params.sweep) / 2) * (Math.PI / 180));
+    assert.ok(chord >= 1.8, `chord ${chord.toFixed(2)}`);
   }
 });
 

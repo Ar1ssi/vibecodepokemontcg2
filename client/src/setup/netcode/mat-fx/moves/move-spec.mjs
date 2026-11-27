@@ -86,6 +86,8 @@ export const UNIT_NAMES = Object.freeze([
   'butterfly',
   // design 092 electric-poison-fighting: the giant Dynamax fist of Max Knuckle / G-Max Chi Strike.
   'maxFist',
+  // design 092 fire-normal: G-Max Replenish's berries.
+  'berry',
 ]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 
