@@ -1,13 +1,13 @@
 /**
  * @file The homebrew game clock (design 090). Pure; wall time comes in as `now` (ms).
- * A chess clock: each player has a 10:00 bank that runs only while that player owes the game an
+ * A chess clock: each player has an 8:00 bank that runs only while that player owes the game an
  * action (their turn, or a prompt they must answer on the opponent's turn); every turn a player
  * finishes adds 40 s and every card they play from hand adds 3 s to their bank. A bank at 0:00 loses the game (the room sends `timeOut`).
  * It runs only when the room's toggle is on and both decks hold at least one homebrew card.
  */
 
 export const HOMEBREW_SET_ID = 'customhb';
-export const CLOCK_BANK_MS = 10 * 60 * 1000;
+export const CLOCK_BANK_MS = 8 * 60 * 1000;
 export const CLOCK_INCREMENT_MS = 40 * 1000;
 export const CLOCK_PLAY_BONUS_MS = 3 * 1000;
 const PLAY_DESTINATIONS = ['active', 'bench', 'board', 'stadium'];
