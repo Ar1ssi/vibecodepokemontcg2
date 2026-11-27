@@ -1,5 +1,7 @@
 # 092: Max Move and G-Max Move animations for Pokémon VMAX
-Status: approved (user, 2026-11-27: scope via three answered questions; "split into subagents to speed it up")
+Status: built 2026-11-27 on feature/max-moves (all 51 specs, every rubric axis ≥ 4 per the forks' final rounds);
+awaiting the user's look on localhost (approved by the user: scope via three answered questions; "split into
+subagents to speed it up")
 Date: 2026-11-27 · Builds on 063 (attack scenes), 065 (signature tier S), 075/089 (scene player, VFX pass), D260 (Gigantamax entry)
 
 ## Problem
@@ -130,4 +132,34 @@ at the end of its table; new names specific to the move (coin, apple, monolith�
 - G-Max Gold Rush: glowing cracks spread under the target, a golden burst throws giant coins.
 
 ## Deviations
-(each group appends its moves' briefs and departures here at integration)
+Each spec file's header comments hold its moves' reference briefs (beats, sampled hexes). Per group, what changed
+from the plan and what was added (shared-table blocks are tagged `// design 092 <group>`):
+- **Build**: seven forks (same model as the session), each in its own worktree; the usage limit stopped six of them
+  mid-verification, resumed afterwards. Merges conflicted only in the shared tables' tail blocks (resolved by keeping
+  every group's block; drawer count 27 → 42, units + star, coin, berry, butterfly, maxFist).
+- **Contact dressing (all groups)**: in a game the TCG Live impact strips `splash`, `shards`, `smoke`, `ring`,
+  `impactFlash` beats and defender particle bursts that start at or after contact (impact-select.mjs
+  `withoutImpactBeats`; seven-frames applies the same strip). Payoff matter therefore starts 15–80 ms before
+  contact or lives in drawers the strip keeps. The first renders of Vine Lash, Geyser and Gold Rush lost their
+  bursts to this before it was found.
+- **Sky (all groups)**: `sky` anchors point up the screen for both seats (move-geometry.mjs `skyLane`, the 063/065
+  convention), so on the far seat a cloud, fist or slab from the sky passes over the attacker's card first.
+  Kept as is; Hailstorm anchors its cloud past the defender instead.
+- **fire-normal**: unit `coin`, `berry`; particle kinds `coin`, `berry` (opaque). Fireball as an unstretched ball
+  ~1.1 h; Strike/Cuddle/Replenish share one frame (Cuddle exactly, as in the game); the clip's ground cracks are
+  dropped (flat strokes on a near-overhead camera); Gold Rush's family is `burst` (its contact beat is the coins).
+- **water-ice**: drawers `surgeStones` (+ `frost`), `auroraVeil`, `splashCrown` (the crown flipbook, 2–3 h, lifts the
+  five geyser-family moves), `chiCrescent` (Rapid Flow's lit slashes). No water pillars: a column reads as glass.
+- **electric-poison-fighting**: drawer `stormCloud` (matter); unit `maxFist` (a dark palette lights it by its core:
+  Chi Strike's brown-red fist); One Blow's dome is ghost-dark-dragon's `darkDome`; Malodor plays in `mud` (poison's
+  gas is fixed violet), so its card reaction is drench.
+- **grass-bug-flying**: drawers `prop` (apple, root, mushroom, scale dome), `vine`, `tornado` (matter: lit
+  translucent sheets); unit `butterfly`. The ray burst of Overgrowth is a glow cloud (no ray fans).
+- **ground-rock-steel**: drawer `monolith` (a real stone in the earth kit); `shade` kind `bubble` (lit sphere);
+  beat tint key `dust` colours a ground/rock material's dust (Sandblast's sand; default unchanged).
+- **psychic-fairy**: drawers `hoopCoil`, `skyColumn` (straight shafts, fade whole: a dissolving glow showed grey
+  blotches); unit `star`. The lens is drawn on the GPU after the canvas, so the column stands above the card.
+- **ghost-dark-dragon**: drawers `hauntedFurniture`, `darkDome`, `darkRibbons`, `wyrmTornado`; the dome's eyes are
+  `flameJet` elements (Canvas2D draws under the GL elements).
+- **Known looks for the user's check**: the brightest contact frames (Max Strike's blade core, Volt Crash's yellow
+  dome, Finale's rings) are tinted at the contact frame only; Overgrowth/Tartness/Sweetness end on a wide pale glow.
