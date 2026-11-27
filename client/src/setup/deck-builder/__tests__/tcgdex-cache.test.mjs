@@ -195,3 +195,48 @@ test('without a store, concurrent calls for one URL share one network lookup', a
   assert.equal(network.calls.length, 1);
   assert.equal(a, b);
 });
+
+test('a stored list counts only under the custom-sets revision it was saved with; records ignore it', async () => {
+  const LIST_URL = 'http://localhost:4000/api/tcgdex/v2/en/cards?name=pikachu';
+  const store = memoryStore();
+  const calls = [];
+  let revision = 'r1';
+  const responses = { [LIST_URL]: [{ id: 'sv01-001' }], [SET_URL]: { id: 'sv01' } };
+  const fetchJson = createCachedFetchJson({
+    store,
+    now: () => 1_000_000,
+    fetchNetwork: async (url) => {
+      calls.push(url);
+      return responses[url];
+    },
+    listRevision: async () => revision,
+  });
+
+  await fetchJson(LIST_URL);
+  await fetchJson(SET_URL);
+  assert.deepEqual(await fetchJson(LIST_URL), [{ id: 'sv01-001' }]);
+  assert.equal(calls.length, 2, 'same revision: served from the store');
+
+  revision = 'r2';
+  responses[LIST_URL] = [{ id: 'sv01-001' }, { id: 'customhb-001' }];
+  assert.deepEqual(await fetchJson(LIST_URL), [{ id: 'sv01-001' }, { id: 'customhb-001' }], 'a custom set changed: refetched');
+  await fetchJson(SET_URL);
+  assert.deepEqual(calls, [LIST_URL, SET_URL, LIST_URL], 'a TCGdex set record is not tied to the custom sets');
+
+  revision = '';
+  assert.deepEqual(await fetchJson(LIST_URL), [{ id: 'sv01-001' }, { id: 'customhb-001' }]);
+  assert.equal(calls.length, 3, 'an unknown revision leaves the TTL to decide');
+});
+
+test('a list revision that fails to load never fails the request', async () => {
+  const LIST_URL = 'http://localhost:4000/api/tcgdex/v2/en/series/sv';
+  const fetchJson = createCachedFetchJson({
+    store: memoryStore(),
+    now: () => 1,
+    fetchNetwork: async () => ({ sets: 1 }),
+    listRevision: async () => {
+      throw new Error('manifest down');
+    },
+  });
+  assert.deepEqual(await fetchJson(LIST_URL), { sets: 1 });
+});

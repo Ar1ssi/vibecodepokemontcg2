@@ -85,6 +85,18 @@ export function verifyHomebrewSession(session, cards = []) {
   return session.packs.every((pack) => pack.every((id) => known.has(id)));
 }
 
+/**
+ * What the Homebrew tab does when the server reloads the set while it is open (design 075 live sets), as a page
+ * reload would: a box naming a card the set no longer has is put away; a bound box rebuilds its pool from the new
+ * cards; a box not yet resumed (the first load failed or is pending) resumes now.
+ * @returns {'none'|'putAway'|'rebuildPool'|'resume'}
+ */
+export function homebrewSetReloadAction(session, deckBound, cards = []) {
+  if (!session) return 'none';
+  if (!verifyHomebrewSession(session, cards)) return 'putAway';
+  return deckBound ? 'rebuildPool' : 'resume';
+}
+
 /** @returns {boolean} false when the session could not be stored (memory only). */
 export function saveHomebrewSession(storage, session) {
   try {

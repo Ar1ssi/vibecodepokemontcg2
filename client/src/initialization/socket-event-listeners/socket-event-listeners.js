@@ -32,7 +32,12 @@ import {
   startSpectatorSession,
 } from '../../setup/spectator/spectator-session.js';
 import { publicRoomName } from '../../../../shared/lobby/public-rooms.mjs';
-import { CUSTOM_SETS_CHANGED_EVENT, noteCustomSetsChanged } from '../../../../shared/tcgdex/custom-sets.mjs';
+import {
+  CUSTOM_SETS_CHANGED_EVENT,
+  noteCustomSetsChanged,
+  recheckCustomSets,
+} from '../../../../shared/tcgdex/custom-sets.mjs';
+import { forgetCustomCardData } from '../../../../shared/engine/rules/rules-state.mjs';
 import { seatTokenFor, writeSeatToken } from '../../setup/lobby/seat-token-store.mjs';
 import { rejectEndsSeat, roomRejectMessage } from '../../setup/lobby/public-room-view.mjs';
 import { startKeybindsSleep } from '../../actions/keybinds/keybindSleep.js';
@@ -480,10 +485,19 @@ export const initializeSocketEventListeners = () => {
     });
   });
   // The card editor pushed a custom set; the server reloaded it (design 075).
+  // Card details are forgotten first, so the panels the notice redraws read the new cards.
+  const applyCustomSetsChange = (change) => {
+    forgetCustomCardData(change?.sets);
+    return noteCustomSetsChanged(change);
+  };
   socket.on(CUSTOM_SETS_CHANGED_EVENT, (change) => {
-    noteCustomSetsChanged(change).catch((error) => console.error('custom set reload notice failed', error));
+    applyCustomSetsChange(change).catch((error) => console.error('custom set reload notice failed', error));
   });
   socket.on('connect', () => {
+    // a notice sent while this socket was down is lost: the manifest's revision says whether one was
+    recheckCustomSets()
+      .then((change) => change && applyCustomSetsChange(change))
+      .catch((error) => console.error('custom set recheck failed', error));
     const notSpectator = !isSpectatorSocket();
     if (systemState.isTwoPlayer) {
       const data = {

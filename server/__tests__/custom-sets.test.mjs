@@ -209,6 +209,27 @@ test('a live store reloads an edited set in place and reports which set changed'
   assert.equal(live.version(), 1);
 });
 
+test("a live store's manifest carries a revision that moves with any set's files and holds across restarts", () => {
+  const root = tempRoot();
+  writeSet(root, 'customhbw', sampleSet());
+  const live = createLiveCustomSets(root, { watch: false });
+  const first = live.manifest().revision;
+  assert.match(first, /^[0-9a-f]{16}$/);
+  assert.deepEqual(live.manifest().sets.map((set) => set.id), ['customhbw']);
+  assert.equal(createLiveCustomSets(root, { watch: false }).manifest().revision, first, 'a restart over the same files');
+
+  writeSet(root, 'customhbw', renamedSet('Tyranitar Prime'));
+  live.reload();
+  const renamed = live.manifest().revision;
+  assert.notEqual(renamed, first);
+
+  const art = path.join(root, 'customhbw', '001');
+  fs.mkdirSync(art);
+  fs.writeFileSync(path.join(art, 'high.webp'), 'new art');
+  live.reload();
+  assert.notEqual(live.manifest().revision, renamed, 'art alone moves it too');
+});
+
 test('a re-rendered card front alone counts as a change; a set added or removed is picked up', () => {
   const root = tempRoot();
   writeSet(root, 'customhbw', sampleSet());
@@ -336,12 +357,13 @@ test('a missing root is watched by polling until the folder appears', async () =
   }
 });
 
-test('the Homebrew set record lists its cards in display order; other sets keep set.json order', () => {
+// 862ff2ae: cardback's export sorts the Homebrew set by type itself, so the server keeps set.json order for every set
+test('every set record, the Homebrew set included, lists its cards in set.json order', () => {
   const base = sampleSet();
   const [tyranitar, bill] = base.cards;
   const larvitar = { ...tyranitar, id: 'customhbw-003', localId: '003', name: 'Larvitar', stage: 'Basic', evolveFrom: undefined, image: '/src/assets/custom-sets/customhbw/003' };
   const cardsOf = (setId) => [tyranitar, bill, larvitar].map((card) => ({ ...card, id: card.id.replace('customhbw', setId), image: card.image.replace('customhbw', setId) }));
   const store = storeOf(sampleSet({ cards: cardsOf('customhbw') }), sampleSet({ id: 'customhb', code: 'HB', cards: cardsOf('customhb') }));
   assert.deepEqual(store.setRecord('customhbw').cards.map((card) => card.name), ['Tyranitar', 'Bill', 'Larvitar']);
-  assert.deepEqual(store.setRecord('customhb').cards.map((card) => card.name), ['Larvitar', 'Bill', 'Tyranitar']);
+  assert.deepEqual(store.setRecord('customhb').cards.map((card) => card.name), ['Tyranitar', 'Bill', 'Larvitar']);
 });

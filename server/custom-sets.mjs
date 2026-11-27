@@ -202,6 +202,12 @@ export function customSetSignatures(rootDirs) {
   return signatures;
 }
 
+/** One token for every set folder's signature: it changes whenever any set's files change, across restarts too. */
+export function customSetsRevision(signatures) {
+  const lines = [...signatures].sort(([a], [b]) => a.localeCompare(b)).map(([dir, signature]) => `${dir}\0${signature}`);
+  return createHash('sha1').update(lines.join('\n')).digest('hex').slice(0, 16);
+}
+
 function changedSetDirs(before, after) {
   const dirs = new Set([...before.keys(), ...after.keys()]);
   return [...dirs].filter((dir) => before.get(dir) !== after.get(dir)).sort();
@@ -224,6 +230,7 @@ export function createLiveCustomSets(
   // signatures before the load: a write landing in between is then seen as a change by the next pass
   let signatures = customSetSignatures(rootDirs);
   let store = loadCustomSets(rootDirs, { log });
+  let revision = customSetsRevision(signatures);
   let version = 0;
   const watchers = new Set();
   let poller = null;
@@ -246,6 +253,7 @@ export function createLiveCustomSets(
     if (!changed.length) return null;
     store = loadCustomSets(rootDirs, { log, previous: store });
     signatures = next;
+    revision = customSetsRevision(signatures);
     version += 1;
     const change = { version, sets: changed };
     try {
@@ -304,7 +312,8 @@ export function createLiveCustomSets(
     card: (cardId) => store.card(cardId),
     setBriefs: () => store.setBriefs(),
     allCards: () => store.allCards(),
-    manifest: () => store.manifest(),
+    // `revision` lets a page's stored TCGdex lists (which merge custom cards) tell they predate a change
+    manifest: () => ({ ...store.manifest(), revision }),
     version: () => version,
     reload,
     close() {

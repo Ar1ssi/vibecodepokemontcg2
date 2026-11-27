@@ -10,6 +10,7 @@ import { advanceUnboxing } from '../../../setup/deck-builder/core/build-battle/u
 import {
   HOMEBREW_DECK_SIZE,
   HOMEBREW_PACK_COUNT,
+  HOMEBREW_SET_ID,
   HOMEBREW_SET_PATH,
   buildHomebrewPackModel,
   homebrewCardClass,
@@ -26,6 +27,7 @@ import {
 import {
   HOMEBREW_DECK_PREFIX,
   clearHomebrewSession,
+  homebrewSetReloadAction,
   createHomebrewSession,
   homebrewDeckName,
   loadHomebrewSession,
@@ -37,6 +39,7 @@ import { cardImage, createPoolTab, el, unlimitedEnergyCards } from './native-dec
 import { browserStorage } from './native-deck-builder-storage.js';
 import { createStage } from './native-deck-builder-stage.js';
 import { mountUnboxingScene } from './native-deck-builder-unboxing.js';
+import { onCustomSetsChanged } from '../../../../../shared/tcgdex/custom-sets.mjs';
 
 /**
  * The Packs and Pool tabs of the Homebrew Build & Battle builder tab (design 078): 30 packs of the
@@ -176,9 +179,14 @@ export const initializeHomebrewBattle = ({
     }
   };
 
+  const useLoadedSet = ({ setInfo, cards }) => {
+    loaded = { setInfo, cards, cardsById: new Map(cards.map((card) => [card.id, card])) };
+    loadError = null;
+  };
+
   loadHomebrewSet().then(
-    ({ setInfo, cards }) => {
-      loaded = { setInfo, cards, cardsById: new Map(cards.map((card) => [card.id, card])) };
+    (set) => {
+      useLoadedSet(set);
       resumeLoadedSession();
       renderAll();
     },
@@ -187,6 +195,34 @@ export const initializeHomebrewBattle = ({
       renderAll();
     }
   );
+
+  // The server reloaded the Homebrew set (the card editor rewrote it): read it again, as a page reload would.
+  // Only the newest read lands, so two quick edits never leave the older cards on screen.
+  let setReads = 0;
+  const applyReloadedSet = (set) => {
+    useLoadedSet(set);
+    const action = homebrewSetReloadAction(session, deckBound, loaded.cards);
+    if (action === 'putAway') {
+      clearHomebrewSession(storage);
+      session = null;
+      deckBound = false;
+      pool = [];
+      staleSetNote = true;
+    } else if (action === 'rebuildPool') {
+      computePool();
+    } else if (action === 'resume') {
+      resumeLoadedSession();
+    }
+    renderAll();
+  };
+  onCustomSetsChanged((notice) => {
+    if (!notice.sets.includes(HOMEBREW_SET_ID)) return;
+    const read = ++setReads;
+    loadHomebrewSet().then(
+      (set) => read === setReads && applyReloadedSet(set),
+      (error) => console.error('Homebrew set reload failed', error)
+    );
+  });
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const openBox = () => {

@@ -11,6 +11,7 @@ import {
   clearHomebrewSession,
   createHomebrewSession,
   homebrewDeckName,
+  homebrewSetReloadAction,
   loadHomebrewSession,
   parseHomebrewSession,
   saveHomebrewSession,
@@ -113,4 +114,14 @@ test('the skin is the box exterior and the packs only: no promo, no props', () =
   assert.match(look.labels.backLines[0], /^30 /);
   assert.equal(homebrewPresentation().singleExit, true);
   assert.match(homebrewPresentation().doneText, /30 packs/);
+});
+
+test('a live reload of the Homebrew set puts away a box naming a lost card, else rebuilds or resumes it', () => {
+  const cards = [{ id: 'customhb-001' }, { id: 'customhb-002' }];
+  const session = { packs: [['customhb-001'], ['customhb-002']] };
+  assert.equal(homebrewSetReloadAction(null, false, cards), 'none');
+  assert.equal(homebrewSetReloadAction(session, true, cards), 'rebuildPool');
+  assert.equal(homebrewSetReloadAction(session, false, cards), 'resume');
+  assert.equal(homebrewSetReloadAction(session, true, cards.slice(0, 1)), 'putAway');
+  assert.equal(homebrewSetReloadAction(session, true, []), 'putAway');
 });

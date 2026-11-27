@@ -7,6 +7,7 @@
     import { pokemonFormKey } from './pokemon-forms.mjs';
     import { legacyTrainerType } from './legacy-trainer-type.mjs';
     import { createCachedFetchJson } from '../../tcgdex/tcgdex-cache.mjs';
+    import { isCustomSetId } from '../../custom-sets/custom-set-schema.mjs';
     import { isReverseHoloId, tcgdexApiUrl, tcgdexLookupId } from '../../tcgdex/tcgdex-url.mjs';
     import {
       buildSetCardIdCandidates,
@@ -271,6 +272,27 @@
       } finally {
         detailInFlight.delete(id);
       }
+    }
+
+    /**
+     * Forgets this page's copies of the cards of custom sets the server reloaded (design 075 live sets), so the
+     * card details and the next game read the new text. Cards already on a board keep what they were given.
+     * @param {string[]} setIds the changed custom set ids
+     * @returns {number} how many cached cards were forgotten
+     */
+    export function forgetCustomCardData(setIds) {
+      const changed = new Set((Array.isArray(setIds) ? setIds : []).filter(isCustomSetId));
+      if (!changed.size) return 0;
+      const inChangedSet = (id) => changed.has(String(id).split('-')[0]);
+      let forgotten = 0;
+      for (const cache of [cardDetailCache, cardDataCache]) {
+        for (const id of [...cache.keys()]) {
+          if (!inChangedSet(id)) continue;
+          cache.delete(id);
+          forgotten += 1;
+        }
+      }
+      return forgotten;
     }
 
     // Deterministic id resolution for the legacy sets we have a code→set-id
