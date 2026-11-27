@@ -425,6 +425,7 @@ const BASE_DRAWER_PARAMS = {
     rings: ['int', 3, 14, 9],
     growIn: ['num', 0.1, 0.6, 0.35],
     retract: ['num', 0.1, 0.5, 0.3],
+    streak: ['enum', [false, true], false],
   },
   // ---- design 092 electric-poison-fighting: the storm cloud over the target (max/storm-cloud.mjs) ----
   stormCloud: {

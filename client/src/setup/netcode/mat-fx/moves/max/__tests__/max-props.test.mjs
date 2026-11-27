@@ -91,11 +91,21 @@ test('vine and tornado draw mid-beat and nothing out of range', () => {
   for (const [drawer, material] of [['vine', MATERIALS.petal], ['tornado', MATERIALS.flying]]) {
     const rec = recordingContext();
     DRAWERS[drawer].draw(rec.ctx, lane, 0.5, info(drawer, {}, material));
-    assert.ok(rec.calls.filter(([key]) => key === 'stroke').length > 4, drawer);
+    assert.ok(rec.calls.filter(([key]) => key === 'stroke' || key === 'fill').length > 4, drawer);
     const none = recordingContext();
     DRAWERS[drawer].draw(none.ctx, lane, 1, info(drawer, {}, material));
     assert.equal(none.calls.length, 0, drawer);
   }
+});
+
+test('the tornado draws each ring as filled sheets, and streak sheets only when asked', () => {
+  const fillsOf = (params) => {
+    const rec = recordingContext();
+    DRAWERS.tornado.draw(rec.ctx, lane, 0.55, info('tornado', { rings: 6, ...params }, MATERIALS.flying));
+    return rec.calls.filter(([key]) => key === 'fill').length;
+  };
+  assert.ok(fillsOf({}) >= 6 * 3, 'three sheets a ring');
+  assert.equal(fillsOf({ streak: true }), fillsOf({}), 'a streak recolours a sheet, it adds none');
 });
 
 test('the butterfly unit is registered, draws its wings and leaves the context balanced', () => {

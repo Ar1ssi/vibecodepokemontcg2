@@ -130,16 +130,18 @@ export const gmaxVineLash = Object.freeze({
     // The lash lands at contact: (whipAt + 0.07) × 1700 = 1000.
     { at: 0, until: 1700, layer: 'front', drawer: 'vine', params: { whipAt: 0.518, retract: 0.3, tint: PINK } },
     flash(1000, PINK),
-    // The petal explosion: petals thrown out of the struck card on the contact frame, pink light
-    // round it, more petals flying wide, then whirling as they settle.
-    { at: 1000, until: 1550, layer: 'front', drawer: 'aura', params: { target: 'defender', hz: 3, alpha: 0.9, r0: 0.75, r1: 1, tint: PINK } },
+    // The petal explosion. It erupts 80 ms before the lash lands, so it is wide on the contact frame
+    // and survives the game's impact strip (impact-select.mjs drops splash / shards dressing that
+    // starts at contact): pink light round the struck card, petal trails thrown out of it, petals
+    // spinning wide, then whirling as they settle.
+    { at: 900, until: 1500, layer: 'front', drawer: 'aura', params: { target: 'defender', hz: 3, alpha: 0.9, r0: 0.8, r1: 1.1, tint: PINK } },
     { at: 1030, until: 1700, layer: 'front', drawer: 'cloud', params: { count: 7, radius: 0.45, drift: 0.35, direction: -90, alpha: 0.75, tint: PINK } },
     { at: 1300, until: 2150, layer: 'front', drawer: 'spiral', params: { turns: 1.5, r0: 0.25, r1: 0.95, rpm: 60, tongues: 10, tint: PINK } },
-    { at: 1000, until: 1300, layer: 'front', drawer: 'splash', params: { count: 10, arc: 360, direction: -90, gravity: 0.3, len: [0.5, 0.9], stagger: 0.02, tint: PINK } },
+    { at: 920, until: 1300, layer: 'front', drawer: 'splash', params: { count: 14, arc: 360, direction: -90, gravity: 0.3, len: [0.75, 1.3], stagger: 0.012, tint: PINK } },
     // Last of the contact beats: the family rule reads the petal burst (a burst, not a splash).
-    { at: 1000, until: 1700, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, direction: -90, distance: 1.3, tint: PINK } },
+    { at: 920, until: 1650, layer: 'front', drawer: 'shards', params: { count: 10, arc: 360, direction: -90, distance: 1.5, tint: PINK } },
   ],
-  particles: [motes(1000, 14, { kind: 'leaf', gravity: 0.3, distance: 1.4, size: [0.04, 0.08], durationMs: 1000 })],
+  particles: [motes(920, 14, { kind: 'leaf', gravity: 0.3, distance: 1.5, size: [0.05, 0.09], durationMs: 1000 })],
   grain: 0.1,
 });
 
@@ -252,21 +254,24 @@ export const gmaxBefuddle = butterflyStorm({
 // ---- the tornado: Max Airstream, G-Max Wind Rage ----------------------------------------------
 
 const SILVER = Object.freeze({ deep: '#7A84A8', body: '#C5C8DE', hot: '#F1F1FF', core: '#FFFFFF' });
-/** The tube's silver rings with the clips' coloured edge: blue streaks (Airstream), crimson (Wind Rage). */
-const SILVER_BLUE = Object.freeze({ deep: '#5F85BF', body: '#B8C2E0', hot: '#E8EEFF', core: '#FFFFFF' });
-const SILVER_CRIMSON = Object.freeze({ deep: '#B9003A', body: '#C5C8DE', hot: '#F1F1FF', core: '#FFFFFF' });
+/**
+ * The tube's silver sheets; `deep` is the colour of its streak sheets, drawn over the scene (the
+ * tornado is source-over): the clips' blue streaks (Airstream), deep crimson (Wind Rage).
+ */
+const SILVER_BLUE = Object.freeze({ deep: '#4A72B8', body: '#B8C2E0', hot: '#E8EEFF', core: '#FFFFFF' });
+const SILVER_CRIMSON = Object.freeze({ deep: '#A8002E', body: '#C5C8DE', hot: '#F1F1FF', core: '#FFFFFF' });
 /** The card rim and heat while the wind blows: silver kept off white, so it never reads as a slab. */
 const GUST = Object.freeze({ deep: '#3E4C7A', body: '#6E80B8', hot: '#8EA4E0', core: '#C8D4F4' });
 const DUST = Object.freeze({ deep: '#6E6660', body: '#B8B0A8', hot: '#E0D8D0', core: '#F4F0EC' });
 const SKY_BLUE = Object.freeze({ deep: '#5F85BF', body: '#9CD3F7', hot: '#DFF4FF', core: '#FFFFFF' });
-const CRIMSON = Object.freeze({ deep: '#7A0A2E', body: '#E6014A', hot: '#FF6A96', core: '#FFD6E2' });
 
 /**
  * The tornado's frame: a silver whirlwind spins up in front of the attacker and is blown down the
- * lane as a horizontal tornado tube that engulfs the defender, a gust of `accent` slashing through
- * it, dust boiling at its foot; it unwinds from its tail.
+ * lane as a horizontal tornado tube of wind sheets, streaked in `tubeTint`'s deep colour, that
+ * engulfs the defender, dust boiling at its foot; it unwinds from its tail. `accent` (optional): a
+ * gust of light slashing through it at contact.
  */
-const tornadoStorm = ({ id, name, accent, vortexHues, tubeTint = SILVER, rim = GUST }) =>
+const tornadoStorm = ({ id, name, accent = null, tubeTint = SILVER, rim = GUST }) =>
   Object.freeze({
     id,
     name,
@@ -283,12 +288,12 @@ const tornadoStorm = ({ id, name, accent, vortexHues, tubeTint = SILVER, rim = G
     defender: { motion: 'float', params: { lift: 0.15 } },
     tint: rim,
     beats: [
-      { at: 0, until: 700, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.12, r1: 0.6, rpm: 140, tongues: 10, tint: SILVER, ...(vortexHues ? { hues: vortexHues } : {}) } },
+      { at: 0, until: 700, layer: 'front', drawer: 'spiral', params: { target: 'attacker', turns: 2, r0: 0.12, r1: 0.6, rpm: 140, tongues: 10, tint: SILVER } },
       // It reaches the defender at contact: 400 + growIn × 1500 = 1000.
-      { at: 400, until: 1900, layer: 'front', drawer: 'tornado', params: { w: 0.9, rpm: 300, rings: 11, growIn: 0.4, retract: 0.3, tint: tubeTint } },
+      { at: 400, until: 1900, layer: 'front', drawer: 'tornado', params: { w: 0.9, rpm: 300, rings: 11, growIn: 0.4, retract: 0.3, streak: true, tint: tubeTint } },
       flash(1000, SKY_BLUE),
       { at: 1100, until: 2100, layer: 'back', drawer: 'cloud', params: { count: 7, radius: 0.3, drift: 0.4, direction: -90, alpha: 0.5, tint: DUST } },
-      { at: 1000, until: 1450, layer: 'front', drawer: 'slashArc', params: { sweep: 110, radius: 0.8, count: 2, gapDeg: 40, angle: 30, thick: 0.14, tint: accent } },
+      ...(accent ? [{ at: 1000, until: 1450, layer: 'front', drawer: 'slashArc', params: { sweep: 110, radius: 0.8, count: 2, gapDeg: 40, angle: 30, thick: 0.14, tint: accent } }] : []),
       { at: 1000, until: 1800, layer: 'front', drawer: 'spiral', params: { turns: 2, r0: 0.2, r1: 1, rpm: 150, tongues: 10, tint: SILVER } },
     ],
     particles: [motes(1000, 12, { kind: 'streak', aspect: 0.4, distance: 1.3, durationMs: 700 })],
@@ -304,12 +309,11 @@ export const maxAirstream = tornadoStorm({ id: 'max-airstream', name: 'Max Airst
 
 // G-Max Wind Rage (Rafale_G-Max_EB, Corviknight → Toxicroak). As Max Airstream, in Corviknight's
 // colours: crimson energy rings wind round the whirlwind (#C90845 #C62577 @2.0 s), crimson slashes
-// cut through the silver tube (#C5C8DE #F1F1FF @4.5 s; #E6014A @4.75 s) · 5.5 s: whiteout.
+// cut through the silver tube (#C5C8DE #F1F1FF @4.5 s; #E6014A @4.75 s) · 5.5 s: whiteout. The
+// crimson is the tube's streak sheets, drawn over the scene: as added light it read pink.
 export const gmaxWindRage = tornadoStorm({
   id: 'g-max-wind-rage',
   name: 'G-Max Wind Rage',
-  accent: CRIMSON,
-  vortexHues: ['#E6014A', '#C5C8DE'],
   tubeTint: SILVER_CRIMSON,
 });
 

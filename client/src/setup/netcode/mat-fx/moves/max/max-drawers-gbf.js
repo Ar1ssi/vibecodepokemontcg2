@@ -2,10 +2,12 @@
 // `prop` and `vine` are matter — giant apples, roots and plants, Venusaur's vines — drawn
 // source-over (scene-move-player.js isSourceOver) and lit as solids: a gradient with its light
 // from the upper left (a 2D canvas shows that much), the GPU canvas's `volume` modifier for the
-// glint and the rim, and a cast shadow from the front layer. `tornado` is light: rings of wind
-// turning about the lane, drawn additively like every light beat. `butterflyUnit` is a body a
-// travelling drawer flies (materials/_units.js contract). Drawers follow move-drawers.js's rules:
-// nothing outside [0, 1), balanced save/restore, no composite changes, lifts per item.
+// glint and the rim, and a cast shadow from the front layer. `tornado` is drawn the same way: its
+// rings are translucent sheets of wind (filled crescents lit on the side toward the light, darker
+// on the far side), so its colours stay what they are over the cards instead of adding up to white
+// or pink. `butterflyUnit` is a body a travelling drawer flies (materials/_units.js contract).
+// Drawers follow move-drawers.js's rules: nothing outside [0, 1), balanced save/restore, no
+// composite changes, lifts per item.
 import { rgbCss } from '../../fx-colors.mjs';
 import { LIFT, standOn, travelLift } from '../beat-lift.mjs';
 import { lanePoint } from '../move-geometry.mjs';
@@ -414,18 +416,91 @@ const tubePoint = (lane, f, side = 0) => lanePoint(lane, f, side);
 
 /** How flat a ring looks from the board camera: a circle across the lane seen nearly from above. */
 const RING_SQUASH = 0.42;
-const ARCS = 4;
-/**
- * Each wind arc's passes, outermost first: palette key, width (h), alpha. Added over each other
- * where the rings crowd, so kept low: the tube must stay silver-blue, never sum to a white slab.
- */
-const ARC_PASSES = Object.freeze([
-  ['deep', 0.1, 0.3],
-  ['body', 0.05, 0.36],
-  ['hot', 0.018, 0.6],
-]);
+/** Crescents per ring, the arc each covers (radians), the points along each edge. */
+const BANDS = 3;
+const BAND_SWEEP = 1.55;
+const BAND_SAMPLES = 10;
+/** How far in a crescent reaches at its middle, × the ring radius (it tapers to its tips). */
+const BAND_THICK = 0.36;
+/** Where the light comes from on the stage (y down): the upper left, as every lit solid here. */
+const LIGHT = Object.freeze([-0.6, -0.8]);
+/** The shadowed side of a sheet: its body colour taken toward a cold dark. */
+const SHADOW_INK = [18, 20, 38];
+/** The sheets shaded as curved surfaces on the GPU canvas, with a little noise grain. */
+const SHEET = Object.freeze({ volume: Object.freeze({ amount: 0.45, spec: 0.35, rim: 0.4, light: 135, ambient: 0.55, bump: 0.3, bumpScale: 5, radius: 0.12 }) });
 
-/** The tornado tube (tornadoPose): air down its axis, two helix strands, and rings of wind arcs. */
+/** The point at angle `a` of a ring's ellipse round `c` (turned by `turn`), `k` of the way out. */
+const ringPoint = (c, r, turn, a, k) => {
+  const ex = Math.cos(a) * r * RING_SQUASH * k;
+  const ey = Math.sin(a) * r * k;
+  return [c.x + ex * Math.cos(turn) - ey * Math.sin(turn), c.y + ex * Math.sin(turn) + ey * Math.cos(turn)];
+};
+
+/** One crescent of a ring from `a0`: its outer edge, then its inner edge back, tapering to its tips. */
+function traceBand(ctx, c, r, turn, a0) {
+  ctx.beginPath();
+  for (let i = 0; i <= BAND_SAMPLES; i += 1) {
+    const [x, y] = ringPoint(c, r, turn, a0 + (BAND_SWEEP * i) / BAND_SAMPLES, 1);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  for (let i = BAND_SAMPLES; i >= 0; i -= 1) {
+    const u = i / BAND_SAMPLES;
+    const [x, y] = ringPoint(c, r, turn, a0 + BAND_SWEEP * u, 1 - BAND_THICK * Math.sin(Math.PI * u));
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+/**
+ * One translucent sheet of wind: lit along its outer edge on the side toward the light, its far
+ * side in shadow; a streak sheet is the palette's deep colour, nearly solid (Wind Rage's crimson,
+ * Airstream's blue), drawn over the scene so it keeps its hue.
+ */
+function drawBand(ctx, c, r, turn, a0, palette, alpha, streak) {
+  const mid = a0 + BAND_SWEEP / 2;
+  const [ox, oy] = ringPoint(c, r, turn, mid, 1);
+  const [ix, iy] = ringPoint(c, r, turn, mid, 1 - BAND_THICK);
+  const dx = ox - c.x;
+  const dy = oy - c.y;
+  const lit = 0.5 + 0.5 * ((dx * LIGHT[0] + dy * LIGHT[1]) / (Math.hypot(dx, dy) || 1));
+  const shadow = mix(palette.body, SHADOW_INK, 0.55);
+  const g = ctx.createLinearGradient(ox, oy, ix, iy);
+  if (streak) {
+    g.addColorStop(0, rgbCss(mix(palette.deep, palette.hot, 0.25 * lit), 0.8 * alpha));
+    g.addColorStop(1, rgbCss(mix(palette.deep, SHADOW_INK, 0.35), 0.7 * alpha));
+  } else {
+    g.addColorStop(0, rgbCss(mix(palette.body, palette.hot, lit), (0.35 + 0.3 * lit) * alpha));
+    g.addColorStop(0.55, rgbCss(mix(shadow, palette.body, lit), (0.25 + 0.25 * lit) * alpha));
+    g.addColorStop(1, rgbCss(shadow, 0.12 * alpha));
+  }
+  const fill = () => {
+    ctx.fillStyle = g;
+    traceBand(ctx, c, r, turn, a0);
+    ctx.fill();
+  };
+  // Only the sheets that face the light are shaded as surfaces; the far ones stay soft.
+  if (lit > 0.45 || streak) withFxMod(ctx, SHEET, fill);
+  else fill();
+  // The lit edge: a thin bright line along the outer curve of a sheet facing the light.
+  if (lit > 0.55 && !streak) {
+    ctx.strokeStyle = rgbCss(palette.core, 0.55 * (lit - 0.55) * 2.2 * alpha);
+    ctx.lineWidth = Math.max(0.75, r * 0.035);
+    ctx.beginPath();
+    for (let i = 1; i < BAND_SAMPLES; i += 1) {
+      const [x, y] = ringPoint(c, r, turn, a0 + (BAND_SWEEP * i) / BAND_SAMPLES, 1);
+      if (i === 1) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+}
+
+/**
+ * The tornado tube (tornadoPose): a faint body of air down its axis, then its rings, each a few
+ * translucent sheets of wind turning about the lane, tail first; with `streak`, every third sheet
+ * of every other ring is a streak in the palette's deep colour.
+ */
 export function tornado(ctx, lane, s, info) {
   const p = info.params;
   const pose = tornadoPose(s, lane.h, { ...p, beatMs: info.beatMs });
@@ -435,50 +510,22 @@ export function tornado(ctx, lane, s, info) {
   ctx.lineCap = 'round';
   const tail = tubePoint(lane, pose.tail);
   const head = tubePoint(lane, pose.head);
-  // The air inside the tube, so the rings read as one body: a deep core inside a paler sleeve.
-  for (const [key, width, alpha] of [
-    ['deep', 2.1, 0.08],
-    ['body', 1.2, 0.05],
-  ]) {
-    ctx.strokeStyle = rgbCss(palette[key], alpha);
-    ctx.lineWidth = pose.radius * width;
-    ctx.beginPath();
-    ctx.moveTo(tail.x, tail.y);
-    ctx.lineTo(head.x, head.y);
-    ctx.stroke();
-  }
-  // Two wind strands spiralling down it.
-  for (const strand of [0, Math.PI]) {
-    ctx.strokeStyle = rgbCss(palette.hot, 0.45);
-    ctx.lineWidth = Math.max(1, lane.h * 0.022);
-    ctx.beginPath();
-    for (let i = 0; i <= 28; i += 1) {
-      const f = pose.tail + ((pose.head - pose.tail) * i) / 28;
-      const side = Math.sin(f * 5 * TAU - pose.turns + strand) * pose.radius * (0.7 + 0.5 * f) * 0.95;
-      const at = tubePoint(lane, f, side);
-      if (i === 0) ctx.moveTo(at.x, at.y);
-      else ctx.lineTo(at.x, at.y);
-    }
-    ctx.stroke();
-  }
+  // The air inside the tube, so the sheets read as one body.
+  ctx.strokeStyle = rgbCss(mix(palette.body, SHADOW_INK, 0.3), 0.12);
+  ctx.lineWidth = pose.radius * 1.9;
+  ctx.beginPath();
+  ctx.moveTo(tail.x, tail.y);
+  ctx.lineTo(head.x, head.y);
+  ctx.stroke();
   const turn = Math.atan2(lane.uy, lane.ux);
-  for (const ring of pose.rings) {
-    if (!(ring.alpha > 0)) continue;
+  pose.rings.forEach((ring, index) => {
+    if (!(ring.alpha > 0)) return;
     const c = tubePoint(lane, ring.f);
-    for (let k = 0; k < ARCS; k += 1) {
-      const a0 = ring.phase + (k * TAU) / ARCS;
-      const sweep = 1.05;
-      // Arcs on the near side of the ring (toward the camera) are brighter than the far ones.
-      const near = 0.5 + 0.5 * Math.sin(a0 + sweep / 2);
-      for (const [key, width, alpha] of ARC_PASSES) {
-        ctx.strokeStyle = rgbCss(palette[key], alpha * ring.alpha * near);
-        ctx.lineWidth = Math.max(1, lane.h * width);
-        ctx.beginPath();
-        ctx.ellipse(c.x, c.y, ring.r * RING_SQUASH, ring.r, turn, a0, a0 + sweep);
-        ctx.stroke();
-      }
+    for (let k = 0; k < BANDS; k += 1) {
+      const streak = Boolean(p.streak) && index % 2 === 0 && k === 0;
+      drawBand(ctx, c, ring.r, turn, ring.phase + (k * TAU) / BANDS, palette, ring.alpha, streak);
     }
-  }
+  });
 }
 
 // ---- butterfly unit ---------------------------------------------------------------------------

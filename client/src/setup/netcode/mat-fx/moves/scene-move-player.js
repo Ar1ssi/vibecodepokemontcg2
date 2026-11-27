@@ -36,9 +36,11 @@ const isSourceOver = (beat) =>
   beat.drawer === 'shade' ||
   // design 092 ground-rock-steel: a slab of stone is matter.
   beat.drawer === 'monolith' ||
-  // design 092 grass-bug-flying: matter (apples, roots, plants, vines) covers what is under it.
+  // design 092 grass-bug-flying: matter (apples, roots, plants, vines) covers what is under it, and
+  // so do the tornado's sheets of wind (their hues stay over the cards: no white, no pink).
   beat.drawer === 'prop' ||
   beat.drawer === 'vine' ||
+  beat.drawer === 'tornado' ||
   // design 092 electric-poison-fighting: the storm cloud is matter.
   beat.drawer === 'stormCloud' ||
   (beat.drawer === 'terrain' && beat.params.kind === 'crack');
