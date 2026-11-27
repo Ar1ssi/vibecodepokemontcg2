@@ -8,6 +8,7 @@ import { findCard } from '../state.mjs';
 import { computeAttackDamage } from '../rules/attack-engine.mjs';
 import {
   attackTargetClause, ownTargetClause, opponentCounterClause, ownBenchDamage,
+  countersPerDiscard,
 } from '../rules/damage-parser.mjs';
 import { attachedTrainerDamageReduction } from '../rules/legacy-attached-trainer.mjs';
 import { applyLegacyDamageModifiers } from '../rules/legacy-power-wording.mjs';
@@ -446,6 +447,21 @@ export function resolveAttackTargetClause(text, parsed, spread) {
     // "put N damage counters on your opponent's Pokémon in any way you like":
     // place them one click at a time, each counter 10 damage, all N must land.
     if (/in any way/i.test(t)) {
+      // Dragapult ex Phantom Dive: `counters.count` per Energy discarded, none when nothing was
+      // (attack-effect.mjs sets `remaining` from the discard).
+      const perDiscard = countersPerDiscard(t);
+      if (perDiscard !== null) {
+        return {
+          kind: 'counters',
+          amount: 10,
+          count: 1,
+          scope: counters.scope || 'any',
+          distributable: true,
+          remaining: 0,
+          remainingFromDiscard: true,
+          remainingPerDiscard: perDiscard,
+        };
+      }
       return {
         kind: 'counters',
         amount: 10,
