@@ -6,6 +6,9 @@
 import { elementKit } from './_kit.js';
 import { smokeBeats } from './_smoke.js';
 import { alphaOf, dissolveOf, emit, rgb01, stageAngle, stageLen, stageOf } from './_emit.js';
+// design 092 ground-rock-steel
+import { monolithBase } from '../move-drawers.js';
+import { monolithPose } from '../max/ground-rock-steel-poses.mjs';
 
 export const EARTH_SCALE = Object.freeze({ body: 1.25, projectile: 1.35, shard: 1.3, leaf: 1.5 });
 const MAX_STRETCH = 4;
@@ -155,14 +158,65 @@ function stoneKit(look) {
     emit(ctx, 'debris', { at, size, alpha: a, seed, spin: time * 4 + seed, colour, light, dissolve });
   }
 
+  // design 092 ground-rock-steel: the monolith as one real slab of stone (a stone stretched up the
+  // screen, falling onto its foot), its contact shadow tightening as it nears, and dust thrown out
+  // round its foot as it lands.
+  const MONOLITH_DUST = 5;
+  function monolith(ctx, lane, s, info) {
+    const pose = monolithPose(s, lane.h, { ...info.params, beatMs: info.beatMs });
+    if (!(pose.alpha > 0)) return true;
+    const { colour, light, dust } = look(info.material.palette, info.material.smoke);
+    const base = monolithBase(lane, info.params);
+    const a = alphaOf(ctx, pose.alpha);
+    const dissolve = dissolveOf(ctx);
+    const w = pose.w * pose.scale;
+    const half = stageLen(ctx, w) / 2;
+    stoneShadow(ctx, stageOf(ctx, base.x, base.y), half * (1.1 + 0.7 * (1 - pose.shadow)), a * pose.shadow, 0);
+    const visible = Math.max(0, pose.tall - pose.sink) * pose.scale;
+    if (visible > 0) {
+      const lean = pose.lean * DEG;
+      emit(ctx, 'debris', {
+        at: stageOf(ctx, base.x + Math.sin(lean) * visible * 0.5, base.y - pose.height - Math.cos(lean) * visible * 0.5),
+        size: half,
+        stretch: Math.max(1, visible / w),
+        headingDeg: stageAngle(ctx, -90 + pose.lean),
+        alpha: a,
+        seed: 3.7,
+        spin: 0.4,
+        colour,
+        light,
+        dissolve,
+      });
+    }
+    for (let k = 0; pose.impact > 0 && k < MONOLITH_DUST; k += 1) {
+      const angle = (k / MONOLITH_DUST) * Math.PI * 2 + 0.3;
+      const reach = lane.h * (0.25 + 0.45 * (1 - pose.impact));
+      emit(ctx, 'smoke', {
+        at: stageOf(ctx, base.x + Math.cos(angle) * reach, base.y + Math.sin(angle) * reach * 0.45),
+        radius: stageLen(ctx, lane.h * (0.22 + 0.2 * (1 - pose.impact))),
+        alpha: a * pose.impact * 0.7,
+        seed: (info.seed ?? 0) + k * 1.7,
+        tint: dust,
+        light,
+        density: 0.55,
+        rise: 0.4,
+        dissolve,
+      });
+    }
+    return true;
+  }
+
   return elementKit({
     body,
     tongue,
     projectile,
-    beats: smokeBeats((info) => {
-      const style = look(info.material.palette, info.material.smoke);
-      return { tint: style.dust, light: style.light, density: 0.5, rise: 0.4, glow: 0, cloudGlow: 0, alphaGain: 2 };
-    }),
+    beats: {
+      ...smokeBeats((info) => {
+        const style = look(info.material.palette, info.material.smoke);
+        return { tint: style.dust, light: style.light, density: 0.5, rise: 0.4, glow: 0, cloudGlow: 0, alphaGain: 2 };
+      }),
+      monolith,
+    },
   });
 }
 

@@ -290,6 +290,20 @@ const BASE_DRAWER_PARAMS = {
   grip: {
     size: ['num', 0.5, 2, 1.2],
   },
+  // design 092 ground-rock-steel: a slab of stone dropped out of the sky onto the struck card's
+  // far half (Max Rockfall, G-Max Volcalith; max/ground-rock-steel-poses.mjs monolithPose).
+  // `back` h past the card's centre (up the screen) is its foot; `w`, `tall` its size (h); it
+  // starts `drop` h up, lands at `land` of the beat, stands `hold` of it, then sinks away.
+  monolith: {
+    target: TARGET(),
+    back: ['num', 0, 1, 0.25],
+    w: ['num', 0.2, 1, 0.55],
+    tall: ['num', 0.4, 1.6, 1],
+    drop: ['num', 0.5, 3, 2],
+    land: ['num', 0.2, 0.9, 0.55],
+    hold: ['num', 0, 0.6, 0.12],
+    lean: ['num', -20, 20, 6],
+  },
 };
 
 /**
@@ -349,6 +363,9 @@ export function tonguesAt(drawer, params) {
       return p.count * p.tongues;
     case 'bolt':
       return p.count * (1 + p.branches);
+    // design 092 ground-rock-steel: the monolith is one stone.
+    case 'monolith':
+      return 1;
     default:
       return 0;
   }
@@ -383,6 +400,8 @@ const DRAWER_FAMILY = Object.freeze({
   shade: 'chime',
   chain: 'projectile',
   grip: 'punch',
+  // design 092 ground-rock-steel: a stone slab landing shakes the ground.
+  monolith: 'quake',
 });
 
 /**
