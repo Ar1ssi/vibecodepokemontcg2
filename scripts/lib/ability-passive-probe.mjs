@@ -30,6 +30,7 @@ import {
   abilityEvolveLock,
   abilityRetreatLock,
   abilityCounterMoveLock,
+  abilityGuardsActiveEnergy,
   abilitySupporterLimit,
   abilityTurnNotEnd,
   abilityForcesOpponentTails,
@@ -390,6 +391,8 @@ function probeAnswers(holder, { turnTrainerName, partners }) {
       }
     }
     ask('counterMoveLock', () => abilityCounterMoveLock(p1));
+    // Blissey Happiness Protector: the holder's side guards its Active's Energy from the opponent.
+    ask('activeEnergyGuard', () => abilityGuardsActiveEnergy(p1));
     // Glimmora ex Dust Field: p1's holder caps the Bench p2 may have.
     ask('benchLimit', () => abilityBenchLimit(p2));
     // Customhb passives: each reader sees a board that can show it (a Dragon / Metal / EX
