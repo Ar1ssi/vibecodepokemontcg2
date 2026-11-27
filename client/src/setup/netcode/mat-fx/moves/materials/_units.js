@@ -8,6 +8,8 @@
 //   4's hand-off); the function here is the palette-only fallback (a hot → body sphere) so the
 //   table is total.
 import { rgbCss } from '../../fx-colors.mjs';
+// design 092 grass-bug-flying
+import { butterflyUnit } from '../max/max-drawers-gbf.js';
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -337,6 +339,8 @@ export const UNITS = Object.freeze({
   star: starUnit,
   // design 092 fire-normal
   coin: coinUnit,
+  // design 092 grass-bug-flying
+  butterfly: butterflyUnit,
 });
 
 export const UNIT_KEYS = Object.freeze(Object.keys(UNITS));

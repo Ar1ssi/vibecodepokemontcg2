@@ -2276,8 +2276,8 @@ test('normal and stellar draw only their palettes (stellar: plus its accents)', 
 
 test('every unit draws finitely, in palette colours, with balanced save/restore', () => {
   const palette = MATERIALS.normal.palette;
-  // design 092 adds, by group: psychic-fairy 'star' · fire-normal 'coin'.
-  assert.deepEqual(Object.keys(UNITS), ['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel', 'star', 'coin']);
+  // design 092 adds, by group: psychic-fairy 'star' · fire-normal 'coin' · grass-bug-flying 'butterfly'.
+  assert.deepEqual(Object.keys(UNITS), ['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel', 'star', 'coin', 'butterfly']);
   for (const [name, unit] of Object.entries(UNITS)) {
     for (const s of [0, 0.5, 0.99]) {
       const rec = recordingContext();

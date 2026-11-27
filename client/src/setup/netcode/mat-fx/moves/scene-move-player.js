@@ -36,6 +36,9 @@ const isSourceOver = (beat) =>
   beat.drawer === 'shade' ||
   // design 092 ground-rock-steel: a slab of stone is matter.
   beat.drawer === 'monolith' ||
+  // design 092 grass-bug-flying: matter (apples, roots, plants, vines) covers what is under it.
+  beat.drawer === 'prop' ||
+  beat.drawer === 'vine' ||
   (beat.drawer === 'terrain' && beat.params.kind === 'crack');
 
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });

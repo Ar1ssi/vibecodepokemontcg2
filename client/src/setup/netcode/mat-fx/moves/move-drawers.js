@@ -61,6 +61,8 @@ import {
 } from './move-poses.mjs';
 // design 092 ground-rock-steel
 import { monolithPose } from './max/ground-rock-steel-poses.mjs';
+// design 092 grass-bug-flying
+import { prop, tornado, vine } from './max/max-drawers-gbf.js';
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
@@ -1035,6 +1037,11 @@ const IMPLEMENTATIONS = {
   monolith: lifted(elementable('monolith', monolith), (lane, p) => standOn(monolithBase(lane, p))),
   // design 092 ghost-dark-dragon: each sets its own lift (per piece, per ribbon run, per column).
   ...Object.fromEntries(Object.entries(GHOST_DARK_DRAGON_DRAWERS).map(([name, draw]) => [name, elementable(name, draw)])),
+  // design 092 grass-bug-flying: each lifts itself (props stand off their feet, the vines and the
+  // tube travel at chest height).
+  prop: elementable('prop', prop),
+  vine: elementable('vine', vine),
+  tornado: elementable('tornado', tornado),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
