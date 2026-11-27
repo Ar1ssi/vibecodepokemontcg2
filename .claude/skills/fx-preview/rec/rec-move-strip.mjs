@@ -3,7 +3,8 @@
 // moves differ (card motion, contact style, aftermath) rather than to score one.
 // usage: PORT=4100 pnpm start, then
 //   MOVES=flamethrower,thunder,hydro-pump node .claude/skills/fx-preview/rec/rec-move-strip.mjs
-// env: MOVES (spec ids; `sig:<id>` for a signature spec) · TIMES (ms after the scene starts; the
+// env: MOVES (spec ids; `sig:<id>` for a signature spec, `max:<id>` for a Max / G-Max spec, design 092)
+//      · GPU=1 (the machine's own GPU: seconds, not minutes) · TIMES (ms after the scene starts; the
 //      default is by each spec: wind-up, travel, contact + 60, + 250, + 500, + 800) · SIDE (self | opp)
 //      · IMPACT=0 keeps the spec's own contact dressing (default: stripped, as in a game the TCG
 //      Live impact replaces it; the impact itself is not drawn here) · BASE_URL · OUT
@@ -11,7 +12,7 @@
 //      · CHROMIUM / CHROMIUM_PATH · SIO_JS · CARD_IMG / CARD_DIR
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
-import { launchOptions, openBoard } from '../board-mode.mjs';
+import { chromiumPath, launchOptions, openBoard } from '../board-mode.mjs';
 
 const {
   MOVES = 'flamethrower,thunder,hydro-pump',
@@ -22,10 +23,14 @@ const {
   OUT = '.agent/scratch/move-strip',
   DPR = '1',
   SIO_JS,
+  GPU,
 } = process.env;
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch(launchOptions());
+const launch = GPU === '1'
+  ? { ...(chromiumPath() ? { executablePath: chromiumPath() } : {}), args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu'] }
+  : launchOptions();
+const browser = await chromium.launch(launch);
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: Number(DPR) || 1 });
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror ${e.message}`));
@@ -80,16 +85,17 @@ const bottom = Math.min(800, Math.max(rects.attacker.top + rects.attacker.height
 const clip = { x: Math.round(left), y: Math.round(top), width: Math.round(right - left), height: Math.round(bottom - top) };
 
 for (const entry of MOVES.split(',').map((name) => name.trim()).filter(Boolean)) {
-  const signature = entry.startsWith('sig:');
-  const id = signature ? entry.slice(4) : entry;
+  const kind = entry.startsWith('sig:') ? 'sig' : entry.startsWith('max:') ? 'max' : 'move';
+  const id = kind === 'move' ? entry : entry.slice(4);
   const spec = await page.evaluate(
-    async ([moveId, isSignature, stripImpact]) => {
+    async ([moveId, kind, stripImpact]) => {
       const { playMoveInScene } = await import('/src/setup/netcode/mat-fx/moves/scene-move-player.js');
       const { SPECS } = await import('/src/setup/netcode/mat-fx/moves/specs/index.mjs');
       const { SIGNATURE_SPECS } = await import('/src/setup/netcode/mat-fx/moves/signature/specs/index.mjs');
+      const { MAX_SPECS } = await import('/src/setup/netcode/mat-fx/moves/max/specs/index.mjs');
       const { withoutImpactBeats } = await import('/src/setup/netcode/mat-fx/impact/impact-select.mjs');
       const p = window.__strip;
-      const full = isSignature ? SIGNATURE_SPECS[moveId] : SPECS[moveId];
+      const full = (kind === 'max' ? MAX_SPECS : kind === 'sig' ? SIGNATURE_SPECS : SPECS)[moveId];
       if (!full) return null;
       // Let the last move's drives and entry run out before this one starts.
       p.clock.currentTime = (p.clock.currentTime ?? 0) + 6000;
@@ -98,7 +104,7 @@ for (const entry of MOVES.split(',').map((name) => name.trim()).filter(Boolean))
       const played = playMoveInScene({ scene: p.scene, spec: stripImpact ? withoutImpactBeats(full) : full, attackerId: p.attackerId, defenderId: p.defenderId, seed: 7 });
       return played ? { contactMs: full.contactMs, durationMs: played.durationMs, attacker: full.attacker.motion, defender: full.defender.motion, material: full.material, tier: full.tier } : null;
     },
-    [id, signature, IMPACT !== '0']
+    [id, kind, IMPACT !== '0']
   );
   if (!spec) {
     console.log('no spec / could not play', entry);
