@@ -112,7 +112,7 @@ const MECH = [
   ],
   [
     'discard-self-energy',
-    /discard (an|a|\d+|all|up to \d+|all basic)[^.]*energy[^.]*(from|attached to) (this pokémon|it\b)/,
+    /discard (an|a|\d+|all|up to \d+|all basic|as many|any (?:number|amount) of)[^.]*energy[^.]*(from|attached to) (this pokémon|it\b)/,
     /^own:attached->(discard|lostZone|gone)$/,
   ],
   [
