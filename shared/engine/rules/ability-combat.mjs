@@ -2341,6 +2341,20 @@ export function healBlockedByAbility(state, card) {
   return owner ? abilityHealLocked(card, sideContextFor(state, owner)) : false;
 }
 
+const ACTIVE_ENERGY_GUARD =
+  /as long as this pok[eé]mon is in play, your opponent[’']s pok[eé]mon and trainer cards can['’]?t discard or move energy attached to your active pok[eé]mon/;
+
+/**
+ * Blissey Happiness Protector: true when an unsuppressed Pokémon in play on the side in `ctx` says
+ * its opponent's Pokémon (attacks, Abilities) and Trainer cards can't discard or move Energy
+ * attached to that side's Active Pokémon. The caller checks the Energy sits on the Active.
+ */
+export function abilityGuardsActiveEnergy(ctx = {}) {
+  return sideInPlay(ctx).some(
+    (holder) => ACTIVE_ENERGY_GUARD.test(cardAbilityText(holder)) && !isAbilitySuppressed(holder, ctx)
+  );
+}
+
 /** Patrat CR: damage counters on any in-play Pokémon can't be moved. */
 export function abilityCounterMoveLock(ctx = {}) {
   const cards = dedupe([

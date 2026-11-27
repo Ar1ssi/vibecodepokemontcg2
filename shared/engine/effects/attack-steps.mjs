@@ -49,7 +49,7 @@ import {
 } from '../rules/attack-markers.mjs';
 import { eachFilterMatches } from '../rules/each-filter.mjs';
 import { energyRemovalGuarded } from '../rules/legacy-attached-trainer.mjs';
-import { abilityPreventsAttackEffects, healBlockedByAbility, sideContextFor, abilityBenchLimit } from '../rules/ability-combat.mjs';
+import { abilityPreventsAttackEffects, abilityGuardsActiveEnergy, healBlockedByAbility, sideContextFor, abilityBenchLimit } from '../rules/ability-combat.mjs';
 import { evolvedView, rareCandyOptions, ownedCards } from '../rules/evolved-pokemon.mjs';
 import { discardCurrentStadium } from './trainer.mjs';
 import {
@@ -415,7 +415,9 @@ function atkGust(ctx) {
 function removableEnergy(ctx, owner, cards) {
   if (owner !== ctx.opponent) return cards;
   const zone = [...(owner?.zones?.active || []), ...(owner?.zones?.bench || [])];
-  return cards.filter((c) => !energyRemovalGuarded(zone, c));
+  const activeGuarded = abilityGuardsActiveEnergy(sideContextFor(ctx.draft, owner.playerId));
+  const activeId = activeOf(owner)?.instanceId;
+  return cards.filter((c) => !energyRemovalGuarded(zone, c) && !(activeGuarded && c.attachedTo != null && c.attachedTo === activeId));
 }
 
 // ── move Energy ─────────────────────────────────────────────────────────────

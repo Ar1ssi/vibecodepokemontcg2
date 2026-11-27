@@ -49,6 +49,7 @@ import { applyStadiumSwitchTriggers, applyStadiumTriggerEffect } from './stadium
 import { stadiumOnSwitchTriggers } from '../rules/stadium-triggers.mjs';
 import {
   abilityCounterMoveLock,
+  abilityGuardsActiveEnergy,
   abilityEvolutionCardLock,
   abilityPreventsCardEffects,
   abilityPreventsCardEffectsOnPlayer,
@@ -1253,7 +1254,11 @@ function devolve(ctx) {
  * opponent's attacks or Trainer cards." A Pokémon Power (Ability) still can.
  */
 function energyRemovable(ctx, owner, card) {
-  if (owner !== ctx.opponent || !isEnergy(card) || ctx.effectType === 'ability') return true;
+  if (owner !== ctx.opponent || !isEnergy(card)) return true;
+  // Blissey Happiness Protector guards its Active's Energy from Abilities too.
+  const activeId = owner.zones?.active?.[0]?.instanceId;
+  if (card.attachedTo != null && card.attachedTo === activeId && abilityGuardsActiveEnergy(sideContextFor(ctx.draft, owner.playerId))) return false;
+  if (ctx.effectType === 'ability') return true;
   const zone = [...(owner.zones?.active || []), ...(owner.zones?.bench || [])];
   return !energyRemovalGuarded(zone, card);
 }
