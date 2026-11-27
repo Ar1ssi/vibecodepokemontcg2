@@ -34,7 +34,9 @@ const isSourceOver = (beat) =>
   beat.drawer === 'vignette' ||
   beat.drawer === 'smoke' ||
   beat.drawer === 'shade' ||
-  (beat.drawer === 'terrain' && beat.params.kind === 'crack');
+  (beat.drawer === 'terrain' && beat.params.kind === 'crack') ||
+  // design 092 electric-poison-fighting: the storm cloud is matter.
+  beat.drawer === 'stormCloud';
 
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
 

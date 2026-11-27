@@ -18,6 +18,7 @@ import { dissolveTail, withFxMod } from './materials/_mods.js';
 import { getNoiseTile } from './materials/_shared.js';
 import { UNITS } from './materials/_units.js';
 import { DRAWER_PARAMS, checkParams, tonguesAt } from './move-spec.mjs';
+import { STORM_GREYS, stormCloudPose } from './max/storm-cloud.mjs';
 import {
   armTongues,
   auraPose,
@@ -906,6 +907,70 @@ const grip = (ctx, lane, s, info) => {
   }
 };
 
+// ---- design 092 electric-poison-fighting ---------------------------------------------
+
+const mixStormRgb = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const fillStormDisc = (ctx, x, y, r, style) => {
+  ctx.fillStyle = style;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fill();
+};
+// Grain for the cloud's body on the GPU canvas: a slow scrolling noise multiplied in.
+const STORM_TEXTURE = Object.freeze({ detail: Object.freeze({ amount: 0.4, speed: 0.5, scale: 5, angle: -90 }) });
+
+/**
+ * The storm cloud over the target (max/storm-cloud.mjs): matter, drawn source-over. Each lobe is a
+ * soft-edged lit volume (a dark mass fading out at its edge, a body lit from the upper left, lit
+ * tops last); the strike's light glows faintly along the underside and a flash lights it inside.
+ */
+const stormCloud = (ctx, lane, s, info) => {
+  const p = info.params;
+  const pose = stormCloudPose(s, lane.h, info.seed, p);
+  if (!(pose.alpha > 0)) return;
+  const c = anchorOf(lane, p);
+  ctx.fxLift = anchorLift(lane, p.target, c, { stand: 0, z: LIFT.travelZ });
+  const { palette } = info.material;
+  const a = pose.alpha;
+  withFxMod(ctx, STORM_TEXTURE, () => {
+    for (const lobe of pose.lobes) {
+      const x = c.x + lobe.x;
+      const y = c.y + lobe.y;
+      const mass = ctx.createRadialGradient(x, y, 0, x, y, lobe.r);
+      mass.addColorStop(0, rgbCss(STORM_GREYS.shadow, a));
+      mass.addColorStop(0.7, rgbCss(STORM_GREYS.shadow, 0.95 * a));
+      mass.addColorStop(1, rgbCss(STORM_GREYS.shadow, 0));
+      fillStormDisc(ctx, x, y, lobe.r, mass);
+      const r = lobe.r * 0.82;
+      const bx = x - lobe.r * 0.1;
+      const by = y - lobe.r * 0.14;
+      const body = ctx.createRadialGradient(bx - r * 0.3, by - r * 0.35, r * 0.05, bx, by, r);
+      body.addColorStop(0, rgbCss(mixStormRgb(STORM_GREYS.body, STORM_GREYS.lit, lobe.shade), 0.9 * a));
+      body.addColorStop(0.55, rgbCss(STORM_GREYS.body, 0.75 * a));
+      body.addColorStop(1, rgbCss(STORM_GREYS.body, 0));
+      fillStormDisc(ctx, bx, by, r, body);
+    }
+  });
+  // The strike's light from below, along the whole underside.
+  const under = c.y + pose.width * 0.12;
+  ctx.save();
+  ctx.translate(c.x, under);
+  ctx.scale(1, 0.28);
+  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, pose.width);
+  glow.addColorStop(0, rgbCss(palette.body, 0.16 * a));
+  glow.addColorStop(1, rgbCss(palette.body, 0));
+  fillStormDisc(ctx, 0, 0, pose.width, glow);
+  ctx.restore();
+  if (pose.flash) {
+    const { x, y, r, alpha } = pose.flash;
+    const g = ctx.createRadialGradient(c.x + x, c.y + y, 0, c.x + x, c.y + y, r);
+    g.addColorStop(0, rgbCss(palette.hot, 0.8 * alpha * a));
+    g.addColorStop(0.45, rgbCss(palette.body, 0.35 * alpha * a));
+    g.addColorStop(1, rgbCss(palette.body, 0));
+    fillStormDisc(ctx, c.x + x, c.y + y, r, g);
+  }
+};
+
 /** `draw` with its whole beat burning away from `fromOf(params)` of its progress. */
 const burning = (draw, fromOf) => (ctx, lane, s, info) =>
   burnOut(ctx, dissolveTail(s, fromOf(info.params)), () => draw(ctx, lane, s, info));
@@ -963,6 +1028,8 @@ const IMPLEMENTATIONS = {
   chain: elementable('chain', chain),
   // The glove comes down out of the air.
   grip: lifted(elementable('grip', grip), fromSky),
+  // design 092 electric-poison-fighting: the storm cloud hangs over the target (it lifts itself).
+  stormCloud: elementable('stormCloud', stormCloud),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */

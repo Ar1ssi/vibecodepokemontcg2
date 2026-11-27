@@ -65,7 +65,11 @@ const ANCHORED = (fallback = 'defender') => ({
   dy: ['num', -2, 2, 0],
 });
 /** Design 065 § New pieces C: the bodies a travelling / orbiting drawer can draw (materials/_units.js). */
-export const UNIT_NAMES = Object.freeze(['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+export const UNIT_NAMES = Object.freeze([
+  'body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel',
+  // design 092 electric-poison-fighting: the giant Dynamax fist of Max Knuckle / G-Max Chi Strike.
+  'maxFist',
+]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 
 const BASE_DRAWER_PARAMS = {
@@ -289,6 +293,13 @@ const BASE_DRAWER_PARAMS = {
   },
   grip: {
     size: ['num', 0.5, 2, 1.2],
+  },
+  // ---- design 092 electric-poison-fighting: the storm cloud over the target (max/storm-cloud.mjs) ----
+  stormCloud: {
+    ...ANCHORED('sky'),
+    r: ['num', 0.3, 1.5, 0.75],
+    puffs: ['int', 3, 10, 7],
+    flashes: ['int', 0, 6, 3],
   },
 };
 
