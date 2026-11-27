@@ -367,11 +367,20 @@ const SPEED_LINES = Object.freeze([
   [0.48, 0.9],
 ]);
 
+const lumaOf = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+/**
+ * A dark fist (G-Max Chi Strike's brown-red one) says so by its palette: a core darker than its
+ * hot. It is lit by its core alone; its hot stays a molten rim, never part of the body.
+ */
+export const isDarkFistPalette = (palette) => lumaOf(palette.core) < lumaOf(palette.hot);
+
 /**
  * Max Knuckle's giant Dynamax fist, knuckles leading along `angleDeg` (Max Knuckle, G-Max Chi
  * Strike): a glow round it, speed lines trailing, the cuff, the back of the hand, four finger rolls
  * (the gaps between them are the creases) and the thumb, each lit from the upper left (core → hot →
- * body → deep), the hand and fingers rimmed in hot like the Dynamax outline.
+ * body → deep; a dark fist core → body → deep), the hand and fingers rimmed in hot like the Dynamax
+ * outline.
  */
 function maxFistUnit(ctx, x, y, r, angleDeg, s, palette) {
   if (!(r > 0)) return;
@@ -392,11 +401,16 @@ function maxFistUnit(ctx, x, y, r, angleDeg, s, palette) {
       ctx.lineTo(-r * (0.95 + len), dy * r);
       ctx.stroke();
     }
+    const dark = isDarkFistPalette(palette);
     const lit = (lx, ly, reach) => {
       const g = ctx.createRadialGradient(lx, ly, reach * 0.05, lx + reach * 0.35, ly + reach * 0.4, reach);
       g.addColorStop(0, rgbCss(palette.core, 0.95));
-      g.addColorStop(0.3, rgbCss(palette.hot, 0.9));
-      g.addColorStop(0.7, rgbCss(palette.body, 0.88));
+      if (dark) {
+        g.addColorStop(0.4, rgbCss(palette.body, 0.92));
+      } else {
+        g.addColorStop(0.3, rgbCss(palette.hot, 0.9));
+        g.addColorStop(0.7, rgbCss(palette.body, 0.88));
+      }
       g.addColorStop(1, rgbCss(palette.deep, 0.85));
       return g;
     };
