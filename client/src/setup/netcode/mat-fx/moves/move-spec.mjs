@@ -290,6 +290,26 @@ const BASE_DRAWER_PARAMS = {
   grip: {
     size: ['num', 0.5, 2, 1.2],
   },
+  // design 092 water-ice: Stonesurge's stones (or Resonance's ice boulders from the sky) and the
+  // Aurora Veil curtains (max/water-ice-poses.mjs).
+  surgeStones: {
+    target: TARGET(),
+    from: ['enum', ['erupt', 'sky'], 'erupt'],
+    count: ['int', 2, 12, 7],
+    distance: ['num', 0.3, 1.8, 0.95],
+    height: ['num', 0.2, 2, 0.7],
+    size: ['pair', 0.03, 0.4, [0.06, 0.11]],
+    gloss: ['num', 0, 1, 0],
+    smooth: ['num', 0, 1, 0],
+  },
+  auroraVeil: {
+    target: TARGET(),
+    count: ['int', 3, 12, 8],
+    r: ['num', 0.4, 2, 1.05],
+    height: ['num', 0.4, 2.5, 1.4],
+    w: ['num', 0.05, 0.6, 0.24],
+    half: ['enum', ['back', 'front', 'both'], 'both'],
+  },
 };
 
 /**
@@ -383,6 +403,9 @@ const DRAWER_FAMILY = Object.freeze({
   shade: 'chime',
   chain: 'projectile',
   grip: 'punch',
+  // design 092 water-ice
+  surgeStones: 'burst',
+  auroraVeil: 'chime',
 });
 
 /**

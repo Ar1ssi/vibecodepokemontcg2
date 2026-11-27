@@ -56,6 +56,9 @@ import {
   vignettePose,
   volleyPose,
 } from './move-poses.mjs';
+// design 092 water-ice
+import { alphaOf, dissolveOf, elementsLive, emit, rgb01, stageAngle, stageLen, stageOf } from './elements/_emit.js';
+import { auroraVeilPose, surgeStonesPose } from './max/water-ice-poses.mjs';
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
@@ -906,6 +909,115 @@ const grip = (ctx, lane, s, info) => {
   }
 };
 
+// ---- design 092 water-ice: Stonesurge's stones and Resonance's boulders, the Aurora Veil -----
+
+/** A stone drawn on a 2D context (no GL layer, or the cast pass): a lit jagged polygon, tip along its heading. */
+const canvasStone = (ctx, palette, x, y, stone, seed) => {
+  const a = (stone.headingDeg * Math.PI) / 180;
+  const along = [Math.cos(a), Math.sin(a)];
+  const across = [-along[1], along[0]];
+  const len = stone.size * stone.stretch;
+  const corners = [0, 1, 2, 3, 4, 5].map((k) => {
+    const t = (k / 6) * TAU;
+    const wob = 0.75 + 0.25 * Math.sin(seed * 3.1 + k * 2.3);
+    const u = Math.cos(t) * len * wob;
+    const v = Math.sin(t) * stone.size * wob;
+    return [x + along[0] * u + across[0] * v, y + along[1] * u + across[1] * v];
+  });
+  const g = ctx.createLinearGradient(x - stone.size, y - len, x + stone.size, y + len);
+  g.addColorStop(0, rgbCss(palette.hot, stone.alpha));
+  g.addColorStop(0.45, rgbCss(palette.body, stone.alpha));
+  g.addColorStop(1, rgbCss(palette.deep, stone.alpha));
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  corners.forEach(([px, py], k) => (k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+  ctx.closePath();
+  ctx.fill();
+};
+
+/**
+ * Stones (Stonesurge) or frosted boulders (Resonance, `from` 'sky', with gloss and smooth) as real
+ * tumbling 3-D stones on the GL layer, each standing on its own ground point round the target, so
+ * what flies above it rises off the cloth and what stands throws its shadow at its foot.
+ */
+const surgeStones = (ctx, lane, s, info) => {
+  const p = info.params;
+  const c = centreOf(lane, p.target);
+  const { palette } = info.material;
+  surgeStonesPose(s, lane.h, info.seed, p).forEach((stone, index) => {
+    if (!(stone.alpha > 0) || !(stone.size > 0)) return;
+    ctx.fxLift = standOn({ x: c.x + stone.gx, y: c.y + stone.gy });
+    const x = c.x + stone.x;
+    const y = c.y + stone.y;
+    const seed = info.seed + index * 1.37;
+    const drawn =
+      elementsLive(ctx) &&
+      emit(ctx, 'debris', {
+        at: stageOf(ctx, x, y),
+        size: stageLen(ctx, stone.size),
+        stretch: stone.stretch,
+        headingDeg: stageAngle(ctx, stone.headingDeg),
+        spin: stone.spin,
+        alpha: alphaOf(ctx, stone.alpha),
+        seed,
+        colour: rgb01(palette.body, 1),
+        light: rgb01(palette.hot, 1.1),
+        gloss: p.gloss,
+        smooth: p.smooth,
+        dissolve: dissolveOf(ctx),
+      });
+    if (!drawn) canvasStone(ctx, palette, x, y, stone, seed);
+  });
+};
+
+/** A curtain's light passes, outermost first: [palette key, width factor, alpha]. Nested and added, they fall off softly. */
+const AURORA_PASSES = Object.freeze([
+  ['deep', 1.6, 0.1],
+  ['body', 1, 0.22],
+  ['body', 0.55, 0.36],
+  ['hot', 0.22, 0.6],
+]);
+const AURORA_STEPS = 10;
+
+/**
+ * The Aurora Veil: soft curtains of light standing on a ring round the target, each nested passes
+ * of one wavering ribbon, narrowing as it rises, bright at its foot and fading toward its top;
+ * item i takes hue i (beat `hues`).
+ */
+const auroraVeil = (ctx, lane, s, info) => {
+  const p = info.params;
+  const c = centreOf(lane, p.target);
+  for (const curtain of auroraVeilPose(s, lane.h, info.seed, p)) {
+    if (!(curtain.alpha > 0) || !(curtain.height > 1)) continue;
+    const { palette } = itemMaterial(info, curtain.index);
+    const footX = c.x + curtain.x;
+    const footY = c.y + curtain.y;
+    const sway = (v) => Math.sin(v * 4 + info.time * 2 + curtain.index * 1.7) * curtain.width * 0.25;
+    ctx.fxLift = standOn({ x: footX, y: footY });
+    for (const [key, factor, passAlpha] of AURORA_PASSES) {
+      const g = ctx.createLinearGradient(footX, footY, footX, footY - curtain.height);
+      g.addColorStop(0, rgbCss(palette[key], 0));
+      g.addColorStop(0.1, rgbCss(palette[key], passAlpha * curtain.alpha));
+      g.addColorStop(0.55, rgbCss(palette[key], passAlpha * curtain.alpha * 0.45));
+      g.addColorStop(1, rgbCss(palette[key], 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      for (let k = 0; k <= AURORA_STEPS; k += 1) {
+        const v = k / AURORA_STEPS;
+        const half = (curtain.width / 2) * factor * (1 - 0.4 * v);
+        ctx.lineTo(footX + sway(v) - half, footY - v * curtain.height);
+      }
+      for (let k = AURORA_STEPS; k >= 0; k -= 1) {
+        const v = k / AURORA_STEPS;
+        const half = (curtain.width / 2) * factor * (1 - 0.4 * v);
+        ctx.lineTo(footX + sway(v) + half, footY - v * curtain.height);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+};
+
 /** `draw` with its whole beat burning away from `fromOf(params)` of its progress. */
 const burning = (draw, fromOf) => (ctx, lane, s, info) =>
   burnOut(ctx, dissolveTail(s, fromOf(info.params)), () => draw(ctx, lane, s, info));
@@ -963,6 +1075,9 @@ const IMPLEMENTATIONS = {
   chain: elementable('chain', chain),
   // The glove comes down out of the air.
   grip: lifted(elementable('grip', grip), fromSky),
+  // design 092 water-ice: each stone and curtain stands on its own ground point (they lift per item).
+  surgeStones,
+  auroraVeil,
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
