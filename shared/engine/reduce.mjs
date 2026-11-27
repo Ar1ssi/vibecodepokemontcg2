@@ -134,6 +134,19 @@ function timeOutCommand({ draft, playerId, events }) {
   setGameEnded(draft, { winner, reason: TIME_OUT_REASON, events });
 }
 
+// reduce/attack-effect.mjs stamps `effectiveRetreatCost` on the defending side's roots for
+// Bronzong Heavy Potential, and every attack resume re-stamps it. Left in place, the value goes
+// stale as soon as a Tool, Energy or Stadium changes and shows a wrong cost in state and logs.
+function clearRetreatCostStamps(draft) {
+  for (const player of Object.values(draft.players || {})) {
+    for (const zoneId of ['active', 'bench']) {
+      for (const card of player?.zones?.[zoneId] || []) {
+        if (card && 'effectiveRetreatCost' in card) delete card.effectiveRetreatCost;
+      }
+    }
+  }
+}
+
 export function applyCommand(state, command, rng = null) {
   if (!state || typeof state !== 'object') {
     return {
@@ -496,6 +509,7 @@ export function applyCommand(state, command, rng = null) {
   settleRevealedHandCards(state, draft, events, findCard);
   delete draft.__attackEffectPhase;
   delete draft.__attackLostZoneKnockouts;
+  if (!draft.pendingChoice) clearRetreatCostStamps(draft);
   // Design 059: a public reveal carries each card's art, so the opponent can draw a card
   // their view still shows face down (the revealed card is in its owner's hand).
   stampRevealedArt(events, (instanceId) => findCard(draft, instanceId)?.card?.src);

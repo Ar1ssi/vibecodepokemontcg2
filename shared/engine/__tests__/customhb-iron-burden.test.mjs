@@ -12,6 +12,8 @@ import { computeEffectiveRetreatCost } from '../reduce/retreat.mjs';
 import { cardEffectiveHp } from '../reduce/shared.mjs';
 import { parseHpBonus, parseRetreatCostModifier } from '../rules/ability-executors.mjs';
 import { holderSwitchOutLocked } from '../rules/tool-combat.mjs';
+import { rulesState } from '../rules/rules-state.mjs';
+import { getEffectiveRetreatCost } from '../rules/retreat.mjs';
 
 const IRON_BURDEN =
   "The Pokémon this card is attached to has its Retreat Cost increased by 2 {C} and its HP increased by 40.\n\nThe Pokémon this card is attached to can't be switched out by an Ability or a Trainer card.";
@@ -161,4 +163,57 @@ test('HB 630 Iron Burden: an attack can still switch the holder out', () => {
     );
   }
   assert.equal(activeName(res.state, 'p2'), 'p2 Bench', 'attacks are neither Abilities nor Trainer cards');
+});
+
+// HB 575 Altar of the Moone (set.json customhb-575 effect, verbatim). Exported match log
+// 2026-11-27: Altaria (Retreat Cost 1) with Iron Burden and a Basic Psychic Energy was refused a
+// retreat "costs 3" — the custom Energy carries no type (or TCGdex's "Normal"), only its name.
+const ALTAR_OF_THE_MOONE =
+  'The Retreat Cost of each Pokémon (both yours and your opponent’s) that has any {P} or {D} Energy attached to it is {C}{C} less.';
+const altar = () =>
+  createCard({ instanceId: 900, name: 'Altar of the Moone', supertype: 'Trainer', type: 'Trainer', trainerType: 'Stadium', subtypes: ['Stadium'], text: ALTAR_OF_THE_MOONE });
+// The card shape the log's state carried: no energyType, no types, empty supertype.
+const loggedEnergy = (host, name, extra = {}) =>
+  createCard({ instanceId: nextId++, name, type: 'Energy', supertype: '', subtypes: [], attachedTo: host.instanceId, ...extra });
+
+test('HB 575 Altar of the Moone offsets Iron Burden on a holder with an untyped Basic Psychic Energy', () => {
+  for (const extra of [{}, { energyType: 'Normal' }]) {
+    const { state, host } = board();
+    state.stadium = altar();
+    state.players.p1.zones.active.push(loggedEnergy(host, 'Basic Psychic Energy', extra));
+    assert.equal(computeEffectiveRetreatCost(state, host, 'p1'), 1, `1 + 2 - 2 (${JSON.stringify(extra)})`);
+    const bench = state.players.p1.zones.bench[0];
+    const res = applyCommand(state, { type: 'retreat', playerId: 'p1', payload: { benchInstanceId: bench.instanceId } }, TAILS);
+    assert.equal(res.error, null, 'one Energy pays the retreat');
+    assert.equal(activeName(res.state, 'p1'), 'p1 Bench');
+  }
+  const { state, host } = board();
+  state.stadium = altar();
+  state.players.p1.zones.active.push(loggedEnergy(host, 'Basic Fire Energy'));
+  assert.equal(computeEffectiveRetreatCost(state, host, 'p1'), 3, 'a Fire Energy does not meet the Altar');
+});
+
+test('HB 575 Altar of the Moone vs Iron Burden, client path: the Stadium applies after the Tool', () => {
+  const saved = { enabled: rulesState.enabled, turnPlayer: rulesState.turnPlayer, stadium: rulesState.stadium };
+  try {
+    rulesState.enabled = true;
+    rulesState.turnPlayer = 'self';
+    rulesState.stadium = { user: 'self', card: altar() };
+    const host = mon('Free', { retreatCost: [] });
+    const zone = [host, ironBurden(host), loggedEnergy(host, 'Basic Psychic Energy', { energyType: 'Psychic' })];
+    assert.equal(getEffectiveRetreatCost(host, 'self', zone), 0, '0 + 2 - 2, not max(0, 0 - 2) + 2');
+  } finally {
+    Object.assign(rulesState, saved);
+  }
+});
+
+test('the Heavy Potential retreat-cost stamp does not outlive the attack', () => {
+  const { state, seats } = board({ burdenOn: 'p2' });
+  seats.p1.active.attacks = [{ name: 'Tackle', cost: [], damage: '10', text: '' }];
+  const res = applyCommand(state, { type: 'attack', playerId: 'p1', payload: { attackIndex: 0 } }, TAILS);
+  assert.equal(res.error, null);
+  const stamped = [...res.state.players.p2.zones.active, ...res.state.players.p2.zones.bench].filter(
+    (c) => 'effectiveRetreatCost' in c
+  );
+  assert.deepEqual(stamped.map((c) => c.name), [], 'a stale cost would go wrong once a Tool, Energy or Stadium changes');
 });

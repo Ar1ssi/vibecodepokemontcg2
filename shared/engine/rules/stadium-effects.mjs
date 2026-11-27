@@ -1425,7 +1425,11 @@ export function stadiumFilterMatches(card, stadiumCard) {
 /** The energy type a card provides/represents, lowercased ('' if unknown). */
 function energyTypeOf(card) {
   if (!card) return '';
-  return lower(card.energyType || (Array.isArray(card.types) ? card.types[0] : ''));
+  const printed = lower(card.energyType || (Array.isArray(card.types) ? card.types[0] : ''));
+  if (printed && printed !== 'normal') return printed;
+  // Custom-set Basic Energy carries no type, or TCGdex's "Normal", only its name ("Basic Psychic
+  // Energy"): the shared resolver reads the name (Altar of the Moone, match log 2026-11-27).
+  return lower(resolveAttachedEnergyType(card));
 }
 
 /** True when `pokemon` has an attached Energy card whose type/name matches. */

@@ -35,8 +35,10 @@ export function getEffectiveRetreatCost(
   if (pokemonHasRedirectEnergy(activeCard, cards)) return 0;
   // Team-wide "no Retreat Cost" ability on a Benched Pokémon (Latias ex "Skyliner").
   if (teamNoRetreatCostForActive(activeCard, benchCards, cards)) return 0;
+  // Same order as the server (reduce/retreat.mjs computeEffectiveRetreatCost): Tools and
+  // Abilities first, then the Stadium. The Stadium clamps at 0, so applying it first lost
+  // Altar of the Moone's -2 against Iron Burden's +2 on a Pokémon whose printed cost is 0-1.
   let cost = getRetreatCostCount(activeCard);
-  cost = getStadiumRetreatCost(cost, activeCard, player, null, cards);
   cost = combinedToolRetreatCost(cost, activeCard, cards, {
     blockTools: stadiumBlocksToolEffects(),
     stadium: getStadium(),
@@ -55,6 +57,7 @@ export function getEffectiveRetreatCost(
     zone: 'active',
     isActive: true,
   });
+  cost = getStadiumRetreatCost(cost, activeCard, player, null, cards);
   cost += pendingRetreatCostDelta(rulesState, player);
   return Math.max(0, cost);
 }
