@@ -12,7 +12,7 @@ import { computeAttackDamage } from '../rules/attack-engine.mjs';
 import {
   drawCount, parseAttackDamage, allBenchDamage, eachPokemonDamage, ownBenchDamage,
   computedCounterClause, targetClauseGate, parseAttackSearchClause, parsePrizeOnKo,
-  prizeFilterMatches, discardEnergyScaling, deckMillScaling, deckRevealScaling,
+  prizeFilterMatches, discardEnergyScaling, countersPerDiscard, deckMillScaling, deckRevealScaling,
   attachDiscardToBenchSpread, returnEnergyBonusClause,
 } from '../rules/damage-parser.mjs';
 import { optionalCostBonusClause } from '../rules/optional-cost-bonus.mjs';
@@ -1468,7 +1468,10 @@ export function resolveAttackEffectPhase(draft, ctx) {
       }
       // Bronzong BREAK Metal Rain: one 30-damage pick per Energy card the discard paid.
       if (attackTarget?.remainingFromDiscard) {
-        attackTarget = energyDiscarded > 0 ? { ...attackTarget, remaining: energyDiscarded } : null;
+        attackTarget =
+          energyDiscarded > 0
+            ? { ...attackTarget, remaining: energyDiscarded * (attackTarget.remainingPerDiscard || 1) }
+            : null;
       }
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
@@ -1849,6 +1852,8 @@ function discardScalePrompt(attack, discardScaling) {
   const per =
     /(\d+) (?:more )?damage (?:for each|times)/i.exec(text)?.[1] ||
     /do (\d+) damage to it/i.exec(text)?.[1] ||
+    // Dragapult ex Phantom Dive: each card is worth counters, not attack damage.
+    (countersPerDiscard(text) !== null ? countersPerDiscard(text) * 10 : 0) ||
     // Garchomp ex Surf: "For each Energy you discard, this attack does 30 damage to each …".
     /for each energy[^,.]* discard(?:ed)?[^,.]*, this attack does (\d+) damage/i.exec(text)?.[1] ||
     parseInt(attack?.damage, 10) ||

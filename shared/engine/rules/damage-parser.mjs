@@ -476,6 +476,7 @@ export function parseAttackDamage(
   } else if (
     text &&
     discardEnergyScaling(attack?.text) &&
+    countersPerDiscard(attack?.text) === null &&
     // Electivire Discharge: the discard sets the coin count; the heads scale the damage.
     // (timesAsForEach has already rewritten "times the number of heads" to "for each heads").
     !/damage (?:times the number of|for each) heads/.test(text)
@@ -2108,6 +2109,18 @@ function discardEnergyGroups(text) {
     basicOnly: Boolean(all[1]),
     all: true,
   };
+}
+
+/**
+ * Dragapult ex Phantom Dive (set.json record customhb-1079, from cardback): "For each Energy card
+ * discarded in this way, put 2 damage counters on …". The discard sets the counter total; it
+ * scales no damage. Returns the counters per discarded card, or null.
+ */
+export function countersPerDiscard(attackText) {
+  const m = /for each energy cards? (?:you )?discarded in this way, (?:put|place) (\d+) damage counters?/i.exec(
+    String(attackText || '').replace(/[‘’]/g, "'")
+  );
+  return m ? Math.max(0, parseInt(m[1], 10)) : null;
 }
 
 export function discardEnergyScaling(attackText) {
