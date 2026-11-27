@@ -348,6 +348,53 @@ const BASE_DRAWER_PARAMS = {
     hold: ['num', 0, 0.6, 0.12],
     lean: ['num', -20, 20, 6],
   },
+  // ---- design 092 ghost-dark-dragon (Max Phantasm, G-Max Terror, Max Darkness, G-Max Snooze,
+  // ---- Max Wyrmwind, G-Max Depletion): moves/max/ghost-dark-dragon-{poses.mjs,drawers.js}.
+  hauntedFurniture: {
+    count: ['int', 2, 8, 6],
+    size: ['num', 0.08, 0.4, 0.2],
+    float: ['num', 0.1, 0.6, 0.4],
+    swarm: ['num', 0.5, 0.95, 0.82],
+    r0: ['num', 0.3, 1.5, 0.75],
+    r1: ['num', 0.3, 1.5, 0.8],
+    spin: ['num', 0, 360, 50],
+  },
+  darkDome: {
+    ...ANCHORED('defender'),
+    r: ['num', 0.4, 1.4, 0.82],
+    grow: ['num', 0.05, 0.5, 0.2],
+    arcs: ['num', 0, 1, 0.5],
+    veins: ['num', 0, 1, 0],
+    end: ['enum', ['fade', 'burst', 'hold'], 'fade'],
+    ink: ['num', 0, 1, 0.85],
+    eyes: ['int', 0, 6, 0],
+  },
+  darkRibbons: {
+    count: ['int', 1, 8, 5],
+    w: ['num', 0.03, 0.4, 0.12],
+    bow: ['num', 0, 1.2, 0.5],
+    length: ['num', 0.1, 1, 0.45],
+    wrap: ['num', 0, 540, 200],
+    turns: ['num', 0, 6, 1.5],
+    stagger: ['num', 0, 0.4, 0.12],
+    z: ['num', 0, 0.6, 0.2],
+  },
+  wyrmTornado: {
+    ...ANCHORED('defender'),
+    height: ['num', 0.4, 2.2, 1.5],
+    r0: ['num', 0.1, 1, 0.35],
+    r1: ['num', 0.2, 1.6, 0.9],
+    bands: ['int', 2, 9, 6],
+    w: ['num', 0.03, 0.3, 0.1],
+    rpm: ['num', 20, 400, 160],
+    fins: ['int', 0, 4, 0],
+    fin: ['hexes', 1, 2, null],
+    debris: ['int', 0, 10, 0],
+    debrisColour: ['hexes', 1, 2, null],
+    metal: ['num', 0, 1, 0],
+    crackle: ['num', 0, 1, 0],
+    crackleColour: ['hexes', 1, 2, null],
+  },
 };
 
 /**
@@ -414,6 +461,12 @@ export function tonguesAt(drawer, params) {
     // design 092 ground-rock-steel: the monolith is one stone.
     case 'monolith':
       return 1;
+    // design 092 ghost-dark-dragon: a piece, a ribbon, a band or a fin each count as a tongue.
+    case 'hauntedFurniture':
+    case 'darkRibbons':
+      return p.count;
+    case 'wyrmTornado':
+      return p.bands + p.fins;
     default:
       return 0;
   }
@@ -453,6 +506,11 @@ const DRAWER_FAMILY = Object.freeze({
   skyColumn: 'beam',
   // design 092 ground-rock-steel: a stone slab landing shakes the ground.
   monolith: 'quake',
+  // design 092 ghost-dark-dragon
+  hauntedFurniture: 'projectile',
+  darkDome: 'chime',
+  darkRibbons: 'beam',
+  wyrmTornado: 'wind',
 });
 
 /**
