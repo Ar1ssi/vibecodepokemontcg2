@@ -214,3 +214,15 @@ export function chiCrescentPose(s, h, params) {
   }
   return out;
 }
+
+/**
+ * Where a crescent's arcs are centred, as an offset (px) from the target's centre: `cross` × the
+ * radius back along the blade's middle (`angle`), so at `cross` 1 the blade's middle passes through
+ * the target (a slash across the card) and at 0 it sweeps round it. Screen degrees, as the pose.
+ * @returns {{ x: number, y: number }}
+ */
+export function chiCrescentCentre(params, h) {
+  const { radius, angle, cross } = withDefaults('chiCrescent', params);
+  const back = cross * radius * h;
+  return { x: -Math.cos(rad(angle)) * back, y: -Math.sin(rad(angle)) * back };
+}

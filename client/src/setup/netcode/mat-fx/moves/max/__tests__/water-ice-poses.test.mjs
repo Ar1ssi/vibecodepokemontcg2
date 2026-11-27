@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CROWN_FRAMES, auroraVeilPose, chiCrescentPose, splashCrownPose, surgeStonesPose } from '../water-ice-poses.mjs';
+import { CROWN_FRAMES, auroraVeilPose, chiCrescentCentre, chiCrescentPose, splashCrownPose, surgeStonesPose } from '../water-ice-poses.mjs';
 import { checkParams, tonguesAt } from '../../move-spec.mjs';
 
 const H = 100;
@@ -130,6 +130,22 @@ test('chiCrescentPose: a crescent sweeps round the card, pointed at both ends, t
   }
   assert.ok(chiCrescentPose(0.9, H, p).every((blade) => blade.alpha < 0.3), 'fading out, not burning');
   assert.ok(finite(mid.flatMap((blade) => blade.points)));
+});
+
+test('chiCrescentCentre: at cross 1 the blade slashes across the card, at 0 it sweeps round it', () => {
+  const length = ({ x, y }) => Math.hypot(x, y);
+  assert.equal(length(chiCrescentCentre({}, H)), 0, 'default: centred on the card, as before');
+  for (const angle of [0, 70, 200, 315]) {
+    const p = { radius: 1.1, angle, cross: 1 };
+    const off = chiCrescentCentre(p, H);
+    // The arc's point at `angle` (its middle) lands on the struck card's centre.
+    const midX = off.x + Math.cos((angle * Math.PI) / 180) * 1.1 * H;
+    const midY = off.y + Math.sin((angle * Math.PI) / 180) * 1.1 * H;
+    assert.ok(Math.hypot(midX, midY) < 1e-6, `angle ${angle}: the blade's middle crosses the centre`);
+  }
+  assert.ok(Math.abs(length(chiCrescentCentre({ radius: 1, cross: 0.5 }, H)) - 0.5 * H) < 1e-6, 'half a radius back');
+  assert.deepEqual(checkParams('chiCrescent', { cross: 1 }), []);
+  assert.ok(checkParams('chiCrescent', { cross: 2 }).length > 0, 'no further back than 1.2 radii');
 });
 
 test('splashCrown / chiCrescent: valid defaults; the crown counts one stream per plume', () => {

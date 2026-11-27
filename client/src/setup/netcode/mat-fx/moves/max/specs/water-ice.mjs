@@ -219,6 +219,8 @@ export const gmaxHydrosnipe = Object.freeze({
 });
 
 const CHI = Object.freeze({ deep: '#0E3A66', body: '#4FA8E8', hot: '#A6E6FF', core: '#E8FAFF' });
+// The attacker's charge rim and the struck card's veil: the slashes' blue, not their near-white hot.
+const CHI_RIM = Object.freeze({ deep: '#0E3A66', body: '#2F7FCF', hot: '#4FA8E8', core: '#A6E6FF' });
 
 /**
  * One crescent blade of the flurry (Rapid Flow): a lit band of chi swept round the defender
@@ -231,6 +233,10 @@ const cut = (at, angle, over = {}) => ({
   drawer: 'chiCrescent',
   params: { sweep: 150, radius: 0.85, count: 1, angle, thick: 0.2, tint: CHI, ...over },
 });
+
+/** One slash of the flurry: a big blade whose middle passes across the struck card (`cross`). */
+const slash = (at, angle, over = {}) =>
+  cut(at, angle, { radius: 1.15, sweep: 125, thick: 0.28, cross: 0.92, ...over });
 
 // G-Max Rapid Flow (Multicoup_G-Max_EB.mp4): blue chi and bubbles gather in Urshifu's fist
 // (1.5–2.3 s) · a sheet of water streams across, crossed blades of light with four-point glints
@@ -249,18 +255,23 @@ export const gmaxRapidFlow = Object.freeze({
   contactMs: 1000,
   pad: 1.9,
   attacker: { motion: 'lunge', params: { wind: 0.3, reach: 0.9, strikes: 3, glow: 0.8 } },
-  defender: { motion: 'stagger', params: { strength: 0.3, hits: 6, gapMs: 90, heat: 0.35, lead: 520 } },
-  tint: CHI,
+  defender: { motion: 'stagger', params: { strength: 0.3, hits: 6, gapMs: 75, heat: 0.35, lead: 520 } },
+  tint: CHI_RIM,
   beats: [
     { at: 0, until: 520, layer: 'front', drawer: 'coreCharge', params: { lead: 0.35, r0: 0.08, r1: 0.24, from: 0.05, rings: 2, tint: CHI } },
-    cut(480, 30),
-    cut(580, 210, { radius: 0.75 }),
-    cut(680, 120, { count: 2, gapDeg: 40 }),
-    cut(790, 300, { radius: 0.95 }),
-    cut(890, 60, { radius: 0.8 }),
+    // Crossed blades of light sweep round the target as the fist comes in.
+    cut(480, 30, { radius: 1.0, sweep: 170 }),
+    cut(620, 210, { radius: 1.05, sweep: 170 }),
+    cut(760, 120, { count: 2, gapDeg: 40, radius: 1.1 }),
+    // The flurry: big blades slash across the card from every side, the first on the contact frame.
+    slash(930, 330),
     flash(1000, CHI),
     { at: 990, until: 1330, layer: 'front', drawer: 'starFlare', params: { arms: 'cross', size: 0.42, width: 0.24, core: 0.12, grow: 0.1, breakAt: 0.6, tint: CHI } },
-    cut(1000, -30, { count: 2, gapDeg: 30, radius: 1.0 }),
+    slash(1000, 150, { count: 2, gapDeg: 24 }),
+    slash(1075, 60),
+    slash(1150, 240, { radius: 1.25 }),
+    slash(1225, 15),
+    slash(1300, 195, { count: 2, gapDeg: 24 }),
     { at: 1150, until: 1750, layer: 'front', drawer: 'splash', params: { count: 6, arc: 200, direction: -90, len: [0.5, 0.9], gravity: 0.7, tint: CHI } },
   ],
   particles: [droplets(1000, { count: 10 }), droplets(1150, { count: 6, kind: 'twinkle', gravity: 0, distance: 0.9, durationMs: 700 })],
