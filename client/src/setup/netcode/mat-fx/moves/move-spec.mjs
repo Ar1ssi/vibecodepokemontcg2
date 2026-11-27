@@ -84,6 +84,8 @@ export const UNIT_NAMES = Object.freeze([
   'coin',
   // design 092 grass-bug-flying
   'butterfly',
+  // design 092 electric-poison-fighting: the giant Dynamax fist of Max Knuckle / G-Max Chi Strike.
+  'maxFist',
 ]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 
@@ -422,6 +424,13 @@ const BASE_DRAWER_PARAMS = {
     rings: ['int', 3, 14, 9],
     growIn: ['num', 0.1, 0.6, 0.35],
     retract: ['num', 0.1, 0.5, 0.3],
+  },
+  // ---- design 092 electric-poison-fighting: the storm cloud over the target (max/storm-cloud.mjs) ----
+  stormCloud: {
+    ...ANCHORED('sky'),
+    r: ['num', 0.3, 1.5, 0.75],
+    puffs: ['int', 3, 10, 7],
+    flashes: ['int', 0, 6, 3],
   },
 };
 

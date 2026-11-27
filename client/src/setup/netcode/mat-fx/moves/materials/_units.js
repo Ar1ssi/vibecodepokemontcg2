@@ -10,6 +10,7 @@
 import { rgbCss } from '../../fx-colors.mjs';
 // design 092 grass-bug-flying
 import { butterflyUnit } from '../max/max-drawers-gbf.js';
+import { withFxMod } from './_mods.js';
 
 const TAU = Math.PI * 2;
 const rad = (deg) => (deg * Math.PI) / 180;
@@ -325,6 +326,110 @@ function coinUnit(ctx, x, y, r, angleDeg, s, palette) {
   });
 }
 
+// ---- design 092 electric-poison-fighting -------------------------------------------------
+
+// The fist's lit body on the GPU canvas: a padded volume lit from the upper left, rimmed.
+const FIST_VOLUME = Object.freeze({
+  volume: Object.freeze({ amount: 0.9, spec: 0.55, rim: 0.6, ambient: 0.32, light: 120, bump: 0.2 }),
+});
+
+/** A rounded-rectangle path from (x0, y0) to (x1, y1), corner radius k. */
+function roundRectPath(ctx, x0, y0, x1, y1, k) {
+  ctx.beginPath();
+  ctx.moveTo(x0 + k, y0);
+  ctx.lineTo(x1 - k, y0);
+  ctx.arc(x1 - k, y0 + k, k, -Math.PI / 2, 0);
+  ctx.lineTo(x1, y1 - k);
+  ctx.arc(x1 - k, y1 - k, k, 0, Math.PI / 2);
+  ctx.lineTo(x0 + k, y1);
+  ctx.arc(x0 + k, y1 - k, k, Math.PI / 2, Math.PI);
+  ctx.lineTo(x0, y0 + k);
+  ctx.arc(x0 + k, y0 + k, k, Math.PI, Math.PI * 1.5);
+  ctx.closePath();
+}
+
+/** A capsule path along y from x0 to x1, half-height hh. */
+function capsulePath(ctx, x0, x1, y, hh) {
+  ctx.beginPath();
+  ctx.moveTo(x0, y - hh);
+  ctx.lineTo(x1, y - hh);
+  ctx.arc(x1, y, hh, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(x0, y + hh);
+  ctx.arc(x0, y, hh, Math.PI / 2, Math.PI * 1.5);
+  ctx.closePath();
+}
+
+const FINGER_ROWS = Object.freeze([-0.45, -0.15, 0.15, 0.45]);
+const SPEED_LINES = Object.freeze([
+  [-0.42, 1.1],
+  [-0.12, 1.5],
+  [0.2, 1.25],
+  [0.48, 0.9],
+]);
+
+/**
+ * Max Knuckle's giant Dynamax fist, knuckles leading along `angleDeg` (Max Knuckle, G-Max Chi
+ * Strike): a glow round it, speed lines trailing, the cuff, the back of the hand, four finger rolls
+ * (the gaps between them are the creases) and the thumb, each lit from the upper left (core → hot →
+ * body → deep), the hand and fingers rimmed in hot like the Dynamax outline.
+ */
+function maxFistUnit(ctx, x, y, r, angleDeg, s, palette) {
+  if (!(r > 0)) return;
+  framed(ctx, x, y, angleDeg, () => {
+    const halo = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.6);
+    halo.addColorStop(0, rgbCss(palette.body, 0.35));
+    halo.addColorStop(1, rgbCss(palette.deep, 0));
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.6, 0, TAU);
+    ctx.fill();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = rgbCss(palette.core, 0.45);
+    ctx.lineWidth = Math.max(1, r * 0.045);
+    for (const [dy, len] of SPEED_LINES) {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.95, dy * r);
+      ctx.lineTo(-r * (0.95 + len), dy * r);
+      ctx.stroke();
+    }
+    const lit = (lx, ly, reach) => {
+      const g = ctx.createRadialGradient(lx, ly, reach * 0.05, lx + reach * 0.35, ly + reach * 0.4, reach);
+      g.addColorStop(0, rgbCss(palette.core, 0.95));
+      g.addColorStop(0.3, rgbCss(palette.hot, 0.9));
+      g.addColorStop(0.7, rgbCss(palette.body, 0.88));
+      g.addColorStop(1, rgbCss(palette.deep, 0.85));
+      return g;
+    };
+    withFxMod(ctx, FIST_VOLUME, () => {
+      ctx.fillStyle = rgbCss(palette.body, 0.75);
+      roundRectPath(ctx, -1.12 * r, -0.4 * r, -0.62 * r, 0.4 * r, 0.12 * r);
+      ctx.fill();
+      ctx.fillStyle = rgbCss(palette.hot, 0.85);
+      roundRectPath(ctx, -0.74 * r, -0.44 * r, -0.6 * r, 0.44 * r, 0.05 * r);
+      ctx.fill();
+      ctx.fillStyle = lit(-0.4 * r, -0.4 * r, 1.05 * r);
+      roundRectPath(ctx, -0.66 * r, -0.6 * r, 0.18 * r, 0.6 * r, 0.26 * r);
+      ctx.fill();
+      for (const fy of FINGER_ROWS) {
+        ctx.fillStyle = lit(0.2 * r, (fy - 0.1) * r, 0.62 * r);
+        capsulePath(ctx, 0.08 * r, 0.6 * r, fy * r, 0.135 * r);
+        ctx.fill();
+      }
+      ctx.fillStyle = lit(-0.15 * r, 0.45 * r, 0.6 * r);
+      capsulePath(ctx, -0.32 * r, 0.3 * r, 0.6 * r, 0.12 * r);
+      ctx.fill();
+    });
+    ctx.strokeStyle = rgbCss(palette.hot, 0.9);
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    roundRectPath(ctx, -0.66 * r, -0.6 * r, 0.18 * r, 0.6 * r, 0.26 * r);
+    ctx.stroke();
+    for (const fy of FINGER_ROWS) {
+      capsulePath(ctx, 0.08 * r, 0.6 * r, fy * r, 0.135 * r);
+      ctx.stroke();
+    }
+  });
+}
+
 export const UNITS = Object.freeze({
   body: bodyUnit,
   rings: ringsUnit,
@@ -341,6 +446,8 @@ export const UNITS = Object.freeze({
   coin: coinUnit,
   // design 092 grass-bug-flying
   butterfly: butterflyUnit,
+  // design 092 electric-poison-fighting
+  maxFist: maxFistUnit,
 });
 
 export const UNIT_KEYS = Object.freeze(Object.keys(UNITS));

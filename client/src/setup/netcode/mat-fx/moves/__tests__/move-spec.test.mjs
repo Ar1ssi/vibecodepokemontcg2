@@ -27,8 +27,9 @@ const has = (errors, text) => errors.some((message) => message.includes(text));
 test('every drawer has a table, and its defaults are valid params', () => {
   // 063's 23 + design 065's fan, shade, chain, grip + design 092's Max Move drawers, by group:
   // psychic-fairy hoopCoil, skyColumn · ground-rock-steel monolith ·
-  // ghost-dark-dragon hauntedFurniture, darkDome, darkRibbons, wyrmTornado · grass-bug-flying prop, vine, tornado
-  assert.equal(Object.keys(DRAWER_PARAMS).length, 37);
+  // ghost-dark-dragon hauntedFurniture, darkDome, darkRibbons, wyrmTornado · grass-bug-flying prop, vine, tornado ·
+  // electric-poison-fighting stormCloud
+  assert.equal(Object.keys(DRAWER_PARAMS).length, 38);
   for (const drawer of Object.keys(DRAWER_PARAMS)) {
     assert.deepEqual(checkParams(drawer, {}), [], drawer);
     assert.deepEqual(checkParams(drawer, withDefaults(drawer, {})), [], `${drawer} defaults`);

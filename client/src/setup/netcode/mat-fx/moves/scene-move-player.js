@@ -39,6 +39,8 @@ const isSourceOver = (beat) =>
   // design 092 grass-bug-flying: matter (apples, roots, plants, vines) covers what is under it.
   beat.drawer === 'prop' ||
   beat.drawer === 'vine' ||
+  // design 092 electric-poison-fighting: the storm cloud is matter.
+  beat.drawer === 'stormCloud' ||
   (beat.drawer === 'terrain' && beat.params.kind === 'crack');
 
 const centreOf = (rect) => ({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
