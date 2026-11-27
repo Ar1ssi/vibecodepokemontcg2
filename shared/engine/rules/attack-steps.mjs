@@ -668,6 +668,12 @@ const TEMPLATES = [
     /^discard all (special )?energy(?: cards?)? (?:from|attached to) both active pokémon$/,
     (m) => ({ type: 'atkDiscardBothActiveEnergy', ...(m[1] ? { special: true } : {}) }),
   ],
+  // Mega Latias ex Luster Purge (customhb, set.json record customhb-1082): "this Pokémon and your
+  // opponent's Active Pokémon" is both Actives; parseAttackEnergyDiscard leaves this sentence to the step.
+  [
+    /^discard all (special )?energy(?: cards?)? (?:from|attached to) this pokémon and your opponent's active pokémon$/,
+    (m) => ({ type: 'atkDiscardBothActiveEnergy', ...(m[1] ? { special: true } : {}) }),
+  ],
   // Vise Grip (user's scan): "Discard 1 Energy from both Active Pokémon".
   [
     /^discard (an?|\d+) (special )?energy(?: cards?)? (?:from|attached to) both active pokémon$/,

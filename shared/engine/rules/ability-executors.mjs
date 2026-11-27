@@ -93,7 +93,10 @@ export function abilityNameLimitKeyFor(card, abilityIndex = 0) {
 // on the move and stays legal from the Bench, and "As long as this Pokémon is in the Active Spot …"
 // is a passive with nothing to activate. Matching either of those would disable a legal ability,
 // which costs more than the over-permissive behavior this replaces.
-const ACTIVE_SPOT_CLAUSE = /if this pok[eé]mon is (?:in the active spot|active|your active pok[eé]mon)\b/;
+// "As long as this Pokémon is in the Active Spot, once during your turn, you may …" (Latios ex Gentle
+// Jet, customhb-1083) is the same gate on an activated ability: the "once during your turn" follows.
+const ACTIVE_SPOT_CLAUSE =
+  /if this pok[eé]mon is (?:in the active spot|active|your active pok[eé]mon)\b|as long as this pok[eé]mon is (?:in the active spot|your active pok[eé]mon),? once during your turn\b/;
 
 export function requiresActiveSpot(card) {
   const text = textOf(card).replace(/[‘’]/g, "'");
