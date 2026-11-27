@@ -46,6 +46,9 @@ export const PARTICLE_KINDS = Object.freeze([
   // Design 065 § F: a Z (Dark Void's sleep motes) and an eighth note (Relic Song).
   'zzz',
   'note',
+  // design 092 fire-normal: G-Max Gold Rush's coins and G-Max Replenish's berries.
+  'coin',
+  'berry',
 ]);
 export const TIER_BAND = Object.freeze({ 1: [900, 1100], 2: [1200, 1500], 3: [1600, 2200], S: [1800, 2600] });
 /** Design 065: tier S (signature moves) contact window, on top of the ratio band. */
@@ -65,7 +68,19 @@ const ANCHORED = (fallback = 'defender') => ({
   dy: ['num', -2, 2, 0],
 });
 /** Design 065 § New pieces C: the bodies a travelling / orbiting drawer can draw (materials/_units.js). */
-export const UNIT_NAMES = Object.freeze(['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+export const UNIT_NAMES = Object.freeze([
+  'body',
+  'rings',
+  'spiked',
+  'facet',
+  'hoop',
+  'crescent',
+  'fist',
+  'hex',
+  'wheel',
+  // design 092 fire-normal
+  'coin',
+]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 
 const BASE_DRAWER_PARAMS = {

@@ -246,6 +246,46 @@ function wheelUnit(ctx, x, y, r, angleDeg, s, palette) {
   });
 }
 
+// design 092 fire-normal: G-Max Gold Rush's coin.
+/**
+ * A gold coin tumbling (G-Max Gold Rush): a deep rim round a face lit from the upper left, an
+ * embossed ring with a lit edge, a glint. It rocks about its own upright axis, never further than a
+ * third of the way to edge-on, so it always reads as a coin; the heading sets where in its rock it
+ * starts, so coins thrown together turn out of step.
+ */
+function coinUnit(ctx, x, y, r, angleDeg, s, palette) {
+  if (!(r > 0)) return;
+  const turn = Math.cos(TAU * 0.75 * s + rad(angleDeg));
+  const squash = 0.35 + 0.65 * Math.abs(turn);
+  framed(ctx, x, y, angleDeg * 0.2, () => {
+    ctx.scale(squash, 1);
+    disc(ctx, r, palette.deep, 0.9);
+    const face = ctx.createRadialGradient(-0.3 * r, -0.35 * r, 0, 0, 0, r * 0.86);
+    face.addColorStop(0, rgbCss(palette.core, 0.9));
+    face.addColorStop(0.3, rgbCss(palette.hot, 0.9));
+    face.addColorStop(0.75, rgbCss(palette.body, 0.9));
+    face.addColorStop(1, rgbCss(palette.deep, 0.9));
+    ctx.fillStyle = face;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.86, 0, TAU);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.strokeStyle = rgbCss(palette.deep, 0.8);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.56, 0, TAU);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(1, r * 0.05);
+    ctx.strokeStyle = rgbCss(palette.hot, 0.7);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.62, Math.PI * 0.9, Math.PI * 1.6);
+    ctx.stroke();
+    ctx.fillStyle = rgbCss(palette.core, 0.8);
+    ctx.beginPath();
+    ctx.ellipse(-0.36 * r, -0.4 * r, r * 0.14, r * 0.07, -0.6, 0, TAU);
+    ctx.fill();
+  });
+}
+
 export const UNITS = Object.freeze({
   body: bodyUnit,
   rings: ringsUnit,
@@ -256,6 +296,8 @@ export const UNITS = Object.freeze({
   fist: fistUnit,
   hex: hexUnit,
   wheel: wheelUnit,
+  // design 092 fire-normal
+  coin: coinUnit,
 });
 
 export const UNIT_KEYS = Object.freeze(Object.keys(UNITS));

@@ -143,6 +143,28 @@ const SHAPES = {
 };
 SHAPES.ember = SHAPES.streak;
 
+// design 092 fire-normal: matter, not light (bursts draw over the board): G-Max Gold Rush's coins
+// and G-Max Replenish's berries keep their own colours, as `star` does, lit from the upper left.
+SHAPES.coin = (ctx) => {
+  ellipse(ctx);
+  ctx.fillStyle = radial(ctx, -0.15, -0.2, [[0, '#fff6c0'], [0.3, '#ffd84a'], [0.75, '#e8a815'], [1, '#8a5205']]);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 0.3, 0.3, 0, 0, TAU);
+  ctx.strokeStyle = '#a8680a';
+  ctx.lineWidth = 0.07;
+  ctx.stroke();
+};
+SHAPES.berry = (ctx) => {
+  ellipse(ctx);
+  ctx.fillStyle = radial(ctx, -0.15, -0.2, [[0, '#fff9c8'], [0.28, '#f3e063'], [0.72, '#d9b320'], [1, '#7a5c06']]);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0.08, -0.46, 0.18, 0.08, -0.5, 0, TAU);
+  ctx.fillStyle = '#4fa83a';
+  ctx.fill();
+};
+
 /** The shape each move particle kind draws ('dot' is the plain `.fx-particle`). */
 export const PARTICLE_SHAPES = Object.freeze(Object.fromEntries(PARTICLE_KINDS.map((kind) => [kind, kind in SHAPES ? kind : 'dot'])));
 
