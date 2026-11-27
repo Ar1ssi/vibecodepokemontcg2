@@ -80,6 +80,7 @@ export const UNIT_NAMES = Object.freeze([
   'wheel',
   // design 092 fire-normal
   'coin',
+  'berry',
 ]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 

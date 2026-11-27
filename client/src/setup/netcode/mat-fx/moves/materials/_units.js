@@ -286,6 +286,41 @@ function coinUnit(ctx, x, y, r, angleDeg, s, palette) {
   });
 }
 
+/**
+ * A berry (G-Max Replenish): a fruit 1.4 r across lit from the upper left (core highlight through
+ * hot and body to a deep shadow side), a glint, and a stalk with a leaf in the deep tone. It spins
+ * slowly with s, so berries thrown together tumble apart.
+ */
+function berryUnit(ctx, x, y, r, angleDeg, s, palette) {
+  if (!(r > 0)) return;
+  const R = r * 1.4;
+  framed(ctx, x, y, angleDeg * 0.15 + 40 * s, () => {
+    const fruit = ctx.createRadialGradient(-0.35 * R, -0.35 * R, 0, 0, 0, R);
+    fruit.addColorStop(0, rgbCss(palette.core, 1));
+    fruit.addColorStop(0.25, rgbCss(palette.hot, 1));
+    fruit.addColorStop(0.7, rgbCss(palette.body, 1));
+    fruit.addColorStop(1, rgbCss(palette.deep, 1));
+    ctx.fillStyle = fruit;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, TAU);
+    ctx.fill();
+    ctx.fillStyle = rgbCss(palette.core, 0.85);
+    ctx.beginPath();
+    ctx.ellipse(-0.38 * R, -0.42 * R, R * 0.16, R * 0.09, -0.6, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = rgbCss(palette.deep, 1);
+    ctx.lineWidth = Math.max(1, R * 0.1);
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.9);
+    ctx.lineTo(R * 0.12, -R * 1.25);
+    ctx.stroke();
+    ctx.fillStyle = rgbCss(palette.deep, 1);
+    ctx.beginPath();
+    ctx.ellipse(R * 0.32, -R * 1.12, R * 0.3, R * 0.12, -0.5, 0, TAU);
+    ctx.fill();
+  });
+}
+
 export const UNITS = Object.freeze({
   body: bodyUnit,
   rings: ringsUnit,
@@ -298,6 +333,7 @@ export const UNITS = Object.freeze({
   wheel: wheelUnit,
   // design 092 fire-normal
   coin: coinUnit,
+  berry: berryUnit,
 });
 
 export const UNIT_KEYS = Object.freeze(Object.keys(UNITS));

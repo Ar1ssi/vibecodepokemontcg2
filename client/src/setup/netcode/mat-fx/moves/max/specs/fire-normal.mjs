@@ -176,8 +176,11 @@ export const gMaxCentiferno = Object.freeze({
   grain: 0.28,
 });
 
-// The ball burns darker inside than at its rim: an orange heart, not a white one.
-const BALL = Object.freeze({ deep: '#6A140A', body: '#C83A22', hot: '#F07A30', core: '#FFC070' });
+// The ball burns orange with a hot yellow rim and an orange-gold heart, never a white one: as
+// light over a bright card, a red ball summed into a faint haze.
+const BALL = Object.freeze({ deep: '#8A2A0A', body: '#E8641C', hot: '#FFA83C', core: '#FFD880' });
+// The comet behind it is darker, so the two never sum to white at the ball's heart.
+const TAIL = Object.freeze({ deep: '#5A1008', body: '#B03018', hot: '#E06A28', core: '#F8A050' });
 const BLAST = Object.freeze({ deep: '#8A2A0A', body: '#F08A1E', hot: '#FFD24A', core: '#FFF4C8' });
 /** The explosion's jets: sideways sprays and two climbing ones, screen degrees. */
 const BLAST_ARMS = Object.freeze([
@@ -189,7 +192,8 @@ const BLAST_ARMS = Object.freeze([
 
 // G-Max Fireball (Pyroball G-Max) — 11.5 s clip (ability text first), contact at 8.75 s.
 // Cinderace juggles an ember that swells into a giant fireball and kicks it; the red-orange ball
-// with a white-hot flaming rim and long orange streaks flies at the target; it bursts into a
+// with a white-hot flaming rim and long orange streaks flies at the target (here a ball about a
+// card height across with flames licking off its rim and a short tail); it bursts into a
 // gold-white explosion that throws sparks out sideways and leaves embers falling.
 // Sampled: ball #9C4537 #D75252 #F78C34 #FDA83C; blast #E0967D #FFC892.
 export const gMaxFireball = Object.freeze({
@@ -208,7 +212,11 @@ export const gMaxFireball = Object.freeze({
   tint: BLAST,
   beats: [
     { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.05, r1: 0.22, from: 0.1, tint: BALL } },
-    { at: 680, until: CONTACT, layer: 'front', drawer: 'projectile', params: { path: 'straight', ease: 'in', r0: 0.18, r1: 0.28, tongues: 9, tint: BALL } },
+    // The tail: a small comet on the same flight, its flame jets streaming a little past the ball.
+    { at: 680, until: CONTACT - 20, layer: 'front', drawer: 'projectile', params: { path: 'straight', ease: 'in', r0: 0.16, r1: 0.18, tongues: 0, tint: TAIL } },
+    // The ball: a fire body flown unstretched (a flare), about a card height across, flames licking
+    // round its rim; it ignites small and grows on the way. It lands as the explosion ignites.
+    { at: 680, until: CONTACT - 20, layer: 'front', drawer: 'projectile', params: { path: 'straight', ease: 'in', r0: 0.3, r1: 0.3, tongues: 0, flare: 'cross', size: 0.45, flareWidth: 0.2, flareCore: 0.7, tint: BALL } },
     dim(1000, 1800),
     flash(CONTACT, BLAST),
     { at: CONTACT - 20, until: 1800, layer: 'front', drawer: 'starFlare', params: { arms: BLAST_ARMS, size: 1, width: 0.36, core: 0.45, grow: 0.06, breakAt: 0.45, tint: BLAST } },
@@ -227,21 +235,24 @@ export const gMaxFireball = Object.freeze({
 const SPIKE = Object.freeze({ deep: '#3B2A6E', body: '#8A5CC8', hot: '#C8A8FF', core: '#F0E8FF' });
 // Each crescent keeps its own colour to its core: two hued crescents sharing one pale core summed
 // into one cream smear.
-const SWEEP_YELLOW = Object.freeze({ deep: '#806010', body: '#D8B800', hot: '#E8C820', core: '#F0D840' });
-const SWEEP_CYAN = Object.freeze({ deep: '#0A5A70', body: '#18B0D0', hot: '#40C8E8', core: '#90E8F8' });
+const SWEEP_YELLOW = Object.freeze({ deep: '#604400', body: '#C89800', hot: '#D8AC08', core: '#E0B818' });
+const SWEEP_CYAN = Object.freeze({ deep: '#08506A', body: '#109CC0', hot: '#30B8E0', core: '#58C8E8' });
 const GOLD = Object.freeze({ deep: '#C8860A', body: '#F2C230', hot: '#FFE98A', core: '#FFFBE8' });
 
 /** The sparks crackling up off the attacker as it Dynamax-charges (its own rim lights with them). */
 const chargeSparks = () =>
   motes(60, 12, { anchor: 'attacker', kind: 'streak', direction: -90, spread: 90, distance: 1.1, size: [0.05, 0.11], aspect: 0.25, maxDelay: 0.35, durationMs: 800 });
 
-/** A crescent of light sweeping over the upper half of the target. */
+/**
+ * A crescent of light sweeping 240° round the target at 1.1 h: the blade (the arc's chord, drawn
+ * long) runs about two card heights across the card as it turns, as the game's screen-wide sweep.
+ */
 const crescent = (at, angle, tint) => ({
   at,
   until: at + 540,
   layer: 'front',
   drawer: 'slashArc',
-  params: { count: 1, sweep: 170, radius: 0.6, angle, thick: 0.3, tint },
+  params: { count: 1, sweep: 240, radius: 1.1, angle, thick: 0.3, tint },
 });
 
 /**
@@ -253,8 +264,8 @@ const crescent = (at, angle, tint) => ({
 const strikeFrame = () => [
   { at: 640, until: 1250, layer: 'front', drawer: 'shards', params: { mode: 'cluster', count: 9, tint: SPIKE } },
   flash(CONTACT, GOLD),
-  crescent(860, -105, SWEEP_YELLOW),
-  crescent(920, -85, SWEEP_CYAN),
+  crescent(860, -135, SWEEP_YELLOW),
+  crescent(930, -70, SWEEP_CYAN),
 ];
 
 /** A spec of the strike frame: everything but its own name, motions and closing beats. */
@@ -300,13 +311,15 @@ export const gMaxCuddle = strikeSpec({
 // G-Max Replenish (Récolte G-Max) — 16 s clip, contact at 4.95 s: the strike frame, then the hit
 // throws up cream dust (the normal hit's own dust settles round the card here) and yellow berries
 // bounce out across the field (the move restores berries). Sampled: berries #BCB305 #F3E063.
+const BERRY = Object.freeze({ deep: '#3F7A24', body: '#D8C020', hot: '#F3E063', core: '#FFF9C8' });
 export const gMaxReplenish = strikeSpec({
   id: 'g-max-replenish',
   name: 'G-Max Replenish',
   attacker: { motion: 'channel', params: { pulse: 0.06, glow: 0.35 } },
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.3 } },
   durationMs: 2400,
-  particles: [motes(MATTER_AT, 14, { kind: 'berry', direction: -90, spread: 170, distance: 1.2, size: [0.12, 0.16], aspect: 1, gravity: 1, maxDelay: 0.2, durationMs: 1450 })],
+  after: [{ at: CONTACT - 20, until: 2200, layer: 'top', drawer: 'shards', params: { count: 7, arc: 360, direction: -90, distance: 1.3, spin: 90, unit: 'berry', tint: BERRY } }],
+  particles: [motes(MATTER_AT, 14, { kind: 'berry', direction: -90, spread: 170, distance: 1.3, size: [0.2, 0.3], aspect: 1, gravity: 1, maxDelay: 0.12, durationMs: 1500 })],
 });
 
 // G-Max Gold Rush (Pactole G-Max) — 13.5 s clip, contact at 4.7 s.
@@ -320,7 +333,7 @@ export const gMaxGoldRush = Object.freeze({
   vgType: 'normal',
   statClass: 'physical',
   tier: 'S',
-  family: 'projectile',
+  family: 'burst',
   material: 'normal',
   durationMs: 2400,
   contactMs: CONTACT,
@@ -330,12 +343,13 @@ export const gMaxGoldRush = Object.freeze({
   tint: GOLD,
   beats: [
     flash(CONTACT, GOLD),
-    { at: 620, until: CONTACT + 20, layer: 'front', drawer: 'projectile', params: { from: 'sky', path: 'straight', ease: 'in', r0: 0.42, r1: 0.5, tongues: 0, unit: 'coin', tint: GOLD } },
+    { at: 600, until: CONTACT - 40, layer: 'front', drawer: 'projectile', params: { from: 'sky', path: 'straight', ease: 'in', r0: 0.42, r1: 0.5, tongues: 0, unit: 'coin', tint: GOLD } },
+    { at: CONTACT - 60, until: 1700, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, direction: -90, distance: 1.4, spin: 540, unit: 'coin', tint: GOLD } },
     { at: 1150, until: 2300, layer: 'front', drawer: 'volley', params: { from: 'sky', count: 6, stagger: 140, r0: 0.1, r1: 0.12, bow: 0.3, tongues: 0, unit: 'coin', tint: GOLD } },
   ],
   particles: [
-    chargeSparks(),
-    motes(MATTER_AT, 15, { kind: 'coin', direction: -90, spread: 200, distance: 1.4, size: [0.12, 0.2], aspect: 0.6, gravity: 1.2, maxDelay: 0.12, durationMs: 1450 }),
+    { ...chargeSparks(), count: 8 },
+    motes(MATTER_AT, 18, { kind: 'coin', direction: -90, spread: 220, distance: 1.5, size: [0.16, 0.26], aspect: 0.6, gravity: 1.2, maxDelay: 0.05, durationMs: 1450 }),
   ],
   grain: 0.12,
 });
