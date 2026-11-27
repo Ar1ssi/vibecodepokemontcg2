@@ -15,7 +15,7 @@ const flash = (at, tint) => ({ at, until: at + 150, layer: 'top', drawer: 'impac
 
 /** Light and bubbles gathering round the attacker as its water orb charges. */
 const charging = (at = 100) =>
-  Object.freeze({ at, anchor: 'attacker', count: 10, distance: 0.55, direction: -90, spread: 360, size: [0.04, 0.08], aspect: 1, gravity: 0, maxDelay: 0.45, durationMs: 700, kind: 'mote' });
+  Object.freeze({ at, anchor: 'attacker', count: 14, distance: 0.6, direction: -90, spread: 360, size: [0.07, 0.13], aspect: 1, gravity: 0, maxDelay: 0.35, durationMs: 800, kind: 'mote' });
 
 /** A burst of water drops thrown off the defender, falling. */
 const droplets = (at, over = {}) =>
@@ -40,25 +40,25 @@ const droplets = (at, over = {}) =>
 /**
  * The shared geyser: a water orb swells at the attacker's mouth in its own cool light; a
  * pressurised torrent (a bright core in a widening stream) lands on the defender at contact
- * (1000 ms); a jet bursts up out of the card and a crown of spray is thrown round it (no rigid
- * column: on this kit one reads as a glass tube, ice); the water rains back down on the card as
- * mist hangs. `tint`
+ * (1000 ms); the geyser erupts out of the card as a crown of water 2-3 card heights tall (the
+ * splashCrown drawer: no rigid column, which on this kit reads as a glass tube, ice), throwing
+ * drops; the water rains back down on the card as mist hangs. The crown starts 20 ms before
+ * contact, so the game's impact prefab never strips it (it replaces contact dressing only). `tint`
  * colours the water; `extra` adds the move's own touch (bubbles, stones); `jet` / `crown` / `rain`
  * trim the spray when a touch needs the tongue budget.
  */
 /** The orb's own cool light: the clear water drop takes its colour from what it bends. */
 const ORB_LIGHT = Object.freeze({ deep: '#2A9AD8', body: '#A8F0FF', hot: '#E2FAFF', core: '#F4FDFF' });
 
-const geyserBeats = (tint, { extra = [], jet = 7, crown = 9, rain = 6 } = {}) => [
+const geyserBeats = (tint, { extra = [], rain = 6, crown = {} } = {}) => [
   { at: 100, until: 700, layer: 'front', drawer: 'cloud', params: { target: 'attacker', dx: 0.42, count: 4, radius: 0.3, drift: 0.04, alpha: 0.8, tint: ORB_LIGHT } },
   { at: 0, until: 700, layer: 'front', drawer: 'coreCharge', params: { lead: 0.42, r0: 0.14, r1: 0.44, from: 0.05, tint } },
   // growIn 0.4 of 1000 ms: the torrent's head lands on the defender at 1000; its bright core
   // retracts first, as the geyser takes over.
   { at: 600, until: 1250, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.1, growIn: 0.4, retract: 0.3, tint } },
   { at: 600, until: 1600, layer: 'front', drawer: 'beam', params: { kind: 'widening', w: 0.5, growIn: 0.4, retract: 0.25, tint } },
+  { at: 980, until: 2150, layer: 'front', drawer: 'splashCrown', params: { height: 2.5, width: 1.25, copies: 3, spread: 20, drops: 6, ...crown, tint } },
   flash(1000, tint),
-  { at: 1000, until: 1700, layer: 'front', drawer: 'splash', params: { count: jet, arc: 50, direction: -90, len: [1.0, 1.5], gravity: 0.5, stagger: 0.03, tint } },
-  { at: 1060, until: 1720, layer: 'front', drawer: 'splash', params: { count: crown, arc: 200, direction: -90, len: [0.8, 1.4], gravity: 0.8, tint } },
   { at: 1150, until: 2250, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.5, drift: 0.4, direction: -90, alpha: 0.45 } },
   { at: 1450, until: 2250, layer: 'front', drawer: 'rain', params: { count: rain, height: 1.6, spread: 1.2, tint } },
   ...extra,
@@ -110,6 +110,7 @@ export const gmaxFoamBurst = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.45, heat: 0.35 } },
   tint: FOAM,
   beats: geyserBeats(FOAM, {
+    crown: { drops: 9 },
     extra: [{ at: 380, until: 1000, layer: 'front', drawer: 'volley', params: { count: 8, stagger: 45, r0: 0.06, r1: 0.11, bow: 0.55, tongues: 0, tint: FOAM } }],
   }),
   particles: [droplets(1000), droplets(1200, { count: 8, kind: 'mote', gravity: 0, direction: -90, spread: 140, distance: 1.1, durationMs: 1000 })],
@@ -139,8 +140,6 @@ export const gmaxStonesurge = Object.freeze({
   defender: { motion: 'knock', params: { strength: 0.5, heat: 0.35 } },
   tint: SURGE,
   beats: geyserBeats(SURGE, {
-    jet: 6,
-    crown: 5,
     rain: 5,
     extra: [{ at: 1000, until: 2400, layer: 'front', drawer: 'surgeStones', params: { from: 'erupt', count: 8, distance: 0.95, height: 0.75, size: [0.06, 0.11], tint: STONE } }],
   }),
@@ -172,8 +171,8 @@ export const gmaxCannonade = Object.freeze({
     // Six shots, 70 ms apart, each crossing the lane in 300 ms; the last lands at contact.
     { at: 400, until: 1050, layer: 'front', drawer: 'volley', params: { count: 6, stagger: 70, r0: 0.1, r1: 0.16, bow: 0.35, tongues: 3, tint: CANNON } },
     flash(1050, CANNON),
-    { at: 1000, until: 1750, layer: 'front', drawer: 'splash', params: { count: 6, arc: 40, direction: -90, len: [1.0, 1.5], gravity: 0.5, tint: CANNON } },
-    { at: 1050, until: 1750, layer: 'front', drawer: 'splash', params: { count: 16, arc: 300, direction: -90, len: [0.6, 1.2], gravity: 0.75, stagger: 0.02, tint: CANNON } },
+    // The converging jets throw up one great crown, the width of the reference's splash.
+    { at: 1030, until: 2200, layer: 'front', drawer: 'splashCrown', params: { height: 2.7, width: 1.5, copies: 3, spread: 26, drops: 8, tint: CANNON } },
     { at: 1250, until: 2300, layer: 'front', drawer: 'cloud', params: { count: 5, radius: 0.5, drift: 0.4, direction: -90, alpha: 0.3 } },
     { at: 1550, until: 2300, layer: 'front', drawer: 'rain', params: { count: 8, height: 1.4, spread: 1.2, tint: CANNON } },
   ],
@@ -208,9 +207,8 @@ export const gmaxHydrosnipe = Object.freeze({
     { at: 800, until: 1350, layer: 'front', drawer: 'beam', params: { kind: 'solid', w: 0.16, growIn: 0.32, retract: 0.4, tint: LANCE } },
     { at: 800, until: 1000, layer: 'front', drawer: 'projectile', params: { path: 'straight', r0: 0.1, r1: 0.14, bow: 0, tongues: 3, ease: 'in', tint: LANCE } },
     flash(1000, LANCE),
-    { at: 1000, until: 1850, layer: 'front', drawer: 'splash', params: { count: 10, arc: 36, direction: -90, len: [1.1, 1.5], gravity: 0.4, stagger: 0.02, tint: LANCE } },
-    { at: 1080, until: 1700, layer: 'front', drawer: 'splash', params: { count: 8, arc: 130, direction: -90, len: [0.6, 1.0], gravity: 0.8, tint: LANCE } },
-    { at: 1150, until: 1950, layer: 'front', drawer: 'splash', params: { count: 8, arc: 28, direction: -90, len: [1.0, 1.5], gravity: 0.35, stagger: 0.03, tint: LANCE } },
+    // The shot blasts a tall, narrow column of spray up round the target.
+    { at: 975, until: 2050, layer: 'front', drawer: 'splashCrown', params: { height: 2.9, width: 0.8, copies: 3, spread: 7, drops: 7, tint: LANCE } },
     { at: 1250, until: 2200, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.4, drift: 0.5, direction: -90, alpha: 0.3 } },
   ],
   particles: [
@@ -222,13 +220,16 @@ export const gmaxHydrosnipe = Object.freeze({
 
 const CHI = Object.freeze({ deep: '#0E3A66', body: '#4FA8E8', hot: '#A6E6FF', core: '#E8FAFF' });
 
-/** One crescent slash of the flurry (Rapid Flow): a broad arc swept across the defender. */
+/**
+ * One crescent blade of the flurry (Rapid Flow): a lit band of chi swept round the defender
+ * (chiCrescent: a hot leading edge over a shadowed inner side), fading clean instead of burning.
+ */
 const cut = (at, angle, over = {}) => ({
   at,
-  until: at + 260,
+  until: at + 280,
   layer: 'front',
-  drawer: 'slashArc',
-  params: { sweep: 150, radius: 0.85, count: 1, angle, thick: 0.18, tint: CHI, ...over },
+  drawer: 'chiCrescent',
+  params: { sweep: 150, radius: 0.85, count: 1, angle, thick: 0.2, tint: CHI, ...over },
 });
 
 // G-Max Rapid Flow (Multicoup_G-Max_EB.mp4): blue chi and bubbles gather in Urshifu's fist
@@ -307,7 +308,8 @@ export const maxHailstorm = Object.freeze({
 });
 
 const AURORA = Object.freeze({ deep: '#3E5FB0', body: '#9FD8F5', hot: '#DDF4FF', core: '#F4FBFF' });
-const BOULDER = Object.freeze({ deep: '#5A93D6', body: '#CFE8FF', hot: '#F2F9FF', core: '#F8FCFF' });
+/** Ice (elements/ice.md): a pale blue body, its colour in the facets; the glints carry the white. */
+const BOULDER = Object.freeze({ deep: '#2F7FD6', body: '#86D4FF', hot: '#CFF3FF', core: '#F2FBFF' });
 /** Aurora curtain hues, sampled from the veil (#73BDF7 / #A2E1FF) with its green and lilac. */
 const VEIL = Object.freeze(['#7FE6D8', '#8FC8FF', '#B8A8FF', '#8FF0B8']);
 
@@ -332,7 +334,7 @@ export const gmaxResonance = Object.freeze({
   tint: AURORA,
   beats: [
     // Each falls in 0.3 of the beat, a ninth of it after the last: the fourth lands on contact.
-    { at: 500, until: 1350, layer: 'front', drawer: 'surgeStones', params: { from: 'sky', count: 4, distance: 0.75, height: 1.5, size: [0.16, 0.24], gloss: 0.75, smooth: 0.6, tint: BOULDER } },
+    { at: 500, until: 1350, layer: 'front', drawer: 'surgeStones', params: { from: 'sky', count: 4, distance: 0.75, height: 1.5, size: [0.16, 0.24], gloss: 0.55, smooth: 0.15, frost: 1, tint: BOULDER } },
     flash(1050, AURORA),
     { at: 1050, until: 1650, layer: 'front', drawer: 'cloud', params: { count: 4, radius: 0.4, drift: 0.5, direction: -90, alpha: 0.3, tint: BOULDER } },
     { at: 1050, until: 1600, layer: 'front', drawer: 'shards', params: { count: 8, arc: 360, distance: 1.1, spin: 300, tint: BOULDER } },

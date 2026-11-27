@@ -1,9 +1,11 @@
-// Design 092 § water-ice: the pure poses of the group's two drawers (move-drawers.js block
+// Design 092 § water-ice: the pure poses of the group's drawers (move-drawers.js block
 // "design 092 water-ice"). `surgeStones`: G-Max Stonesurge's stones, flung out of the geyser and
 // left standing round the struck card (the Stealth Rock it sets), or, from the sky, G-Max
-// Resonance's frosted boulders crashing down round it. `auroraVeil`: the Aurora Veil light that
-// rises in a ring of curtains round the card after G-Max Resonance. Offsets are screen px from the
-// target's centre, `h` the card height; DOM-free and deterministic for a seed.
+// Resonance's ice boulders crashing down round it. `auroraVeil`: the Aurora Veil light that rises
+// in a ring of curtains round the card after G-Max Resonance. `splashCrown`: the geyser of water
+// that erupts out of the struck card (Max Geyser and its kin). `chiCrescent`: G-Max Rapid Flow's
+// crescent blades of light. Offsets are screen px from the target's centre, `h` the card height;
+// DOM-free and deterministic for a seed.
 import { seededRandom } from '../../flow-pose.mjs';
 import { withDefaults } from '../move-spec.mjs';
 
@@ -119,6 +121,96 @@ export function auroraVeilPose(s, h, seed, params) {
       index: i,
       depth,
     });
+  }
+  return out;
+}
+
+/** The crown flipbook's frames: a chunky mass, a wider sheet, crescents breaking off, scattered drops. */
+export const CROWN_FRAMES = 4;
+
+/**
+ * The geyser crown erupting out of the struck card: `copies` plumes fanned `spread` degrees apart
+ * round straight up, each rising to `height` h in the first fifth of the beat (overshooting a
+ * little, the water's mass), its flipbook stepping from the chunky mass to scattered drops over
+ * the beat, fading over the last third (a clean fade: it never burns away). `drops` water drops
+ * are thrown off its top from a quarter of the way in, arcing out and falling under gravity.
+ * `rise` is the plume's length along its heading now (h px), `headingDeg` a screen angle (-90 up),
+ * `frame` the flipbook frame, `drops` offsets from the plume's base.
+ * @returns {{ plumes: { headingDeg: number, rise: number, width: number, frame: number, alpha: number,
+ *   index: number }[], drops: { x: number, y: number, r: number, alpha: number }[] }}
+ */
+export function splashCrownPose(s, h, seed, params) {
+  const { height, width, copies, spread, drops } = withDefaults('splashCrown', params);
+  const rand = seededRandom(seed);
+  const c = clamp01(s);
+  const grow = clamp01(c / 0.2);
+  // An easeOutBack: the column overshoots its height a little and settles, water with mass.
+  const surge = grow <= 0 ? 0 : 1 + 2.2 * (grow - 1) ** 3 + 1.2 * (grow - 1) ** 2;
+  // Exactly 0 at the end, where (1 - 0.66) / 0.34 leaves a rounding speck.
+  const fade = c >= 1 ? 0 : 1 - clamp01((c - 0.66) / 0.34) ** 1.6;
+  const plumes = [];
+  for (let i = 0; i < copies; i += 1) {
+    const side = copies > 1 ? i / (copies - 1) - 0.5 : 0;
+    const scale = 1 - 0.22 * Math.abs(side) * 2 + 0.08 * rand();
+    plumes.push({
+      headingDeg: -90 + side * spread * 2 + (rand() - 0.5) * 6,
+      rise: height * h * scale * surge,
+      width: width * h * (0.75 + 0.25 * grow) * scale,
+      frame: Math.min(CROWN_FRAMES - 1, Math.floor((c * 1.1 + i * 0.04) * CROWN_FRAMES)),
+      alpha: clamp01(c / 0.05) * fade,
+      index: i,
+    });
+  }
+  const out = [];
+  for (let k = 0; k < drops; k += 1) {
+    const start = 0.25 + rand() * 0.2;
+    const local = (c - start) / (1 - start);
+    if (!(local > 0) || local >= 1) continue;
+    const angle = -90 + (rand() - 0.5) * 120;
+    const speed = height * h * (0.5 + 0.5 * rand());
+    const t = local * 1.1;
+    out.push({
+      x: Math.cos(rad(angle)) * speed * 0.7 * t,
+      y: -height * h * (0.75 + 0.2 * rand()) + Math.sin(rad(angle)) * speed * 0.5 * t + 1.6 * height * h * t * t,
+      r: h * (0.035 + 0.035 * rand()),
+      alpha: (1 - local) ** 0.7,
+    });
+  }
+  return { plumes, drops: out };
+}
+
+/**
+ * Crescent blades of light (G-Max Rapid Flow): `count` arcs of radius `radius` h round the target,
+ * `gapDeg` apart, each sweeping `sweep` degrees from `angle` (screen degrees) in the first 55% of
+ * the beat, the tail catching the head after it; `points` run from the tail to the head and carry
+ * the half-thickness there (a crescent: pointed at both ends, fattest past the middle). `alpha`
+ * rises at once and falls cleanly over the last 40% (no dissolve).
+ * @returns {{ points: { x: number, y: number, half: number, nx: number, ny: number }[], alpha: number,
+ *   index: number }[]}
+ */
+export function chiCrescentPose(s, h, params) {
+  const { radius, sweep, angle, thick, count, gapDeg } = withDefaults('chiCrescent', params);
+  const c = clamp01(s);
+  const head = easeOutCubic(clamp01(c / 0.55));
+  const tail = easeOutCubic(clamp01((c - 0.18) / 0.62));
+  const alpha = clamp01(c / 0.06) * (1 - clamp01((c - 0.6) / 0.4) ** 1.4);
+  const out = [];
+  if (!(head > tail)) return out;
+  const steps = 18;
+  for (let i = 0; i < count; i += 1) {
+    const start = angle - sweep / 2 + (i - (count - 1) / 2) * gapDeg;
+    const from = start + sweep * Math.max(tail, head - 0.62);
+    const to = start + sweep * head;
+    const r = radius * h * (1 + 0.06 * i);
+    const points = [];
+    for (let k = 0; k <= steps; k += 1) {
+      const u = k / steps;
+      const a = rad(from + (to - from) * u);
+      // Fattest a little past the middle, toward the leading point: the blade's edge cuts first.
+      const profile = Math.sin(Math.PI * u ** 0.85) ** 0.8;
+      points.push({ x: Math.cos(a) * r, y: Math.sin(a) * r, half: (thick * h * profile) / 2, nx: Math.cos(a), ny: Math.sin(a) });
+    }
+    out.push({ points, alpha, index: i });
   }
   return out;
 }

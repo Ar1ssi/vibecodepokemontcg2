@@ -447,6 +447,8 @@ const BASE_DRAWER_PARAMS = {
     size: ['pair', 0.03, 0.4, [0.06, 0.11]],
     gloss: ['num', 0, 1, 0],
     smooth: ['num', 0, 1, 0],
+    // 1: ice — translucent, a pale Fresnel rim and hard corner glints (Resonance's boulders).
+    frost: ['num', 0, 1, 0],
   },
   auroraVeil: {
     target: TARGET(),
@@ -455,6 +457,25 @@ const BASE_DRAWER_PARAMS = {
     height: ['num', 0.4, 2.5, 1.4],
     w: ['num', 0.05, 0.6, 0.24],
     half: ['enum', ['back', 'front', 'both'], 'both'],
+  },
+  // The geyser crown erupting out of the struck card (the water kit's crown flipbook, 2–3 h
+  // tall) and Rapid Flow's lit crescent blades.
+  splashCrown: {
+    target: TARGET(),
+    height: ['num', 1, 3, 2.4],
+    width: ['num', 0.3, 2, 1.1],
+    copies: ['int', 1, 3, 3],
+    spread: ['num', 0, 40, 20],
+    drops: ['int', 0, 10, 6],
+  },
+  chiCrescent: {
+    target: TARGET(),
+    radius: ['num', 0.3, 1.4, 0.85],
+    sweep: ['deg', 150],
+    angle: ['deg', 45],
+    thick: ['num', 0.04, 0.4, 0.16],
+    count: ['int', 1, 3, 1],
+    gapDeg: ['deg', 30],
   },
 };
 
@@ -535,6 +556,9 @@ export function tonguesAt(drawer, params) {
       return 2;
     case 'tornado':
       return p.rings;
+    // design 092 water-ice: each plume of the crown is one stream on a 2D context.
+    case 'splashCrown':
+      return p.copies;
     default:
       return 0;
   }
@@ -582,6 +606,8 @@ const DRAWER_FAMILY = Object.freeze({
   // design 092 water-ice
   surgeStones: 'burst',
   auroraVeil: 'chime',
+  splashCrown: 'splash',
+  chiCrescent: 'slash',
 });
 
 /**
