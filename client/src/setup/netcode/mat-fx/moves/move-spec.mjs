@@ -476,6 +476,8 @@ const BASE_DRAWER_PARAMS = {
     thick: ['num', 0.04, 0.4, 0.16],
     count: ['int', 1, 3, 1],
     gapDeg: ['deg', 30],
+    // 0 sweeps round the card; 1 slashes across it (max/water-ice-poses.mjs chiCrescentCentre).
+    cross: ['num', 0, 1.2, 0],
   },
 };
 

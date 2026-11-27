@@ -66,7 +66,7 @@ import { monolithPose } from './max/ground-rock-steel-poses.mjs';
 import { prop, tornado, vine } from './max/max-drawers-gbf.js';
 // design 092 water-ice
 import { alphaOf, dissolveOf, elementsLive, emit, rgb01, stageAngle, stageLen, stageOf } from './elements/_emit.js';
-import { auroraVeilPose, chiCrescentPose, splashCrownPose, surgeStonesPose } from './max/water-ice-poses.mjs';
+import { auroraVeilPose, chiCrescentCentre, chiCrescentPose, splashCrownPose, surgeStonesPose } from './max/water-ice-poses.mjs';
 
 const TAU = Math.PI * 2;
 const HELIX_SAMPLES = 12;
@@ -1331,8 +1331,11 @@ const traceCrescent = (ctx, cx, cy, points, scale, out) => {
  * the blade has a lit edge and a shadowed inner side. They fade cleanly: no burn.
  */
 const chiCrescent = (ctx, lane, s, info) => {
-  const c = centreOf(lane, info.params.target);
-  ctx.fxLift = burstLift(c);
+  const target = centreOf(lane, info.params.target);
+  // Stood about the struck card, whether the blades sweep round it or slash across it.
+  ctx.fxLift = burstLift(target);
+  const offset = chiCrescentCentre(info.params, lane.h);
+  const c = { x: target.x + offset.x, y: target.y + offset.y };
   const { palette } = info.material;
   for (const blade of chiCrescentPose(s, lane.h, info.params)) {
     if (!(blade.alpha > 0) || blade.points.length < 2) continue;
