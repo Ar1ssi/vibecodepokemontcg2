@@ -18,6 +18,8 @@ import { dissolveTail, withFxMod } from './materials/_mods.js';
 import { getNoiseTile } from './materials/_shared.js';
 import { UNITS } from './materials/_units.js';
 import { DRAWER_PARAMS, checkParams, tonguesAt } from './move-spec.mjs';
+// design 092 ghost-dark-dragon
+import { GHOST_DARK_DRAGON_DRAWERS } from './max/ghost-dark-dragon-drawers.js';
 import {
   armTongues,
   auraPose,
@@ -963,6 +965,8 @@ const IMPLEMENTATIONS = {
   chain: elementable('chain', chain),
   // The glove comes down out of the air.
   grip: lifted(elementable('grip', grip), fromSky),
+  // design 092 ghost-dark-dragon: each sets its own lift (per piece, per ribbon run, per column).
+  ...Object.fromEntries(Object.entries(GHOST_DARK_DRAGON_DRAWERS).map(([name, draw]) => [name, elementable(name, draw)])),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */

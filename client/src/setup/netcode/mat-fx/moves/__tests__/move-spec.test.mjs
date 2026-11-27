@@ -25,7 +25,8 @@ const has = (errors, text) => errors.some((message) => message.includes(text));
 // ---- checkParams / withDefaults -------------------------------------------------
 
 test('every drawer has a table, and its defaults are valid params', () => {
-  assert.equal(Object.keys(DRAWER_PARAMS).length, 27); // 063's 23 + design 065's fan, shade, chain, grip
+  // 063's 23 + design 065's fan, shade, chain, grip + design 092 ghost-dark-dragon's hauntedFurniture, darkDome, darkRibbons, wyrmTornado
+  assert.equal(Object.keys(DRAWER_PARAMS).length, 31);
   for (const drawer of Object.keys(DRAWER_PARAMS)) {
     assert.deepEqual(checkParams(drawer, {}), [], drawer);
     assert.deepEqual(checkParams(drawer, withDefaults(drawer, {})), [], `${drawer} defaults`);
