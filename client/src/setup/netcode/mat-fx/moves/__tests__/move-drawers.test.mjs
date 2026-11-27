@@ -344,6 +344,8 @@ const BURNING = [
   ['bolt', {}],
   ['pillar', {}],
   ['fan', {}],
+  // design 092 psychic-fairy: the hoop coil burns as its ripple fades (skyColumn is light: it fades whole).
+  ['hoopCoil', {}],
 ];
 /**
  * The caller's own modifiers, which a drawer's dissolve merges over. A probe module no kit sets:

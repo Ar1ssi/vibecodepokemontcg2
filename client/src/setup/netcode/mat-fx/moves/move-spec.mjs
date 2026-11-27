@@ -65,7 +65,19 @@ const ANCHORED = (fallback = 'defender') => ({
   dy: ['num', -2, 2, 0],
 });
 /** Design 065 § New pieces C: the bodies a travelling / orbiting drawer can draw (materials/_units.js). */
-export const UNIT_NAMES = Object.freeze(['body', 'rings', 'spiked', 'facet', 'hoop', 'crescent', 'fist', 'hex', 'wheel']);
+export const UNIT_NAMES = Object.freeze([
+  'body',
+  'rings',
+  'spiked',
+  'facet',
+  'hoop',
+  'crescent',
+  'fist',
+  'hex',
+  'wheel',
+  // design 092 psychic-fairy: Max Starfall's five-point stars.
+  'star',
+]);
 const UNIT = ['enum', UNIT_NAMES, 'body'];
 
 const BASE_DRAWER_PARAMS = {
@@ -290,6 +302,33 @@ const BASE_DRAWER_PARAMS = {
   grip: {
     size: ['num', 0.5, 2, 1.2],
   },
+  // design 092 psychic-fairy: Max Mindstorm's coil of hoops, falling from `height` card heights
+  // onto its anchor by `land` of the beat, then collapsing into a ring that ripples out to
+  // `spread` × r (max/psychic-fairy-poses.mjs).
+  hoopCoil: {
+    ...ANCHORED('defender'),
+    count: ['int', 2, 8, 5],
+    r: ['num', 0.3, 1.2, 0.62],
+    squash: ['num', 0.15, 0.6, 0.3],
+    gap: ['num', 0.1, 0.6, 0.26],
+    height: ['num', 0, 3, 1.4],
+    land: ['num', 0.3, 0.9, 0.65],
+    spread: ['num', 1, 3, 1.7],
+    width: ['num', 0.02, 0.15, 0.05],
+    spin: ['num', -1080, 1080, 360],
+  },
+  // design 092 psychic-fairy: straight shafts of light striking `from` the sky onto points across
+  // `spread` card heights round the anchor (or rising out of them), each `stagger` ms after the
+  // last in a scattered order: the fairy Max Moves' light pillars, the psychic column.
+  skyColumn: {
+    ...ANCHORED('defender'),
+    count: ['int', 1, 6, 4],
+    spread: ['num', 0, 3, 1.5],
+    stagger: ['num', 0, 400, 90],
+    w: ['num', 0.04, 0.6, 0.12],
+    height: ['num', 0.8, 3, 2],
+    from: ['enum', ['above', 'below'], 'above'],
+  },
 };
 
 /**
@@ -349,6 +388,10 @@ export function tonguesAt(drawer, params) {
       return p.count * p.tongues;
     case 'bolt':
       return p.count * (1 + p.branches);
+    // design 092 psychic-fairy: each hoop is one stroked tube, each shaft one column.
+    case 'hoopCoil':
+    case 'skyColumn':
+      return p.count;
     default:
       return 0;
   }
@@ -383,6 +426,9 @@ const DRAWER_FAMILY = Object.freeze({
   shade: 'chime',
   chain: 'projectile',
   grip: 'punch',
+  // design 092 psychic-fairy: psychic rings chime; a shaft of light is a beam.
+  hoopCoil: 'chime',
+  skyColumn: 'beam',
 });
 
 /**
