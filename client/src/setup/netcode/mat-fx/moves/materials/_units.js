@@ -246,6 +246,43 @@ function wheelUnit(ctx, x, y, r, angleDeg, s, palette) {
   });
 }
 
+// ---- design 092 psychic-fairy ----
+
+/** The ten corners of a five-point star of radius r about the origin, its first tip straight up. */
+export const starCorners = (r, inner = 0.48) =>
+  Array.from({ length: 10 }, (_, k) => {
+    const a = -Math.PI / 2 + (k * Math.PI) / 5;
+    const radius = k % 2 ? r * inner : r;
+    return [Math.cos(a) * radius, Math.sin(a) * radius];
+  });
+
+/**
+ * Max Starfall's star: a chunky five-point star of light, its body falling from a hot top to its
+ * body colour, a deeper rim round it and a glint high on it, tumbling 180·s° as it flies.
+ */
+function starUnit(ctx, x, y, r, angleDeg, s, palette) {
+  if (!(r > 0)) return;
+  framed(ctx, x, y, 180 * s, () => {
+    ctx.fillStyle = rgbCss(palette.deep, 0.75);
+    poly(ctx, starCorners(r * 1.14, 0.5));
+    ctx.fill();
+    const g = ctx.createLinearGradient(0, -r, 0, r);
+    g.addColorStop(0, rgbCss(palette.hot, 0.95));
+    g.addColorStop(0.55, rgbCss(palette.body, 0.9));
+    g.addColorStop(1, rgbCss(palette.body, 0.7));
+    ctx.fillStyle = g;
+    poly(ctx, starCorners(r));
+    ctx.fill();
+    const glint = ctx.createRadialGradient(-r * 0.12, -r * 0.3, 0, -r * 0.12, -r * 0.3, r * 0.4);
+    glint.addColorStop(0, rgbCss(palette.core, 0.7));
+    glint.addColorStop(1, rgbCss(palette.hot, 0));
+    ctx.fillStyle = glint;
+    ctx.beginPath();
+    ctx.arc(-r * 0.12, -r * 0.3, r * 0.4, 0, TAU);
+    ctx.fill();
+  });
+}
+
 export const UNITS = Object.freeze({
   body: bodyUnit,
   rings: ringsUnit,
@@ -256,6 +293,8 @@ export const UNITS = Object.freeze({
   fist: fistUnit,
   hex: hexUnit,
   wheel: wheelUnit,
+  // design 092 psychic-fairy
+  star: starUnit,
 });
 
 export const UNIT_KEYS = Object.freeze(Object.keys(UNITS));

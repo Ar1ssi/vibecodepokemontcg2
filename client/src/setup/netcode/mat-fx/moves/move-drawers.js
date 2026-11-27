@@ -18,6 +18,7 @@ import { dissolveTail, withFxMod } from './materials/_mods.js';
 import { getNoiseTile } from './materials/_shared.js';
 import { UNITS } from './materials/_units.js';
 import { DRAWER_PARAMS, checkParams, tonguesAt } from './move-spec.mjs';
+import { hoopCoil, skyColumn } from './max/psychic-fairy-drawers.js';
 import {
   armTongues,
   auraPose,
@@ -963,6 +964,10 @@ const IMPLEMENTATIONS = {
   chain: elementable('chain', chain),
   // The glove comes down out of the air.
   grip: lifted(elementable('grip', grip), fromSky),
+  // design 092 psychic-fairy: both lift themselves (stood off the card's near edge); the coil burns,
+  // the shafts (light) fade whole.
+  hoopCoil: elementable('hoopCoil', hoopCoil),
+  skyColumn: elementable('skyColumn', skyColumn),
 };
 
 /** The drawer registry: `{ draw, check, tonguesAt }` per drawer name. */
