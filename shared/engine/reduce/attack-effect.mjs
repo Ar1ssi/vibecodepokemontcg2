@@ -1470,6 +1470,13 @@ export function resolveAttackEffectPhase(draft, ctx) {
       if (attackTarget?.remainingFromDiscard) {
         attackTarget = energyDiscarded > 0 ? { ...attackTarget, remaining: energyDiscarded } : null;
       }
+      // Homebrew Dragapult ex Phantom Dive: N damage counters per Energy card the discard paid.
+      if (attackTarget?.remainingPerDiscard) {
+        attackTarget =
+          energyDiscarded > 0
+            ? { ...attackTarget, remaining: attackTarget.remainingPerDiscard * energyDiscarded }
+            : null;
+      }
       // Alolan Exeggutor-GX Tropical Head: the snipe scales with the attacker's Energy cards.
       if (attackTarget?.amountPerEnergy) {
         const ref = attacker ? findCard(draft, attacker.instanceId) : null;

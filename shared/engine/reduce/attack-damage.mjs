@@ -446,6 +446,9 @@ export function resolveAttackTargetClause(text, parsed, spread) {
     // "put N damage counters on your opponent's Pokémon in any way you like":
     // place them one click at a time, each counter 10 damage, all N must land.
     if (/in any way/i.test(t)) {
+      // Homebrew Dragapult ex Phantom Dive: "For each Energy discarded in this way, place 2
+      // damage counters …" — the total is N per discarded card (attack-effect.mjs).
+      const perDiscard = /for each (?:\{[a-z]\} )?(?:basic )?energy (?:cards? )?discarded in this way, (?:place|put) \d+ damage counters?/i.test(t);
       return {
         kind: 'counters',
         amount: 10,
@@ -453,6 +456,7 @@ export function resolveAttackTargetClause(text, parsed, spread) {
         scope: counters.scope || 'any',
         distributable: true,
         remaining: counters.count,
+        ...(perDiscard ? { remainingPerDiscard: counters.count } : {}),
       };
     }
     return {

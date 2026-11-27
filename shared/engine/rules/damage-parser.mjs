@@ -478,7 +478,12 @@ export function parseAttackDamage(
     discardEnergyScaling(attack?.text) &&
     // Electivire Discharge: the discard sets the coin count; the heads scale the damage.
     // (timesAsForEach has already rewritten "times the number of heads" to "for each heads").
-    !/damage (?:times the number of|for each) heads/.test(text)
+    !/damage (?:times the number of|for each) heads/.test(text) &&
+    // Homebrew Dragapult ex Phantom Dive: the discard scales the counters placed, not the
+    // printed 160 (reduce/attack-effect.mjs reads energyDiscarded for the spread).
+    !/for each (?:\{[a-z]\} )?(?:basic )?energy (?:cards? )?discarded in this way, (?:place|put) \d+ damage counters?/i.test(
+      text
+    )
   ) {
     const discarded = ctx.energyDiscarded ?? 0;
     // "does N more damage for each card" (Mega Clefable ex) adds to the base;
@@ -2182,6 +2187,21 @@ function discardEnergyScalingClause(attackText) {
       source: discardSourceOf(attached[3]),
       energyType: energyTypeOf(attached[2]),
       basicOnly: Boolean(attached[1]),
+    };
+  }
+
+  // Homebrew Dragapult ex Phantom Dive: "Discard as many Energy cards as you like from this
+  // Pokémon." (the "as you like" follows the noun, unlike the "attached to" prints above).
+  const asManyFrom =
+    /discard\s+as\s+many\s+(basic\s+)?(?:\{([A-Z])\}\s+)?Energy(?:\s+cards?)?\s+as\s+you\s+like\s+from\s+(this\s+Pok[ée]mon|(?:among\s+)?your\s+Benched\s+Pok[ée]mon|(?:among\s+)?your\s+Pok[ée]mon)/i.exec(
+      text
+    );
+  if (asManyFrom) {
+    return {
+      max: Infinity,
+      source: discardSourceOf(asManyFrom[3]),
+      energyType: energyTypeOf(asManyFrom[2]),
+      basicOnly: Boolean(asManyFrom[1]),
     };
   }
 
