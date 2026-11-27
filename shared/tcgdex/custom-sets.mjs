@@ -53,6 +53,7 @@ function normalizeManifest(value) {
         releaseDate: typeof set.releaseDate === 'string' ? set.releaseDate : '',
         group: CUSTOM_SET_GROUPS.includes(set.group) ? set.group : DEFAULT_CUSTOM_SET_GROUP,
       })),
+    revision: typeof value?.revision === 'string' ? value.revision : '',
   };
 }
 
@@ -84,6 +85,15 @@ export function fetchCustomSetManifest({ fetchImpl = globalThis.fetch, force = f
   return attempt;
 }
 
+/**
+ * The server's token for the custom sets' current files ('' when unknown): a stored TCGdex list saved under another
+ * revision may hold old custom cards (tcgdex-cache.mjs).
+ * @param {{ fetchImpl?: typeof fetch }} [options]
+ */
+export async function customSetsRevision(options) {
+  return (await fetchCustomSetManifest(options)).revision || '';
+}
+
 /** `{ HBW: "customhbw", … }` — the decklist set codes a manifest adds. */
 export function customSetCodes(manifest) {
   const codes = {};
@@ -96,6 +106,28 @@ export function customSetCodes(manifest) {
 // showing custom cards subscribe here instead of to the socket.
 const changeListeners = new Set();
 
+// A browser reuses an image it already showed in this page for the same URL, without asking the server, so art a
+// change rewrote keeps its old face until a reload. Sets that changed while this page was open get a per-page
+// `?v=` on their art URLs instead (versionedCustomArtUrl); the server ignores the query.
+const artRevisions = new Map();
+let artRevision = 0;
+
+/**
+ * `src` with a `v` query naming the last change to its custom set in this page; any other URL, or art of a set
+ * that has not changed since the page loaded, comes back as given. Relative URLs stay relative.
+ * @param {string} src
+ */
+export function versionedCustomArtUrl(src) {
+  const cardId = customCardIdFromImageUrl(src);
+  if (!cardId) return src;
+  const revision = artRevisions.get(cardId.slice(0, cardId.lastIndexOf('-')));
+  if (!revision) return src;
+  const url = new URL(src, PLACEHOLDER_ORIGIN);
+  if (url.searchParams.get('v') === String(revision)) return src;
+  url.searchParams.set('v', String(revision));
+  return url.origin === PLACEHOLDER_ORIGIN ? `${url.pathname}${url.search}${url.hash}` : url.href;
+}
+
 /**
  * Called with `{ version, sets }` after a set changed on the server, once the manifest has been refetched.
  * @returns {() => void} unsubscribe
@@ -103,6 +135,23 @@ const changeListeners = new Set();
 export function onCustomSetsChanged(listener) {
   changeListeners.add(listener);
   return () => changeListeners.delete(listener);
+}
+
+/**
+ * For a page that may have missed CUSTOM_SETS_CHANGED_EVENT (its socket was down): refetches the manifest and, when
+ * its revision moved since this page last read it, returns a change naming every custom set before and after (which
+ * ones changed is not known). Null when nothing changed, or this page never read the manifest.
+ * @param {{ fetchImpl?: typeof fetch }} [options]
+ * @returns {Promise<{ version: number, sets: string[] }|null>}
+ */
+export async function recheckCustomSets({ fetchImpl } = {}) {
+  if (!manifestPromise) return null;
+  const before = await manifestPromise;
+  if (!before.revision) return null;
+  const after = await fetchCustomSetManifest({ fetchImpl, force: true });
+  if (!after.revision || after.revision === before.revision) return null;
+  const sets = new Set([...before.sets, ...after.sets].map((set) => set.id));
+  return { version: 0, sets: [...sets].sort() };
 }
 
 /**
@@ -114,6 +163,10 @@ export function onCustomSetsChanged(listener) {
 export async function noteCustomSetsChanged(change, { fetchImpl } = {}) {
   const sets = Array.isArray(change?.sets) ? change.sets.filter(isCustomSetId) : [];
   const notice = { version: Number.isInteger(change?.version) ? change.version : 0, sets };
+  if (sets.length) {
+    artRevision += 1;
+    for (const setId of sets) artRevisions.set(setId, artRevision);
+  }
   await fetchCustomSetManifest({ fetchImpl, force: true });
   for (const listener of [...changeListeners]) {
     try {

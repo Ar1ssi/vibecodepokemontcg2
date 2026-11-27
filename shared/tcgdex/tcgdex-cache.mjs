@@ -4,6 +4,8 @@
 // Backed by IndexedDB in the browser. Where IndexedDB is missing (node tests,
 // some private windows) the cache is a pass-through to the network.
 
+import { customSetsRevision } from './custom-sets.mjs';
+
 const DB_NAME = 'tcgdex-cache';
 const STORE_NAME = 'json';
 const KEY_VERSION = 'v1:';
@@ -18,6 +20,12 @@ const RECORD_PATH = /\/v2\/[a-z-]+\/(sets|cards)\/[^/?]+$/i;
 // (it reloads them live): their records always come from the server, the stored copy only when it is down.
 const CUSTOM_RECORD_PATH = /\/v2\/[a-z-]+\/(sets|cards)\/custom[a-z0-9]/i;
 const CUSTOM_TTL_MS = 0;
+
+// Lists and queries (`/cards?name=…`, `/sets`) merge the custom sets' cards, which change while pages are open:
+// a stored list counts only under the custom-sets revision it was saved with (the server's manifest token).
+export function isListUrl(url) {
+  return !RECORD_PATH.test(String(url));
+}
 
 export function ttlForUrl(url) {
   const value = String(url);
@@ -93,8 +101,19 @@ export function createCachedFetchJson({
   now = () => Date.now(),
   fetchNetwork = fetchJsonFromNetwork,
   ttlFor = ttlForUrl,
+  listRevision = customSetsRevision,
 } = {}) {
   if (!store) return shareInFlight(fetchNetwork);
+
+  // '' (unknown, or the server down) never makes an entry stale: the TTL alone decides then.
+  async function currentListRevision(url) {
+    if (!isListUrl(url)) return '';
+    try {
+      return (await listRevision()) || '';
+    } catch {
+      return '';
+    }
+  }
 
   async function readEntry(key) {
     try {
@@ -105,9 +124,9 @@ export function createCachedFetchJson({
     }
   }
 
-  async function writeEntry(key, data) {
+  async function writeEntry(key, data, revision) {
     try {
-      await store.set(key, { savedAt: now(), data });
+      await store.set(key, revision ? { savedAt: now(), data, revision } : { savedAt: now(), data });
     } catch {
       // Quota full or storage blocked: serve uncached.
     }
@@ -115,12 +134,13 @@ export function createCachedFetchJson({
 
   return shareInFlight(async function loadCached(url) {
     const key = KEY_VERSION + String(url);
-    const entry = await readEntry(key);
-    if (entry && now() - entry.savedAt < ttlFor(url)) return entry.data;
+    const [entry, revision] = await Promise.all([readEntry(key), currentListRevision(url)]);
+    const sameRevision = !revision || entry?.revision === revision;
+    if (entry && sameRevision && now() - entry.savedAt < ttlFor(url)) return entry.data;
 
     try {
       const data = await fetchNetwork(url);
-      await writeEntry(key, data);
+      await writeEntry(key, data, revision);
       return data;
     } catch (error) {
       if (entry) return entry.data;

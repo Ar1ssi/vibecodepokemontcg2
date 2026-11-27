@@ -119,6 +119,7 @@ import {
 import { whenLoaded } from '../../../setup/deck-builder/core/catalog-loader.mjs';
 import { coinArtUrl } from '../../../setup/deck-builder/core/coin-effects.mjs';
 import { initializeDeckBuilderBoxPicker } from './native-deck-builder-box-picker.js';
+import { watchCustomArt } from '../../../setup/deck-builder/core/custom-art-refresh.mjs';
 import { initializeCustomizeStage } from '../../../setup/deck-builder/core/customize-stage/customize-stage.js';
 import {
   boxAtlasUrl,
@@ -400,6 +401,8 @@ export const initializeNativeDeckBuilder = ({
   const workspaceEl = document.getElementById('nativeDeckBuilderWorkspace');
   const themeToggle = document.getElementById('nativeDeckBuilderThemeToggle');
   initPhoneView(workspaceEl);
+  // a custom set the server reloads shows its new art here without a page reload
+  watchCustomArt([workspaceEl, previewScrim]);
   let builderTheme = applyBuilderTheme(
     workspaceEl,
     loadBuilderTheme(window.localStorage),
