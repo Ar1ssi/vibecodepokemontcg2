@@ -5,10 +5,13 @@ import { ShapeUtils, Vector2 } from 'three';
 import { createGpuCanvas } from '../../../../../board3d/fx/gpu-canvas.mjs';
 import { monolithPose } from '../ground-rock-steel-poses.mjs';
 import { GROUND_ROCK_STEEL_MAX_SPECS } from '../specs/ground-rock-steel.mjs';
-import { materialFor } from '../../materials/index.js';
-import { rockElements } from '../../elements/earth.js';
-import { monolithBase } from '../../move-drawers.js';
+import { MATERIALS, materialFor } from '../../materials/index.js';
+import { groundElements, rockElements } from '../../elements/earth.js';
+import { DRAWERS, monolithBase } from '../../move-drawers.js';
+import { checkParams, withDefaults } from '../../move-spec.mjs';
+import { tintedPalette } from '../../materials/_shared.js';
 import { withoutImpactBeats } from '../../../impact/impact-select.mjs';
+import { recordingContext } from '../../__tests__/recording-context.mjs';
 
 const H = 100;
 const steps = (n = 100) => Array.from({ length: n + 1 }, (_, i) => i / n);
@@ -88,4 +91,36 @@ test("each move keeps its own matter in a game: the impact prefab's strip leaves
     assert.ok(after.length > 0, `${id}: nothing of its own after contact`);
     assert.ok(played.beats.some((beat) => beat.at <= spec.contactMs && beat.until > spec.contactMs && beat.drawer !== 'vignette'), `${id}: nothing at contact`);
   }
+});
+
+test('a beat tint may colour a ground or rock dust (`dust`); without it the dust keeps its own colour', () => {
+  assert.deepEqual(checkParams('cloud', { tint: { dust: '#C08A40' } }), []);
+  const golden = (key) => materialFor(key).withPalette(tintedPalette(materialFor(key).palette, { dust: '#C08A40' }));
+  assert.deepEqual([...golden('ground').smoke], [0xc0, 0x8a, 0x40]);
+  assert.deepEqual([...golden('rock').smoke], [0xc0, 0x8a, 0x40]);
+  assert.deepEqual([...materialFor('ground').smoke], [150, 130, 110], 'the default dust is untouched');
+  assert.deepEqual([...materialFor('ground').withPalette(tintedPalette(materialFor('ground').palette, { body: '#A27033' })).smoke], [150, 130, 110]);
+  // The dust the board draws: the earth kit's cloud beat in the tinted material.
+  const { ctx, emits } = liveCtx();
+  groundElements.beats.cloud(ctx, LANE, 0.5, { material: golden('ground'), params: withDefaults('cloud', { target: 'defender' }), seed: 3 });
+  const puffs = emits.filter((e) => e.kind === 'smoke');
+  assert.ok(puffs.length > 0);
+  const [r, g, b] = puffs[0].params.tint;
+  assert.ok(r > g && g > b && r - b > 0.25, `golden, not grey: ${puffs[0].params.tint}`);
+});
+
+test("a 'bubble' shade is a sphere lit from the upper left: a lit crescent, a shaded one and a specular arc", () => {
+  assert.deepEqual(checkParams('shade', { kind: 'bubble' }), []);
+  const draw = (kind) => {
+    const rec = recordingContext();
+    const info = { elapsedMs: 400, beatMs: 800, time: 1, seed: 5, material: MATERIALS.psychic, params: withDefaults('shade', { kind, fill: 'body' }) };
+    DRAWERS.shade.draw(rec.ctx, LANE, 0.5, info);
+    return rec;
+  };
+  const bubble = draw('bubble');
+  const sphere = draw('sphere');
+  assert.equal(sphere.calls.filter(([key]) => key === 'stroke').length, 0);
+  assert.equal(bubble.calls.filter(([key]) => key === 'stroke').length, 1, 'the specular arc');
+  assert.equal(bubble.calls.filter(([key]) => key === 'fill').length, sphere.calls.filter(([key]) => key === 'fill').length + 2, 'the lit and shaded crescents');
+  assert.equal(bubble.state.depth, 0);
 });

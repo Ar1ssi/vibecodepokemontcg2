@@ -19,8 +19,11 @@ export const TARGETS = Object.freeze(['attacker', 'defender']);
  * Every TARGETS value is an anchor.
  */
 export const ANCHORS = Object.freeze(['attacker', 'defender', 'sky', 'sky-attacker']);
-/** Design 065: the palette keys a beat `tint` may replace. */
-export const PALETTE_KEYS = Object.freeze(['deep', 'body', 'hot', 'core']);
+/**
+ * Design 065: the palette keys a beat `tint` may replace. Design 092 ground-rock-steel: `dust`,
+ * the colour of a ground or rock material's dust (its `smoke`); without it the material's own.
+ */
+export const PALETTE_KEYS = Object.freeze(['deep', 'body', 'hot', 'core', 'dust']);
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const isHex = (v) => typeof v === 'string' && HEX.test(v);

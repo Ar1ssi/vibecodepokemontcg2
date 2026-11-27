@@ -315,8 +315,9 @@ function groundKit(palette) {
     palette,
     // The vignette's tint: an umber-black kept local to a card.
     shade: Object.freeze([38, 22, 8]),
-    // Dust (the recipe's "smoke = dust", fighting's dust tone).
-    smoke: Object.freeze([150, 130, 110]),
+    // Dust (the recipe's "smoke = dust", fighting's dust tone); design 092 ground-rock-steel: a
+    // beat tint's `dust` colours it (G-Max Sandblast's golden sand).
+    smoke: palette.dust ?? Object.freeze([150, 130, 110]),
     particle: Object.freeze({ className: 'fx-particle--shard', color: rgbCss(palette.hot), aspect: 0.6 }),
     glow: haloOf(palette),
     body,
