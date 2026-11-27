@@ -8,7 +8,7 @@ Focus: VMAX: Gigantamax entry (D260) and the 51 Max/G-Max Move attack scenes (09
 Active: Render: set ADMIN_PASSWORD or the admin UI stays off. Localhost checks — log export (Options → Export full log; `node tools/log.mjs summary <file>`); 089 look (12 attacks, a Prize take, a shuffle, a switching attack); Tera/Mega
   entries (both seats), Gigantamax entry (a VMAX evolve, D260), Max/G-Max Moves (a VMAX's Max/G-Max attack; strip: `MOVES=max:<id> GPU=1 rec-move-strip`); the 22 restored Stadium boards (`?stadiumEnv=<key>`); deck box deal (073 rev B); 085; first custom-set publish; 088 `Client: bundle`, `KEEP_AWAKE`; I266, 074.
 Next: maintain.md is due (caps over after the two merges). I283 (P1, D246); I294 (socket handlers uncaught), I295 (undo view dropped); I284 (e2e scripts), I291 (review 087, 078/079), I290 (formatting: the user's call),
-  I287/I288, I282; tune 089 from the user's verdict; I264, I259, 072 coin prompts, I239, I227; ETB (057) slice 6.
+  I287/I288, I282; tune 089/092 from the user's verdict (092's water-ice misses: its § Deviations); I264, I259, 072 coin prompts, I239, I227; ETB (057) slice 6.
 Blocked: I86 needs design approval (029 30th Celebration); I87 needs the user's description; I235 needs a face-down-card design.
 
 ## Watch-outs (≤5)

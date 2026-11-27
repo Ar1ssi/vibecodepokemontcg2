@@ -1,7 +1,8 @@
 # 092: Max Move and G-Max Move animations for Pokémon VMAX
-Status: built 2026-11-27 on feature/max-moves (all 51 specs, every rubric axis ≥ 4 per the forks' final rounds);
-awaiting the user's look on localhost (approved by the user: scope via three answered questions; "split into
-subagents to speed it up")
+Status: built and landed 2026-11-27 (all 51 specs; the forks scored every rubric axis ≥ 4 on their final rounds;
+the lead's independent re-score covered water-ice only and found the misses in § Deviations, landed without a
+third round); awaiting the user's look on localhost (approved by the user: scope via three answered questions;
+"split into subagents to speed it up")
 Date: 2026-11-27 · Builds on 063 (attack scenes), 065 (signature tier S), 075/089 (scene player, VFX pass), D260 (Gigantamax entry)
 
 ## Problem
@@ -150,6 +151,8 @@ from the plan and what was added (shared-table blocks are tagged `// design 092 
   dropped (flat strokes on a near-overhead camera); Gold Rush's family is `burst` (its contact beat is the coins).
 - **water-ice**: drawers `surgeStones` (+ `frost`), `auroraVeil`, `splashCrown` (the crown flipbook, 2–3 h, lifts the
   five geyser-family moves), `chiCrescent` (Rapid Flow's lit slashes). No water pillars: a column reads as glass.
+  Rapid Flow round 2: `chiCrescent` `cross` sets the arc's centre back along the blade, so its slashes (1.5–2 h)
+  cut across the card instead of circling it; the attacker's rim is blue (`CHI_RIM`), no longer near-white.
 - **electric-poison-fighting**: drawer `stormCloud` (matter); unit `maxFist` (a dark palette lights it by its core:
   Chi Strike's brown-red fist); One Blow's dome is ghost-dark-dragon's `darkDome`; Malodor plays in `mud` (poison's
   gas is fixed violet), so its card reaction is drench.
@@ -163,3 +166,10 @@ from the plan and what was added (shared-table blocks are tagged `// design 092 
   `flameJet` elements (Canvas2D draws under the GL elements).
 - **Known looks for the user's check**: the brightest contact frames (Max Strike's blade core, Volt Crash's yellow
   dome, Finale's rings) are tinted at the contact frame only; Overgrowth/Tartness/Sweetness end on a wide pale glow.
+- **Misses (water-ice, independent re-score past the round cap)**: Geyser element 3 (the shared house water beam
+  reads as a glossy glass capsule mid-travel) and reference parity 3 (no water orb at anticipation); Foam Burst and
+  Stonesurge element 3 (the same beam); Resonance scale 3 (ice boulders ~0.25 h) and readability 3 (the contact
+  frame is near empty); some of Rapid Flow's slashes clip the top of the attacker's card on the near seat. Fixes: a
+  churning spray torrent in place of the capsule beam for the geyser trio, a water orb at Geyser's charge, 0.5–0.7 h
+  boulders with the last landing on contact, slash angles 300/120/60/240/90/270 (now 330/150/60/240/15/195).
+  Cannonade, Hydrosnipe, Hailstorm and Rapid Flow (after round 2) scored ≥ 4 on every axis.
