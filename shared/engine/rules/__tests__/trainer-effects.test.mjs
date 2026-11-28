@@ -2537,7 +2537,8 @@ describe('Audit S&M compound clauses (S6)', () => {
     );
     assert.equal(r.steps[0].type, 'attachFromHand');
     assert.equal(r.steps[0].handCount, 2);
-    assert.deepEqual(r.steps[0].handEnergy, { basic: true, types: ['fire'] });
+    // Welder prints no "Basic": Special Energy providing {R} (Nitro Fire Energy) qualifies.
+    assert.deepEqual(r.steps[0].handEnergy, { types: ['fire'] });
     assert.equal(r.steps[1].type, 'draw');
     assert.equal(r.steps[1].count, 3);
   });
@@ -2606,7 +2607,7 @@ describe('Audit S&M compound clauses (S6)', () => {
     assert.deepEqual(r.steps.map((s) => s.type), ['draw', 'attachFromHand']);
     assert.equal(r.steps[0].count, 2);
     assert.equal(r.steps[1].handCount, 2);
-    assert.deepEqual(r.steps[1].handEnergy, { basic: true, types: ['grass'] });
+    assert.deepEqual(r.steps[1].handEnergy, { types: ['grass'] });
   });
 
   test("Mars: the random discard follows the draw", () => {

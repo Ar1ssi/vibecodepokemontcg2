@@ -418,3 +418,10 @@ test('Welder as printed (up to 2 {R}, draw 3) also draws only after an attach', 
   const two = play(board({ p1: { hand: [fire(), fire()] } }), trainer('Welder', 'Supporter', printed));
   assert.equal(two.state.players.p1.zones.hand.length, 3, 'two attached, 3 drawn');
 });
+
+test('Welder as printed also attaches Nitro Fire Energy (Special Energy providing {R}), not Special Water', () => {
+  const printed = 'Attach up to 2 {R} Energy cards from your hand to 1 of your Pokémon. If you do, draw 3 cards.';
+  const nitro = createCard({ instanceId: nextId++, name: 'Nitro Fire Energy', type: 'Energy', supertype: 'Energy', subtypes: ['Special'], energyType: 'Normal' });
+  const res = play(board({ p1: { hand: [nitro, water()] } }), trainer('Welder', 'Supporter', printed));
+  assert.deepEqual(optionNames(res.prompts[0]), ['Nitro Fire Energy']);
+});
