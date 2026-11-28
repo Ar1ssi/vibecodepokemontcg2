@@ -2767,7 +2767,9 @@ function parseTrainerStepsInner(lower) {
       }
       const symbol = at[2] || at[4];
       const typeWord = symbol ? SYMBOL_TO_TYPE[symbol] : at[5] || null;
-      const basic = Boolean(at[3] || typeWord);
+      // Only a printed "Basic" (or an old type word) restricts to Basic Energy: "{R} Energy
+      // cards" (Welder) also takes Special Energy that provides {R}, like Nitro Fire Energy.
+      const basic = Boolean(at[3] || (typeWord && !symbol));
       // Gardenia's Vigor prints "Draw 2 cards. If you drew any cards in this
       // way, attach …": the draw leads and the attach follows it (review 5).
       const leadingDraw = lower.match(/^\s*draw\s+(\d+)\s+cards?/);
@@ -2779,7 +2781,7 @@ function parseTrainerStepsInner(lower) {
         target,
         handCount: count,
         handTarget: target.toLowerCase(),
-        handEnergy: typeWord ? { basic: true, types: [typeWord] } : basic ? { basic: true } : {},
+        handEnergy: typeWord ? { ...(basic ? { basic: true } : {}), types: [typeWord] } : basic ? { basic: true } : {},
         // "If you drew any cards in this way" (Gardenia's Vigor): the attach
         // only resolves when the leading draw actually drew (review finding 4).
         ...(leadingDraw ? { requiresDraw: true } : {}),
