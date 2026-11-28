@@ -15,7 +15,7 @@ import { isGxCard, isUltraBeastCard, isRuleBoxPokemon, isVCard, isVmaxCard } fro
 import { isAncientCard, isFutureCard } from '../rules/paradox-tags.mjs';
 import { becomeFossilPokemon } from '../rules/fossil.mjs';
 import { classifyEnergyEffect } from '../rules/energy-effects.mjs';
-import { normalizeStage } from '../rules/evolution.mjs';
+import { normalizeStage, requiresTurnEndOnEvolve } from '../rules/evolution.mjs';
 import {
   addCondition,
   clearConditions,
@@ -1089,6 +1089,9 @@ function searchDeckSequence(ctx) {
 // recovers from Special Conditions, and the Pokémon is marked as evolved this turn.
 function evolveInPlay(ctx, evolution, base) {
   const { player } = ctx;
+  // Gen 6 Mega Evolution / Primal Reversion ends the turn however the evolution arrives; the
+  // matching Spirit Link, read before the evolution joins the stack, exempts it.
+  const endsTurn = requiresTurnEndOnEvolve(evolution, { ...base, attachedCards: attachedCards(player, base.instanceId) });
   attachTo(player, evolution, base, ctx.events);
   const turnNumber = ctx.draft?.turn?.number;
   if (turnNumber != null) {
@@ -1100,6 +1103,7 @@ function evolveInPlay(ctx, evolution, base) {
   if (!player.flags.evolved) player.flags.evolved = {};
   player.flags.evolved[base.instanceId] = true;
   ctx.events.push({ type: 'pokemonEvolved', playerId: player.playerId, instanceId: evolution.instanceId, targetInstanceId: base.instanceId });
+  if (endsTurn) ctx.requestTurnEnd?.();
 }
 
 // Rare Candy: a Stage 2 from hand onto a Basic in play, skipping Stage 1.
@@ -1373,6 +1377,9 @@ function discardEnergyFromOpponent(ctx) {
   const matchesEnergy = (c) => kindMatches(c) && energyRemovable(ctx, opponent, c);
 
   if (step.scope === 'each Pokémon') return discardEnergyFromEach(ctx, matchesEnergy);
+  if (step.energy === 'Special Energy' && step.scope === '1 Pokémon' && (step.count || 1) === 1 && step.action !== 'returnToHand') {
+    return discardSpecialEnergyFromOnePokemon(ctx, matchesEnergy);
+  }
 
   // scope 'Active': only the opponent's Active Pokémon (Crawdaunt Unruly Claw).
   const active = step.scope === 'Active' ? targetableRoots(ctx, opponent).find((r) => r === activeOf(opponent)) : null;
@@ -1397,6 +1404,49 @@ function discardEnergyFromOpponent(ctx) {
     options: energies,
     min: 1,
     max: 1,
+  });
+}
+
+// Enhanced Hammer: the Pokémon is picked on the mat first, then the Special Energy only when it
+// holds different ones.
+function discardSpecialEnergyFromOnePokemon(ctx, matchesEnergy) {
+  const { opponent } = ctx;
+  const energyOn = (root) => attachedCards(opponent, root.instanceId).filter(matchesEnergy);
+  const hosts = targetableRoots(ctx, opponent).filter((root) => energyOn(root).length > 0);
+  const discardFrom = (host) => {
+    const energies = energyOn(host);
+    if (new Set(energies.map((c) => c.name)).size <= 1) {
+      discardCard(ctx.draft, energies[0], ctx.events);
+      return null;
+    }
+    return ctx.ask({
+      prompt: `${sourceName(ctx, 'Trainer')}: Choose a Special Energy attached to ${topPokemonCard(opponent, host)?.name || 'that Pokémon'} to discard`,
+      options: energies,
+      min: 1,
+      max: 1,
+      memo: { stage: 'energy', hostId: host.instanceId },
+    });
+  };
+
+  if (ctx.memo?.stage === 'energy') {
+    const host = hosts.find((root) => root.instanceId === ctx.memo.hostId);
+    const energy = host && energyOn(host).find((c) => c.instanceId === ctx.selection?.[0]);
+    if (!energy) return skip(ctx, 'target_not_found');
+    discardCard(ctx.draft, energy, ctx.events);
+    return null;
+  }
+  if (ctx.selection) {
+    const host = hosts.find((root) => root.instanceId === ctx.selection[0]);
+    return host ? discardFrom(host) : skip(ctx, 'target_not_found');
+  }
+  if (hosts.length === 0) return skip(ctx, 'no_opponent_energy');
+  if (hosts.length === 1) return discardFrom(hosts[0]);
+  return ctx.ask({
+    prompt: `${sourceName(ctx, 'Trainer')}: Choose 1 of your opponent's Pokémon`,
+    options: hosts,
+    min: 1,
+    max: 1,
+    memo: { stage: 'host' },
   });
 }
 

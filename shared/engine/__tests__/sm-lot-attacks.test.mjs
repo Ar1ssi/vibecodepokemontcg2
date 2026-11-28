@@ -520,6 +520,14 @@ test('Ariados Spider Trap (sm7-6): the switched-in Active is the one left Asleep
   assert.deepEqual(listConditions(res.players.p2.zones.bench.find((c) => c.name === 'Defender')), []);
 });
 
+test('Mega Delphox ex Trick Portal (customhb 434): the Pokémon switched in is Burned and Confused', () => {
+  const text = "Switch in 1 of your opponent's Benched Pokémon to the Active Spot. If you do, your opponent's new Active Pokémon is now Burned and Confused.";
+  const res = attack(board('Mega Delphox ex', text, { setup: benches }), (pc) => [pc.options[0].instanceId ?? pc.options[0].id]).state;
+  assert.equal(activeName(res, 'p2'), 'TheirBench');
+  assert.deepEqual(conditionsOf(res, 'p2').sort(), ['Burned', 'Confused']);
+  assert.deepEqual(listConditions(res.players.p2.zones.bench.find((c) => c.name === 'Defender')), []);
+});
+
 test('Plusle Draw for Everybody (sm7-53) draws one card per Benched Pokémon on both sides', () => {
   const text = 'Shuffle your hand into your deck. Then, draw a card for each Benched Pokémon (both yours and your opponent’s).';
   const res = attack(board('Plusle', text, { setup: (s) => benches(s) || s.players.p2.zones.bench.push(mon('Another')) })).state;

@@ -418,3 +418,37 @@ test('Welder as printed (up to 2 {R}, draw 3) also draws only after an attach', 
   const two = play(board({ p1: { hand: [fire(), fire()] } }), trainer('Welder', 'Supporter', printed));
   assert.equal(two.state.players.p1.zones.hand.length, 3, 'two attached, 3 drawn');
 });
+
+// ── Enhanced Hammer (Twilight Masquerade 224, out/pkmn-trainer-cards.json) ─────────────────
+// The Pokémon is picked on the mat (every option an in-play Pokémon); the Special Energy is
+// asked for only when that Pokémon holds different ones.
+
+const HAMMER = "Discard a Special Energy from 1 of your opponent's Pokémon.";
+
+test('Enhanced Hammer picks the opponent Pokémon first, then discards its Special Energy', () => {
+  const a = mon('Alpha', 'Fire');
+  const b = mon('Beta', 'Water');
+  const dte = special('Double Turbo Energy');
+  const gift = special('Gift Energy');
+  const state = board({ p2: { active: [a, ...attach(a, dte)], bench: [b, ...attach(b, gift)] } });
+  const res = play(state, trainer('Enhanced Hammer', 'Item', HAMMER), {
+    answer: (choice) => [choice.options.find((o) => o.name === 'Beta').instanceId],
+  });
+  assert.deepEqual(optionNames(res.prompts[0]).sort(), ['Alpha', 'Beta']);
+  assert.equal(res.prompts.length, 1, 'one Special Energy on Beta: no Energy prompt');
+  const p2 = res.state.players.p2.zones;
+  assert.ok(p2.discard.some((c) => c.name === 'Gift Energy'));
+  assert.ok(Object.values(p2).flat().some((c) => c.name === 'Double Turbo Energy'), 'Alpha keeps its Energy');
+});
+
+test('Enhanced Hammer asks which Special Energy only when the Pokémon holds different ones', () => {
+  const a = mon('Alpha', 'Fire');
+  const dte = special('Double Turbo Energy');
+  const gift = special('Gift Energy');
+  const state = board({ p2: { active: [a, ...attach(a, dte, gift)] } });
+  const res = play(state, trainer('Enhanced Hammer', 'Item', HAMMER), {
+    answer: (choice) => [choice.options.find((o) => o.name === 'Gift Energy' || o.name === 'Alpha').instanceId],
+  });
+  assert.deepEqual(optionNames(res.prompts[0]).sort(), ['Double Turbo Energy', 'Gift Energy']);
+  assert.ok(res.state.players.p2.zones.discard.some((c) => c.name === 'Gift Energy'));
+});

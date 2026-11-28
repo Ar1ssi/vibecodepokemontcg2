@@ -67,7 +67,7 @@ export function executeAbility(draft, {
 
     draft.pendingChoice = null;
     // The ability was spent when its first choice opened.
-    return { pendingChoice: null, completed: true, turnEnds: !!resumeToken?.context?.abilityEndsTurn };
+    return { pendingChoice: null, completed: true, turnEnds: Boolean(result.turnEnds) || !!resumeToken?.context?.abilityEndsTurn };
   }
 
   // Do not spend the once-per-turn ability before we know it has anything to do:
@@ -181,7 +181,7 @@ export function executeAbility(draft, {
   if (!skippedOnly) markUsed();
 
   draft.pendingChoice = null;
-  return { pendingChoice: null, completed: true, turnEnds: endsTurn && !skippedOnly };
+  return { pendingChoice: null, completed: true, turnEnds: Boolean(result.turnEnds) || (endsTurn && !skippedOnly) };
 }
 
 /**

@@ -248,7 +248,7 @@ export function executeStadium(draft, {
       pendingChoice: null,
       completed: true,
       // Lumiose City only ends the turn if the deck was actually searched.
-      turnEnds: turnEndsOnResolve && (selection?.length ?? 0) > 0,
+      turnEnds: Boolean(result.turnEnds) || (turnEndsOnResolve && (selection?.length ?? 0) > 0),
     };
   }
 
@@ -572,6 +572,7 @@ export function executeStadium(draft, {
   return {
     pendingChoice: null,
     completed: true,
-    turnEnds: turnEndsOnResolve && !SEARCH_KINDS.has(opt?.kind),
+    // An evolution the effect put into play can end the turn itself (Grand Tree onto a Mega).
+    turnEnds: Boolean(result.turnEnds) || (turnEndsOnResolve && !SEARCH_KINDS.has(opt?.kind)),
   };
 }

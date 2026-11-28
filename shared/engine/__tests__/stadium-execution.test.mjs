@@ -2310,3 +2310,33 @@ test('stadium: Perilous Jungle puts 1 counter only on non-{D} Pokémon with a Sp
   assert.equal(damageOf('p1', 'bench', 95), 0);
   assert.equal(damageOf('p2', 'bench', 96), 0);
 });
+
+// Gen 6 Mega Evolution ends the turn however it arrives, not only from the hand (rulebook 30c 1.4).
+const megaCard = (instanceId, name, evolvesFrom) =>
+  createCard({ instanceId, name, hp: 220, stage: 'MEGA', supertype: 'Pokémon', evolvesFrom });
+
+test('stadium: Grand Tree putting a Mega onto its Basic ends the turn', () => {
+  const mega = megaCard(81, 'M Charizard-EX', 'Charizard-EX');
+  const { state, rng } = grandTreeGame({ hosts: ['Charizard-EX'], deck: [mega] });
+  const res1 = activate(state, rng);
+  const res2 = resolveChoice(res1, [81], rng);
+  assert.equal(res2.error, null);
+  assert.equal(cardInPlay(res2.state, 81).attachedTo, 60, 'the Mega evolved the Basic');
+  assert.equal(res2.state.turn.player, 'p2', 'no Mega Signal or Spirit Link: the turn ends');
+});
+
+test('stadium: Grand Tree onto a Mega holding its Spirit Link keeps the turn going', () => {
+  const mega = megaCard(81, 'M Charizard-EX', 'Charizard-EX');
+  const { state, rng } = grandTreeGame({ hosts: ['Charizard-EX'], deck: [mega] });
+  state.players.p1.zones.active.push(
+    createCard({ instanceId: 82, name: 'Charizard Spirit Link', supertype: 'Trainer', attachedTo: 60 })
+  );
+  const res2 = resolveChoice(activate(state, rng), [81], rng);
+  assert.equal(res2.state.turn.player, 'p1');
+});
+
+test('stadium: Grand Tree onto an ordinary Stage 1 leaves the turn alone', () => {
+  const { state, rng } = grandTreeGame({ deck: [stage1Card(71, 'Charmeleon', 'Charmander')] });
+  const res2 = resolveChoice(activate(state, rng), [71], rng);
+  assert.equal(res2.state.turn.player, 'p1');
+});

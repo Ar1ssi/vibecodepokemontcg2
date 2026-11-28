@@ -298,7 +298,12 @@ export function resumeEnergyEvolution(draft, { selection, resumeToken, activeRng
   if (!player || !host) return;
   const deck = player.zones.deck || [];
   const picked = deck.find((c) => (selection || []).includes(c.instanceId) && isPokemon(c));
+  let endsTurn = false;
   if (picked) {
+    endsTurn = requiresTurnEndOnEvolve(picked, {
+      ...host,
+      attachedCards: [...(player.zones.active || []), ...(player.zones.bench || [])].filter((c) => c.attachedTo === host.instanceId),
+    });
     attachToRoot(player, picked, host, events);
     const turn = draft.turn?.number;
     picked.enteredPlayTurn = turn;
@@ -309,6 +314,10 @@ export function resumeEnergyEvolution(draft, { selection, resumeToken, activeRng
   }
   if (rng) shuffleInPlace(rng, deck);
   events.push({ type: 'deckShuffled', playerId: token.initiatorPlayerId });
+  // A Mega Evolution found this way ends the turn like any other (after the shuffle).
+  if (endsTurn && draft.turn?.player === token.initiatorPlayerId) {
+    endTurnAfterMegaEvolve(draft, { playerId: token.initiatorPlayerId, instanceId: picked.instanceId, activeRng: rng, events });
+  }
 }
 
 /** Resumes the α Growth offer: attach the chosen hand Energy cards to the host. */

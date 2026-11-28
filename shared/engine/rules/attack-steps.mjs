@@ -2434,7 +2434,7 @@ export function parseAttackSteps(text, { selfName = '', forAbility = false } = {
     const templates = chained && !handChain && !optionalChain && !switchChain ? [...CHAIN_TEMPLATES, ...TEMPLATES] : TEMPLATES;
     // Ariados Spider Trap (sm7-6): a status printed after a switch of the opponent's Active lands on
     // the new Active, so it runs as a step after the switch (attack-status.mjs leaves it alone).
-    const afterGust = previous?.type === 'atkGust' && /^your opponent's active pokémon is now (.+)$/.exec(rest);
+    const afterGust = previous?.type === 'atkGust' && /^your opponent's (?:new )?active pokémon is now (.+)$/.exec(rest);
     if (afterGust) {
       result.after.push(...conditionList(afterGust[1]).map((condition) => ({ type: 'atkApplyCondition', condition })));
       continue;

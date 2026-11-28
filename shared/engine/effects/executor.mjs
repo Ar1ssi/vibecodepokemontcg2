@@ -446,6 +446,14 @@ export function executeSteps(draft, {
   const oppId = Object.keys(draft.players || {}).find((id) => id !== playerId);
   const opponent = oppId ? draft.players[oppId] : null;
 
+  // "Your turn ends": the caller ends the turn once the whole effect has resolved. Kept on the
+  // context so it survives a choice resume (Mega Evolution through Grand Tree, then a Stage 2 pick).
+  const requestTurnEnd = () => {
+    if (context.turnEnds) return;
+    context.turnEnds = true;
+    events.push({ type: 'turnEndRequested', playerId, instanceId: sourceCard?.instanceId });
+  };
+
   let currentSelection = selection;
   // A `cost` step ("… you may discard X. If you do, …") that skipped stops the rest of the effect.
   let costEventsFrom = null;
@@ -619,6 +627,8 @@ export function executeSteps(draft, {
         memo: context[memoKey],
         // Joltik Jolting Charge: how many cards this effect attached (across resumes).
         attachedThisEffect: (context.attachedIds || []).length,
+        // An effect that ends the turn once it resolves (Mega Evolution put onto a Pokémon).
+        requestTurnEnd,
         // Runs `more` right after this step (a Supporter's effect used as an attack's, design
         // 036 E). The widened list rides on later resume tokens.
         insertSteps: (more) => {
@@ -1951,14 +1961,7 @@ export function executeSteps(draft, {
       case 'turnEnds': {
         // "If tails, your turn ends immediately" (Tickling Machine, Minion of Team
         // Rocket): the caller ends the turn once the whole effect has resolved.
-        if (!context.turnEnds) {
-          context.turnEnds = true;
-          events.push({
-            type: 'turnEndRequested',
-            playerId,
-            instanceId: sourceCard?.instanceId,
-          });
-        }
+        requestTurnEnd();
         break;
       }
 
@@ -2635,5 +2638,9 @@ export function executeSteps(draft, {
     }
   }
 
-  return { pendingChoice: null, completed: true };
+  // A request made before a resume left its event in an earlier command: say it again here.
+  if (context.turnEnds && !events.some((e) => e.type === 'turnEndRequested' && e.playerId === playerId)) {
+    events.push({ type: 'turnEndRequested', playerId, instanceId: sourceCard?.instanceId });
+  }
+  return { pendingChoice: null, completed: true, turnEnds: Boolean(context.turnEnds) };
 }
