@@ -1156,7 +1156,7 @@ const TEMPLATES = [
   // Dusknoir Reaper Pulse: "Move UP TO 2 damage counters …" — the player chooses how many, not a
   // fixed amount (`upTo: true` lets the executor ask instead of always moving the max).
   [
-    /^move (up to )?(all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|any) of your pokémon) to (your opponent's active pokémon|(?:1|any) of your opponent's (?:benched )?pokémon)$/,
+    /^move (up to )?(all|\d+|an?) damage counters? from (this pokémon|each of your pokémon|1 of your benched pokémon|(?:1|one|any) of your pokémon) (?:to|onto) (your opponent's active pokémon|(?:1|any) of your opponent's (?:benched )?pokémon)$/,
     (m) => ({
       type: 'atkMoveCounterToOpponent',
       count: m[2] === 'all' ? 'all' : countOf(m[2]),

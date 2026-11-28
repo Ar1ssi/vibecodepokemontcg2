@@ -21,6 +21,10 @@ test('parser: design 036 D wordings', () => {
   assert.deepEqual(stepsOf("Move 1 damage counter from 1 of your Pokémon to 1 of your opponent's Pokémon."), [
     { type: 'atkMoveCounterToOpponent', count: 1, from: 'one', to: 'any' },
   ]);
+  // Transfusion: "one of … onto" wording, from the user's scan.
+  assert.deepEqual(stepsOf("Move 3 damage counters from one of your Pokémon onto your opponent's Active Pokémon."), [
+    { type: 'atkMoveCounterToOpponent', count: 3, from: 'one', to: 'active' },
+  ]);
   assert.deepEqual(stepsOf("Move an Energy from 1 of your opponent's Pokémon to another of their Pokémon."), [
     { type: 'atkMoveEnergy', from: 'opponentAny', to: 'opponentAny', count: 1 },
   ]);
